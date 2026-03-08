@@ -1,0 +1,1643 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aircraft Tech Log System</title>
+<style>
+:root{
+  --bg:#0b1a2e;--panel:#0f2035;--border:#1a3050;--sb:#07111e;
+  --blue:#1a6fff;--acc:#4a9eff;--grn:#20c070;--amb:#f0a020;--red:#e05050;
+  --txt:#c8dff0;--mut:#567898;--dim:#243850;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--txt);min-height:100vh;}
+input,button,select,textarea{font-family:inherit;}
+.screen{display:none;}
+.screen.active{display:flex;}
+
+/* ── PASSWORD ──────────────────────────────────── */
+#s-password{min-height:100vh;align-items:center;justify-content:center;background:linear-gradient(135deg,#07111e,#0f2540);}
+.pbox{background:#0d1e35;border:1px solid var(--border);border-radius:20px;padding:50px 46px;width:420px;box-shadow:0 30px 80px rgba(0,0,0,.6);text-align:center;}
+.pbox-logo{font-size:11px;letter-spacing:5px;color:var(--acc);font-weight:800;margin-bottom:16px;}
+.pbox-title{font-size:26px;color:#fff;font-weight:900;margin-bottom:6px;}
+.pbox-sub{font-size:13px;color:var(--mut);margin-bottom:32px;}
+.pbox input{width:100%;background:#07111e;border:1px solid var(--border);border-radius:9px;padding:14px 15px;color:#fff;font-size:16px;outline:none;margin-bottom:12px;text-align:center;letter-spacing:3px;}
+.pbox input:focus{border-color:var(--acc);}
+.pbox input::placeholder{letter-spacing:1px;font-size:13px;}
+.pbox-btn{width:100%;background:var(--blue);border:none;border-radius:9px;padding:14px;color:#fff;font-weight:800;font-size:14px;cursor:pointer;letter-spacing:1px;}
+.pbox-btn:hover{background:#2a7fff;}
+.pbox-err{color:var(--red);font-size:12px;margin-top:8px;min-height:16px;}
+
+/* ── LOGIN ─────────────────────────────────────── */
+#s-login{min-height:100vh;align-items:center;justify-content:center;background:linear-gradient(135deg,#07111e,#0f2540);}
+.lbox{background:#0d1e35;border:1px solid var(--border);border-radius:20px;padding:50px 46px;width:500px;box-shadow:0 30px 80px rgba(0,0,0,.6);}
+.ley{font-size:10px;letter-spacing:5px;color:var(--acc);font-weight:800;margin-bottom:8px;}
+.ltitle{font-size:28px;color:#fff;font-weight:900;line-height:1.15;margin-bottom:6px;}
+.lsub{font-size:13px;color:var(--mut);margin-bottom:32px;}
+.flbl{font-size:10px;color:var(--mut);letter-spacing:2px;margin-bottom:7px;}
+.lbox input{width:100%;background:#07111e;border:1px solid var(--border);border-radius:9px;padding:12px 15px;color:#fff;font-size:13px;outline:none;margin-bottom:11px;}
+.lbox input:focus{border-color:var(--acc);}
+.btnp{width:100%;background:var(--blue);border:none;border-radius:9px;padding:13px;color:#fff;font-weight:800;font-size:14px;cursor:pointer;margin-bottom:9px;}
+.btnp:hover{background:#2a7fff;}
+.btnp:disabled{background:#1a3050;cursor:default;opacity:.6;}
+.btng{width:100%;background:transparent;border:1px solid var(--border);border-radius:9px;padding:11px;color:var(--mut);font-size:13px;cursor:pointer;}
+.btng:hover{border-color:var(--acc);color:var(--acc);}
+.lerr{margin-top:14px;background:#2a1020;border:1px solid #6b2020;border-radius:8px;padding:10px 13px;font-size:12px;color:#ff7070;display:none;}
+.lhint{margin-top:20px;font-size:11px;color:var(--dim);line-height:1.9;}
+.lhint b{color:#3a6080;}
+.saved-key-banner{background:#0d2e1a;border:1px solid #1a6040;border-radius:9px;padding:11px 14px;margin-bottom:14px;font-size:12px;color:var(--grn);display:none;align-items:center;gap:10px;}
+.saved-key-banner button{background:none;border:none;color:var(--mut);font-size:11px;cursor:pointer;margin-left:auto;text-decoration:underline;}
+
+/* ── APP SHELL ─────────────────────────────────── */
+#s-app{flex-direction:row;min-height:100vh;}
+.sb{width:238px;background:var(--sb);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;position:fixed;height:100vh;overflow-y:auto;}
+.sb-brand{padding:20px 18px 16px;border-bottom:1px solid var(--border);}
+.sb-eye{font-size:9px;letter-spacing:4px;color:var(--acc);font-weight:800;}
+.sb-name{font-size:17px;font-weight:900;color:#fff;margin-top:2px;}
+.sb-stat{font-size:10px;margin-top:4px;}
+.sb-sec{padding:13px 0 3px 18px;font-size:9px;color:var(--dim);letter-spacing:3px;}
+.nb{display:block;width:100%;text-align:left;background:transparent;border:none;border-left:3px solid transparent;color:var(--mut);padding:9px 17px;cursor:pointer;font-size:12px;font-weight:400;transition:all .15s;}
+.nb:hover{background:#0f2035;color:var(--txt);}
+.nb.act{background:#112240;border-left-color:var(--acc);color:var(--acc);font-weight:700;}
+.acb{display:block;width:100%;text-align:left;background:transparent;border:none;border-left:3px solid transparent;color:var(--mut);padding:7px 17px;cursor:pointer;font-size:12px;}
+.acb:hover{background:#0f2035;color:var(--txt);}
+.acb.act{background:#0f2035;border-left-color:var(--acc);color:#fff;}
+.acb small{display:block;font-size:10px;opacity:.5;margin-top:1px;}
+.sb-foot{margin-top:auto;}
+.sb-foot button{background:none;border:none;color:var(--dim);font-size:11px;padding:10px 17px;cursor:pointer;display:block;width:100%;text-align:left;}
+.sb-foot button:hover{color:var(--mut);}
+
+.main{flex:1;margin-left:238px;display:flex;flex-direction:column;min-height:100vh;}
+.topbar{background:var(--bg);border-bottom:1px solid var(--border);padding:13px 26px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:10;}
+.tbar-title{flex:1;font-size:17px;font-weight:800;color:#fff;}
+.btn-print{background:var(--blue);border:none;border-radius:8px;padding:9px 18px;color:#fff;font-weight:700;font-size:12px;cursor:pointer;}
+.btn-print:hover{background:#2a7fff;}
+.content{padding:22px;}
+
+/* ── COMPONENTS ────────────────────────────────── */
+.card{background:var(--panel);border:1px solid var(--border);border-radius:11px;padding:18px 20px;}
+.sgrid3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:18px;}
+.sc{background:var(--panel);border:1px solid var(--border);border-radius:11px;padding:18px 20px;text-align:center;}
+.sv{font-size:30px;font-weight:900;}
+.sl{font-size:10px;color:var(--mut);margin-top:5px;letter-spacing:1px;}
+.acgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;}
+.acc-card{background:var(--panel);border:1px solid var(--border);border-radius:11px;padding:18px 20px;cursor:pointer;transition:border-color .2s;}
+.acc-card:hover{border-color:var(--acc);}
+.mrow{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px;}
+.mc{background:var(--panel);border:1px solid var(--border);border-radius:11px;padding:16px 20px;}
+.ml{font-size:10px;color:var(--mut);margin-bottom:5px;letter-spacing:1px;}
+.mv{font-size:22px;font-weight:900;color:#fff;}
+.mv.bl{color:var(--acc);}
+
+.tbl{background:var(--panel);border:1px solid var(--border);border-radius:11px;overflow:auto;}
+table{width:100%;border-collapse:collapse;font-size:12px;}
+thead th{background:#07111e;color:var(--mut);padding:9px 11px;text-align:left;font-size:10px;letter-spacing:.8px;border-bottom:2px solid var(--border);white-space:nowrap;}
+tbody tr{border-bottom:1px solid var(--border);}
+tbody tr:nth-child(odd){background:#0f2035;}
+tbody tr:nth-child(even){background:#0a1828;}
+tbody tr.ck{cursor:pointer;}
+tbody tr.ck:hover{background:#112240;}
+tbody td{padding:9px 11px;}
+tfoot td{padding:11px;background:#112240;font-weight:700;}
+.tw{color:#fff;font-weight:700;}.tb{color:var(--acc);font-weight:700;}.tg{color:var(--grn);font-weight:700;}.tm{color:var(--mut);}.td{color:var(--dim);}
+
+/* ── SETTINGS ──────────────────────────────────── */
+.sg{display:grid;grid-template-columns:1fr 1fr;gap:13px;margin-bottom:16px;}
+.sf label{display:block;font-size:10px;color:var(--mut);letter-spacing:1px;margin-bottom:6px;}
+.sf input{width:100%;background:#07111e;border:1px solid var(--border);border-radius:7px;padding:9px 12px;color:#fff;font-size:13px;outline:none;}
+.sf input:focus{border-color:var(--acc);}
+.ssave{background:var(--blue);border:none;border-radius:8px;padding:9px 20px;color:#fff;font-weight:700;font-size:13px;cursor:pointer;}
+.ssave:hover{background:#2a7fff;}
+.sflash{color:var(--grn);font-size:12px;margin-left:12px;opacity:0;transition:opacity .3s;}
+.key-row{display:flex;align-items:center;gap:10px;background:#07111e;border:1px solid var(--border);border-radius:9px;padding:10px 14px;margin-bottom:18px;}
+.key-row span{flex:1;font-size:12px;color:var(--mut);}
+.key-row code{font-size:12px;color:var(--acc);letter-spacing:1px;}
+.key-row button{background:none;border:1px solid var(--border);border-radius:6px;color:var(--mut);font-size:11px;padding:4px 10px;cursor:pointer;}
+.key-row button:hover{border-color:var(--red);color:var(--red);}
+
+/* ── TECH LOG PREVIEW ──────────────────────────── */
+.preview-wrap{background:#1a1a1a;border:1px solid var(--border);border-radius:11px;overflow:auto;padding:20px;}
+.preview-page{
+  background:#fff;color:#111;font-family:Arial,sans-serif;font-size:9.5px;
+  width:277mm;min-height:190mm;margin:0 auto;padding:8mm 10mm;
+  display:flex;flex-direction:column;gap:6px;
+  box-shadow:0 4px 30px rgba(0,0,0,.5);
+}
+/* old header CSS removed */
+/* ── new header layout ── */
+.pg-hdr-wrap{border:2px solid #000;margin-bottom:4px;}
+.hdr-top{display:flex;align-items:center;gap:0;border-bottom:1px solid #000;padding:4px 6px;}
+.hdr-reg{font-size:28px;font-weight:900;color:#000;letter-spacing:2px;min-width:90px;}
+.hdr-divider{width:1px;background:#000;height:32px;margin:0 10px;}
+.hdr-big-block{text-align:center;min-width:60px;}
+.hdr-big-label{font-size:6.5px;font-weight:700;color:#444;letter-spacing:1px;text-transform:uppercase;}
+.hdr-big-val{font-size:22px;font-weight:900;color:#000;line-height:1;}
+.hdr-big-val[contenteditable]{background:#fff;outline:none;min-width:50px;display:inline-block;}
+.hdr-warn{font-weight:900;background:#ff0;padding:1px 3px;border-radius:2px;}
+.hdr-spacer{flex:1;}
+.hdr-title-block{text-align:right;}
+.hdr-title{font-size:13px;font-weight:900;color:#000;letter-spacing:1px;}
+.hdr-org{font-size:9px;color:#555;}
+.hdr-detail{display:flex;flex-wrap:nowrap;border-top:1px solid #000;}
+.hdr-dbox{flex:1;border-right:1px solid #000;padding:3px 5px;min-width:0;}
+.hdr-dbox:last-child{border-right:none;}
+.hdr-dk{font-size:7px;font-weight:700;color:#333;text-transform:uppercase;letter-spacing:.3px;white-space:nowrap;overflow:hidden;}
+.hdr-dv{font-size:10px;font-weight:600;color:#000;min-height:13px;}
+.hdr-dv[contenteditable]{background:#fff;outline:none;}
+/* ── flight table: black & white ── */
+.pt{width:100%;border-collapse:collapse;flex:1;font-size:8px;table-layout:fixed;}
+.pt th{background:#fff;color:#000;padding:3px 4px;text-align:center;border:1px solid #000;font-size:7px;line-height:1.25;vertical-align:middle;font-weight:700;}
+.pt td{border:1px solid #000;padding:2px 3px;text-align:center;vertical-align:middle;height:19mm;}
+.pt tr:nth-child(even) td{background:#fff;}
+/* column widths */
+.th-date{width:14mm;}.th-name{width:20mm;}.th-ap{width:9mm;}
+.th-fuel{width:13mm;}.th-sig{width:14mm;}.th-auth{width:14mm;}
+.th-grp{}.th-t{width:11mm;}
+/* data cell classes */
+.pt td.dc{width:14mm;font-size:7.5px;}
+.pt td.nc{width:20mm;}
+.pt td.ac{width:9mm;font-weight:700;font-size:8px;}
+.pt td.fc{width:13mm;}
+.pt td.sc{width:14mm;}
+.pt td.authc{width:14mm;}
+.pt td.tc{width:11mm;}
+/* stacked cells */
+.pt td.stacked{width:11mm;padding:0;}
+.top-val,.bot-val{display:block;padding:2px 3px;font-size:7.5px;}
+.top-val{border-bottom:1px solid #000;}
+.pt td.ftc{width:12mm;padding:0;}
+.th-frt{width:12mm;}
+.pt td.ftc span{display:block;padding:2px 3px;font-size:8px;font-weight:700;color:#000;line-height:1.3;}
+.pt td.ftc span:first-child{border-bottom:1px solid #000;}
+.pt td.stn{width:9mm;padding:0;}
+.th-tn{width:9mm;}
+.hdr-org-big{font-size:16px;font-weight:900;color:#000;letter-spacing:1px;text-align:right;}
+.hdr-title-small{font-size:9px;color:#444;text-align:right;margin-top:1px;}
+.pfoot{display:flex;justify-content:space-between;font-size:7px;color:#888;border-top:1px solid #ccc;padding-top:3px;margin-top:auto;}
+.ph-sub{font-size:9px;color:#555;margin-top:2px;}
+.page-nav{display:flex;align-items:center;gap:10px;margin-bottom:14px;}
+.page-nav button{background:#07111e;border:1px solid var(--border);border-radius:7px;color:var(--mut);font-size:12px;padding:6px 14px;cursor:pointer;}
+.page-nav button:hover{border-color:var(--acc);color:var(--acc);}
+.page-nav button.act{background:#112240;border-color:var(--acc);color:var(--acc);}
+.page-info{font-size:12px;color:var(--mut);}
+
+.spin{font-size:28px;display:inline-block;animation:sp 1.1s linear infinite;}
+@keyframes sp{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+.empty{text-align:center;color:var(--dim);padding:60px;font-size:14px;}
+</style>
+</head>
+<body>
+
+<!-- ══════════ PASSWORD ═════════════════════════ -->
+<div id="s-password" class="screen active">
+  <div class="pbox">
+    <div class="pbox-logo">LS AIRMOTIVE</div>
+    <div class="pbox-title">✈ Flight Ops</div>
+    <p class="pbox-sub">Aircraft Technical Log System<br>Enter the access code to continue</p>
+    <form onsubmit="checkPassword(event)" autocomplete="on">
+      <input id="pw-input" type="password" name="password" autocomplete="current-password"
+        placeholder="Enter access code" autofocus>
+      <button type="submit" class="pbox-btn">ENTER →</button>
+    </form>
+    <div class="pbox-err" id="pw-err"></div>
+  </div>
+</div>
+
+<!-- ══════════ LOGIN ══════════════════════════════ -->
+<div id="s-login" class="screen">
+  <div class="lbox">
+    <div class="ley">FLIGHT OPERATIONS</div>
+    <h1 class="ltitle">Aircraft Tech Log<br>System</h1>
+    <p class="lsub">Powered by Airbly · Save &amp; open locally in any browser</p>
+
+    <div id="saved-banner" class="saved-key-banner">
+      <span>✓ API key saved — connecting automatically…</span>
+      <button onclick="clearSavedKey()">Use different key</button>
+    </div>
+
+    <div id="key-entry">
+      <div class="flbl">AIRBLY GROUP API KEY</div>
+      <input id="api-input" type="text" placeholder="30-character key from Airbly Group Settings">
+      <button class="btnp" id="conn-btn" onclick="doConnect()">CONNECT TO AIRBLY →</button>
+      <button class="btng" onclick="loadDemo()">Try with demo data</button>
+    </div>
+
+    <div id="lerr" class="lerr"></div>
+    <div class="lhint">
+      <b>Find your key:</b> Airbly web app → Group Settings → Integrations &amp; API → Read-only key<br>
+      <b>Tip:</b> Download &amp; open this file on your computer — your key is saved so you only enter it once.
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ APP ═════════════════════════════════ -->
+<div id="s-app" class="screen">
+  <div class="sb">
+    <div class="sb-brand">
+      <div class="sb-eye">FLIGHT OPS</div>
+      <div class="sb-name">Tech Log</div>
+      <div class="sb-stat" id="sb-stat"></div>
+    </div>
+    <div class="sb-sec">VIEWS</div>
+    <button class="nb act" id="nb-dashboard" onclick="sv('dashboard')">📊&nbsp; Fleet Dashboard</button>
+    <button class="nb"     id="nb-preview"   onclick="sv('preview')">📋&nbsp; Tech Log Preview</button>
+    <button class="nb"     id="nb-hours"     onclick="sv('hours')">⏱&nbsp; Hours Tracker</button>
+    <button class="nb"     id="nb-settings"  onclick="sv('settings')">⚙️&nbsp; Aircraft Settings</button>
+    <div class="sb-sec" style="margin-top:6px">AIRCRAFT</div>
+    <div id="ac-list"></div>
+    <div class="sb-foot">
+      <button onclick="goLogin()">← Manage API Key</button>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="topbar">
+      <div class="tbar-title" id="view-title">Fleet Dashboard</div>
+      <div style="display:flex;align-items:center;gap:12px">
+        <div id="sync-status" style="font-size:11px;color:var(--mut)"></div>
+        <div id="print-btns" style="display:none;gap:8px;align-items:center"><button class="btn-print" onclick="doPrint(false)">🖨 Print THIS Tech Log</button><button class="btn-print" style="background:#1a4a20;border:1px solid var(--grn)" onclick="doPrint(true)">🖨 Print ALL Tech Logs</button></div>
+      </div>
+    </div>
+    <div class="content" id="mc">
+      <div style="text-align:center;padding:70px;color:var(--mut)"><div class="spin">✈</div><br><br>Loading fleet data…</div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ══ JSONBIN SYNC ══════════════════════════════════
+const JB={
+  BIN: '69ac06bf43b1c97be9bd5667',
+  KEY: '$2a$10$wjZldGseV25iurze/grlbOQ1ZxUVCugh.kmmRH3LOo3zEiUF4RKPS',
+  URL: 'https://api.jsonbin.io/v3/b/',
+  _pushing: false,
+  _timer: null,
+};
+
+// Set sync status indicator in topbar
+function syncStatus(state, msg){
+  const el=document.getElementById('sync-status');
+  if(!el) return;
+  const map={
+    syncing:  {icon:'🔄', color:'var(--mut)',  text: msg||'Syncing…'},
+    ok:       {icon:'☁✓', color:'var(--grn)',  text: msg||'Synced'},
+    offline:  {icon:'⚠',  color:'var(--amb)',  text: msg||'Offline — saved locally'},
+    error:    {icon:'✕',  color:'var(--red)',  text: msg||'Sync error'},
+  };
+  const s=map[state]||map.ok;
+  el.innerHTML=`<span style="color:${s.color};font-size:11px">${s.icon} ${s.text}</span>`;
+}
+
+// Pull latest from JSONBin and merge into local state
+async function syncPull(){
+  try{
+    const r=await fetch(JB.URL+JB.BIN+'/latest',{
+      headers:{'X-Master-Key':JB.KEY,'X-Bin-Meta':'false'},
+    });
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const remote=await r.json();
+    // Merge: remote is authoritative for cfg and manualAircraft
+    if(remote.cfg && typeof remote.cfg==='object'){
+      // Deep merge: remote wins on conflict (last-write-wins)
+      Object.keys(remote.cfg).forEach(k=>{
+        ST.cfg[k]=Object.assign({},ST.cfg[k]||{},remote.cfg[k]);
+      });
+      localStorage.setItem('tl_cfg',JSON.stringify(ST.cfg));
+    }
+    if(Array.isArray(remote.manual)){
+      ST.manualAircraft=remote.manual;
+      localStorage.setItem('tl_manual',JSON.stringify(ST.manualAircraft));
+    }
+    if(remote.dailyLog && typeof remote.dailyLog==='object'){
+      // Merge daily logs — combine entries from both sides, deduplicate by date+tacho+sorties
+      Object.keys(remote.dailyLog).forEach(id=>{
+        const local=ST.dailyLog[id]||[];
+        const rem=remote.dailyLog[id]||[];
+        // Use remote as base, keep any local entries not in remote
+        const remKeys=new Set(rem.map(e=>e.date+'|'+e.tacho+'|'+e.sorties));
+        const localOnly=local.filter(e=>!remKeys.has(e.date+'|'+e.tacho+'|'+e.sorties));
+        ST.dailyLog[id]=[...rem,...localOnly];
+      });
+      // Also keep any local aircraft ids not in remote
+      Object.keys(ST.dailyLog).forEach(id=>{
+        if(!remote.dailyLog[id]) {} // keep local
+      });
+      localStorage.setItem('tl_dailylog',JSON.stringify(ST.dailyLog));
+    }
+    syncStatus('ok');
+    return true;
+  } catch(e){
+    console.warn('syncPull failed:',e.message);
+    syncStatus('offline');
+    return false;
+  }
+}
+
+// Push current state to JSONBin (debounced — waits 800ms after last call)
+function syncPush(){
+  clearTimeout(JB._timer);
+  JB._timer=setTimeout(async ()=>{
+    if(JB._pushing) return;
+    JB._pushing=true;
+    syncStatus('syncing');
+    try{
+      const payload={
+        cfg: ST.cfg,
+        manual: ST.manualAircraft,
+        dailyLog: ST.dailyLog||{},
+        sheets: Object.fromEntries(
+          Object.keys(ST.cfg).map(id=>[id, ST.cfg[id]?.sheet_start||'1'])
+        ),
+        _updated: new Date().toISOString(),
+      };
+      const r=await fetch(JB.URL+JB.BIN,{
+        method:'PUT',
+        headers:{
+          'Content-Type':'application/json',
+          'X-Master-Key':JB.KEY,
+        },
+        body: JSON.stringify(payload),
+      });
+      if(r.status===429){
+        // Rate limited — retry after 5 seconds
+        setTimeout(()=>syncPush(), 5000);
+        syncStatus('offline','Rate limited — will retry…');
+        return;
+      }
+      if(!r.ok) throw new Error('HTTP '+r.status);
+      syncStatus('ok','Synced '+ new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}));
+    } catch(e){
+      console.warn('syncPush failed:',e.message);
+      syncStatus('offline','Saved locally (offline)');
+    } finally{
+      JB._pushing=false;
+    }
+  }, 800);
+}
+
+// ══ STATE ════════════════════════════════════════
+const ST={
+  aircraft:[], flights:{}, selected:null,
+  view:'dashboard', isDemo:false, previewPage:0,
+  cfg: JSON.parse(localStorage.getItem('tl_cfg')||'{}'),
+  manualAircraft: JSON.parse(localStorage.getItem('tl_manual')||'[]'),
+  dailyLog: JSON.parse(localStorage.getItem('tl_dailylog')||'{}'),  // keyed by aircraft id
+};
+
+// Save locally AND push to cloud
+function saveCfg(){
+  localStorage.setItem('tl_cfg',JSON.stringify(ST.cfg));
+  syncPush();
+}
+function saveManual(){
+  localStorage.setItem('tl_manual',JSON.stringify(ST.manualAircraft));
+  syncPush();
+}
+function saveDailyLog(){
+  localStorage.setItem('tl_dailylog',JSON.stringify(ST.dailyLog));
+  syncPush();
+}
+
+// Returns all aircraft (Airbly + manual) for display purposes
+function allAircraft(){ return [...ST.aircraft, ...ST.manualAircraft.map(manToAc)]; }
+
+// Convert a manual aircraft record to the same shape as an Airbly aircraft object
+function manToAc(m){
+  // Always use cfg as source of truth for hours/lastflight (editable in preview)
+  const c=ST.cfg[m.id]||{};
+  const hours=parseFloat(c.man_hours||m.hours||'0');
+  const lf=c.man_last_flight||m.last_flight||'';
+  return {
+    id: m.id, reg: (c.reg||m.reg||'').toUpperCase(), type: c.type||m.type||'',
+    totalHobbs: hours,
+    totalLandings: parseInt(c.man_landings||m.landings||'0',10),
+    totalCycles: parseInt(c.man_landings||m.landings||'0',10),
+    opStatus: '', attStatus: '', maintStatus: '',
+    lastFlight: lf ? (new Date(lf).getTime()/1000) : null,
+    isManual: true
+  };
+}
+function cfgGet(id,k,def=''){ return ST.cfg[id]?.[k]??def; }
+function cfgSet(id,k,v){ if(!ST.cfg[id]) ST.cfg[id]={}; ST.cfg[id][k]=v; saveCfg(); }
+
+// ══ HELPERS ══════════════════════════════════════
+const $ = id => document.getElementById(id);
+const esc = v => String(v||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const fmtDate = ms => ms?new Date(ms).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric',timeZone:'UTC'}):'—';
+const fmtTime = ms => ms?new Date(ms).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'UTC'}):'—';
+const toHrs  = s  => s?(s/3600).toFixed(1):'0.0';
+const toHHMM = s  => `${Math.floor((s||0)/3600)}:${String(Math.floor(((s||0)%3600)/60)).padStart(2,'0')}`;
+
+// ══ PASSWORD GATE ════════════════════════════════
+const PW_HASH = 'limasierra'; // simple match — not cryptographic, just a deterrent
+function initPassword(){
+  // If already authenticated this session (or saved in localStorage), skip straight through
+  if(localStorage.getItem('tl_auth')==='1'){
+    $('s-password').classList.remove('active');
+    initLogin();
+  }
+}
+function checkPassword(e){
+  e.preventDefault();
+  const val=($('pw-input')?.value||'').trim().toLowerCase();
+  const err=$('pw-err');
+  if(val===PW_HASH){
+    localStorage.setItem('tl_auth','1');
+    $('s-password').classList.remove('active');
+    $('s-login').classList.add('active');
+    initLogin();
+  } else {
+    if(err) err.textContent='Incorrect access code. Try again.';
+    $('pw-input').value='';
+    $('pw-input').focus();
+    // Brief shake animation
+    const box=document.querySelector('.pbox');
+    if(box){ box.style.transition='transform .08s'; box.style.transform='translateX(8px)';
+      setTimeout(()=>{box.style.transform='translateX(-8px)';
+        setTimeout(()=>{box.style.transform='';},80);},80); }
+  }
+}
+
+// ══ KEY MANAGEMENT ════════════════════════════════
+function initLogin(){
+  // Hardcoded key — pre-saved so user never has to re-enter
+  const HARDCODED_KEY = 'AamCntOnk72udRQvYYiX4oUlcpHcgg';
+  if(!localStorage.getItem('tl_key')) localStorage.setItem('tl_key', HARDCODED_KEY);
+  const saved = localStorage.getItem('tl_key');
+  if(saved){
+    $('saved-banner').style.display='flex';
+    $('key-entry').style.display='none';
+    setTimeout(()=>doConnect(saved), 300);
+  }
+}
+function clearSavedKey(){
+  localStorage.removeItem('tl_key');
+  $('saved-banner').style.display='none';
+  $('key-entry').style.display='block';
+}
+function goLogin(){
+  $('s-app').classList.remove('active');
+  $('s-login').classList.add('active');
+  // Show current key status
+  const saved=localStorage.getItem('tl_key');
+  if(saved){
+    $('saved-banner').style.display='flex';
+    $('saved-banner').querySelector('span').textContent='✓ API key is saved. Connect again or use a different key.';
+    $('saved-banner').querySelector('button').textContent='Clear saved key';
+    $('key-entry').style.display='none';
+  }
+}
+
+// ══ CONNECT ══════════════════════════════════════
+async function doConnect(keyOverride){
+  const key = keyOverride || $('api-input').value.trim();
+  if(!key) return;
+  const btn=$('conn-btn'), err=$('lerr');
+  if(btn){ btn.textContent='⏳  Connecting…'; btn.disabled=true; }
+  if(err) err.style.display='none';
+  try{
+    // log_types=flight fetches actual flight records per asset
+    // log_limit_per_asset=500 ensures we get full history not just 10
+    const url=`https://airbly.com/api/v3/assetList?groupKey=${encodeURIComponent(key)}&log_types=flight&log_limit_per_asset=500`;
+    const r=await fetch(url);
+    if(!r.ok) throw new Error(`Airbly returned HTTP ${r.status}. Check your key.`);
+    const raw=await r.json();
+    if(raw.auth_group_success===false) throw new Error('API key rejected by Airbly. Please check it and try again.');
+    const {aircraft,flights}=parseAirbly(raw);
+    if(!aircraft.length) throw new Error('No aircraft found in this Airbly group.');
+    // Save key permanently — never asked again
+    if(!keyOverride) localStorage.setItem('tl_key', key);
+    Object.assign(ST,{aircraft,flights,selected:aircraft[0],isDemo:false});
+    showApp();
+  } catch(e){
+    if(err){ err.textContent='⚠ '+e.message; err.style.display='block'; }
+    if(keyOverride){
+      $('saved-banner').style.display='none';
+      $('key-entry').style.display='block';
+      $('lerr').textContent='⚠ Auto-connect failed: '+e.message;
+      $('lerr').style.display='block';
+    }
+  } finally{
+    if(btn){ btn.textContent='CONNECT TO AIRBLY →'; btn.disabled=false; }
+  }
+}
+$('api-input').addEventListener('keydown',e=>{ if(e.key==='Enter') doConnect(); });
+
+// ══ PARSE AIRBLY RESPONSE ════════════════════════
+// Real field names confirmed from live API response:
+//   asset id    → a.uuid
+//   registration→ a.ident
+//   make/model  → a.make + a.model  (separate fields)
+//   description → a.description     (e.g. "Cherokee")
+//   air hours   → a.usage.air_seconds
+//   landings    → a.usage.landings
+//   cycles      → a.usage.cycles
+//   flight logs → a.logs[]  (when log_types=flight is in request)
+//     log id    → l.uuid
+//     takeoff   → l.takeoff_timestamp  (ms)
+//     landing   → l.landing_timestamp  (ms)
+//     dep icao  → l.takeoff_airport_icao
+//     arr icao  → l.landing_airport_icao
+//     air time  → l.air_seconds  (NOT air_time_seconds)
+//     hobbs     → l.hobbs_start / l.hobbs_end
+//     cycles    → l.cycles
+//     fuel      → l.fuel_added
+function parseAirbly(raw){
+  const list=raw?.assetList?.assets||[];
+  const aircraft=[], flights={};
+  for(const a of list){
+    const id = a.uuid;
+    // Registration: use saved override if set, else real ident field
+    const airblyReg  = (a.ident||'Unknown').toUpperCase();
+    // Type: "Make Model — Description" e.g. "Piper PA-28-140 — Cherokee"
+    const airblyType = [a.make, a.model, a.description].filter(Boolean).join(' ');
+    const reg  = ST.cfg[id]?.reg  ? ST.cfg[id].reg.toUpperCase() : airblyReg;
+    const type = ST.cfg[id]?.type ? ST.cfg[id].type               : airblyType;
+    // Total air hours from usage block
+    const totalHobbs = a.usage?.air_seconds ? a.usage.air_seconds/3600 : 0;
+    // Total landings from usage block (shown in hours tracker)
+    const totalLandings  = a.usage?.landings      || 0;
+    const totalCycles    = a.usage?.cycles        || 0;
+    const totalTachHrs   = a.usage?.tach_seconds ? a.usage.tach_seconds/3600 : 0;
+    const totalEngineHrs = a.usage?.engine_seconds? a.usage.engine_seconds/3600: 0;
+    const battery = a.device?.battery||'';
+    aircraft.push({id, reg, type, totalHobbs, totalLandings, totalCycles, totalTachHrs, totalEngineHrs, opStatus: a.operational_status||"", attStatus: a.attention_status||"", maintStatus: a.maintenance_status||"", lastFlight:null, battery});
+
+    // Flight logs — accept any log entry that has a takeoff timestamp
+    const logs = a.logs || [];
+    console.log(`[${id}] ${airblyReg}: ${logs.length} logs returned`);
+    if(logs.length) console.log('[sample log fields]', Object.keys(logs[0]));
+    flights[id] = logs
+      .filter(l => (l.takeoff_timestamp||l.departure_timestamp||l.start_timestamp||l.timestamp) > 0)
+      .map(l => {
+        const dep = l.takeoff_timestamp||l.departure_timestamp||l.start_timestamp||l.timestamp||null;
+        const arr = l.landing_timestamp||l.arrival_timestamp||l.end_timestamp||null;
+        return {
+          id:          l.uuid || Math.random(),
+          dep_ms:      dep,
+          arr_ms:      arr,
+          from:        l.takeoff_airport_icao||l.takeoff_airport||l.departure_icao||l.dep_icao||'',
+          to:          l.landing_airport_icao||l.landing_airport||l.arrival_icao||l.arr_icao||'',
+          air_sec:     l.air_seconds||l.air_time_seconds||0,
+          hobbs_start: l.hobbs_start??null,
+          hobbs_end:   l.hobbs_end??null,
+          cycles:      l.cycles||1,
+          fuel:        l.fuel_added??l.fuel_uplift??null,
+        };
+      })
+      .filter(l => l.dep_ms)
+      .sort((a,b)=>(a.dep_ms||0)-(b.dep_ms||0));
+    // Derive last flight date from the most recent entry
+    // Fallback: use updated_at from the asset itself (Airbly updates it on each flight)
+    const lastLog=flights[id].length?flights[id][flights[id].length-1]:null;
+    const acObj=aircraft.find(a=>a.id===id);
+    if(acObj){
+      if(lastLog) acObj.lastFlight=lastLog.dep_ms/1000;
+      else if(a.updated_at) acObj.lastFlight=a.updated_at/1000; // updated_at confirmed in API
+    }
+  }
+  return{aircraft,flights};
+}
+
+// ══ DEMO ════════════════════════════════════════
+function loadDemo(){
+  const apts=['EGKB','EGKA','EGBB','EGCC','EGNX','EGGD','EGHI','EGBJ','EGTK','EGBP'];
+  const mk=(rid,i,bh)=>{
+    const dep=new Date(2025,2,1+Math.floor(i/2),7+(i%5)*2,15).getTime();
+    const s=Math.round(3600+Math.random()*7200);
+    const hs=parseFloat((bh+i*1.8).toFixed(1));
+    return{id:`f${rid}${i}`,dep_ms:dep,arr_ms:dep+s*1000,
+      from:apts[i%apts.length],to:apts[(i+3)%apts.length],
+      air_sec:s,hobbs_start:hs,hobbs_end:parseFloat((hs+s/3600).toFixed(1)),
+      cycles:1,fuel:Math.round(30+Math.random()*60)};
+  };
+  ST.aircraft=[
+    {id:'ac1',reg:'G-ABCD',type:'Cessna 172S',    totalHobbs:1247.3},
+    {id:'ac2',reg:'G-EFGH',type:'Piper PA-28-161', totalHobbs:843.7},
+    {id:'ac3',reg:'G-IJKL',type:'Robin DR400/180',  totalHobbs:2103.6},
+  ];
+  ST.flights={
+    ac1:Array.from({length:14},(_,i)=>mk('ac1',i,1232.5)),
+    ac2:Array.from({length:9}, (_,i)=>mk('ac2',i,836.1)),
+    ac3:Array.from({length:22},(_,i)=>mk('ac3',i,2090.2)),
+  };
+  // Pre-fill demo settings
+  ['ac1','ac2','ac3'].forEach((id,i)=>{
+    if(!ST.cfg[id]) ST.cfg[id]={};
+    Object.assign(ST.cfg[id],{
+      operator:'Skyline Aviation Ltd',
+      base:['EGKB','EGKA','EGBB'][i],
+      maint_due:['01 Sep 2025 / 1300 hrs','15 Oct 2025 / 860 hrs','30 Nov 2025 / 2150 hrs'][i],
+      cofa_exp: ['14 Nov 2025','22 Mar 2026','07 Aug 2025'][i],
+      annual_due:['31 Mar 2026','30 Sep 2025','28 Feb 2026'][i],
+    });
+  });
+  ST.selected=ST.aircraft[0]; ST.isDemo=true;
+  showApp();
+}
+
+// ══ SHOW APP ═════════════════════════════════════
+async function showApp(){
+  $('s-login').classList.remove('active');
+  $('s-app').classList.add('active');
+  $('sb-stat').textContent=ST.isDemo?'● Demo Mode':'● Live – Airbly';
+  $('sb-stat').style.color=ST.isDemo?'#f0a020':'#20c070';
+  // Pull latest settings from JSONBin before first render
+  syncStatus('syncing','Loading cloud settings…');
+  await syncPull();
+  // Re-register manual aircraft flights slots after pull (may have new aircraft)
+  ST.manualAircraft.forEach(m=>{ if(!ST.flights[m.id]) ST.flights[m.id]=[]; });
+  buildAcList(); render();
+  // Background sync every 60s — picks up changes from other users
+  if(!ST._syncInterval){
+    ST._syncInterval=setInterval(async()=>{
+      await syncPull();
+      // Only re-render if user is NOT actively typing OR daily log panel is open
+      const active=document.activeElement;
+      const userTyping=active&&(active.tagName==='INPUT'||active.tagName==='TEXTAREA'||active.tagName==='SELECT');
+      const dlPanel=document.getElementById('daily-log-panel');
+      const dlOpen=dlPanel&&dlPanel.style.display!=='none'&&dlPanel.innerHTML.trim()!=='';
+      if(!userTyping&&!dlOpen){ buildAcList(); render(); }
+      else{ syncStatus('ok','Synced (refresh pending)'); }
+    }, 60000);
+  }
+}
+function buildAcList(){
+  const all=allAircraft();
+  $('ac-list').innerHTML=all.map(ac=>`
+    <button class="acb ${ST.selected?.id===ac.id?'act':''}" onclick="selAc('${ac.id}')">
+      <strong>${esc(ac.reg)}${ac.isManual?' <span style=\'font-size:9px;opacity:.6\'>[M]</span>':''}</strong>
+      <small>${esc(ac.type)||'Unknown type'}</small>
+    </button>`).join('');
+}
+function selAc(id){
+  ST.selected=allAircraft().find(a=>a.id===id);
+  ST.previewPage=0; ST.view='preview';
+  buildAcList(); render();
+}
+function sv(v){ ST.view=v; render(); }
+
+// ══ RENDER ═══════════════════════════════════════
+function render(){
+  ['dashboard','preview','hours','settings'].forEach(v=>{
+    const b=$('nb-'+v); if(b) b.classList.toggle('act',v===ST.view);
+  });
+  const titles={
+    dashboard:'Fleet Dashboard',
+    preview:`Tech Log Preview — ${ST.selected?.reg||'select an aircraft'}`,
+    hours:'Hours Tracker',
+    settings:'Aircraft Settings',
+  };
+  $('view-title').textContent=titles[ST.view]||'';
+  const fl=ST.flights[ST.selected?.id]||[];
+  const pb=$('print-btns'); if(pb) pb.style.display=(ST.view==='preview'&&ST.selected)?'flex':'none';
+  const c=$('mc');
+  if(ST.view==='dashboard') c.innerHTML=rDash();
+  else if(ST.view==='preview') c.innerHTML=rPreview();
+  else if(ST.view==='hours') c.innerHTML=rHours();
+  else if(ST.view==='settings') c.innerHTML=rSettings();
+}
+
+// ── DASHBOARD ────────────────────────────────────
+function rDash(){
+  const _all=allAircraft();
+  const totH=_all.reduce((a,x)=>a+x.totalHobbs,0);
+  const totFl=Object.values(ST.flights).reduce((a,x)=>a+x.length,0);
+  // ── Top 3 stat boxes ─────────────────────────────
+  // 1. Aircraft Airborne — live from operational_status
+  const airborne = _all.filter(ac=>ac.opStatus==='inflight').length;
+
+  // 2. Total Aircraft in Fleet
+
+  // 3. Maintenance Warnings — aircraft where hrs remaining to next check ≤ 10
+  const maintWarn = _all.filter(ac=>{
+    const rem = hobbsRemaining(ac);
+    return rem !== null && parseFloat(rem) <= 10;
+  }).length;
+
+  // ── Subtitles for stat boxes ──────────────────────
+  const airborneNames = _all.filter(ac=>ac.opStatus==='inflight').map(ac=>ac.reg).join(', ');
+  const warnNames = _all.filter(ac=>{
+    const rem=hobbsRemaining(ac); return rem!==null&&parseFloat(rem)<=10;
+  }).map(ac=>ac.reg).join(', ');
+
+  const stats=[
+    {v: airborne,         l:'Aircraft Airborne',      c: airborne>0?'var(--grn)':'var(--mut)', bg: airborne>0?'#0d2e1a':'',  sub: airborneNames||'All on ground'},
+    {v: _all.length,      l:'Aircraft in Fleet',      c:'var(--amb)',                          bg:'',                         sub: ST.aircraft.length+' Airbly · '+ST.manualAircraft.length+' manual'},
+    {v: maintWarn,        l:'Maintenance Warnings',    c: maintWarn>0?'#ff4444':'var(--grn)',   bg: maintWarn>0?'#2a0a0a':'', sub: warnNames||'All checks OK'},
+  ];
+  const cards=_all.map(ac=>{
+    const fl=ST.flights[ac.id]||[];
+    const airS=fl.reduce((a,f)=>a+f.air_sec,0);
+    // Find most recent flight that has a departure timestamp
+    const last=fl.slice().reverse().find(f=>f.dep_ms)||fl[fl.length-1]||null;
+    const isFlying = ac.opStatus==='inflight';
+    const needsAttn = ac.attStatus==='required';
+    const statusBadge = isFlying
+      ? `<span style="background:#1a4a20;border:1px solid var(--grn);color:var(--grn);font-size:10px;font-weight:700;border-radius:5px;padding:2px 8px;letter-spacing:1px">✈ IN FLIGHT</span>`
+      : `<span style="background:#07111e;border:1px solid var(--dim);color:var(--mut);font-size:10px;font-weight:600;border-radius:5px;padding:2px 8px">● STOPPED</span>`;
+    const attnBadge = needsAttn
+      ? `<span style="background:#3a2000;border:1px solid var(--amb);color:var(--amb);font-size:10px;font-weight:700;border-radius:5px;padding:2px 8px;margin-left:6px">⚠ ATTENTION</span>`
+      : '';
+    return`<div class="acc-card" onclick="selAc('${ac.id}')" style="${isFlying?'border-color:var(--grn)':''}">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
+        <div>
+          <div style="font-size:20px;font-weight:900;color:#fff">${esc(ac.reg)}</div>
+          <div style="font-size:12px;color:var(--mut)">${esc(ac.type)||'Unknown type'}</div>
+        </div>
+        <div style="background:#0d1e30;border-radius:7px;padding:7px 12px;text-align:center">
+          <div style="font-size:16px;font-weight:900;color:var(--acc)">${ac.totalHobbs.toFixed(1)}</div>
+          <div style="font-size:9px;color:var(--acc);letter-spacing:1px">Aircraft Hrs</div>
+        </div>
+      </div>
+      <div style="margin-bottom:10px;display:flex;gap:4px;flex-wrap:wrap">${statusBadge}${attnBadge}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px">
+        ${(()=>{
+          const lastDate=last&&last.dep_ms?fmtDate(last.dep_ms):(ac.lastFlight?fmtDate(ac.lastFlight*1000):'—');
+          const hrsRem=hobbsRemaining(ac);
+          const hrsOverdue=hrsRem==='OVERDUE';
+          const hrsRemVal=hrsRem!==null?(hrsOverdue?'OVERDUE':hrsRem+'h'):'—';
+          const hrsRemNum=hrsRem!==null&&!hrsOverdue?parseFloat(hrsRem):null;
+          const hrsRemRed=hrsOverdue||(hrsRemNum!==null&&hrsRemNum<=5);
+          const hrsRemAmb=!hrsOverdue&&hrsRemNum!==null&&hrsRemNum>5&&hrsRemNum<=10;
+          const mWarn=ac.maintStatus==='warn'||ac.maintStatus==='due';
+          return[
+            {v:lastDate,l:'Last Flight',w:false},
+            {v:hrsRemVal,l:'Hrs to Next Check',w:hrsRemAmb,r:hrsRemRed},
+            (()=>{
+              const b=(ac.battery||'').toLowerCase();
+              const batIcon = b==='good'?'🟢':b==='low'?'🔴':b==='ok'?'🟡':'⚪';
+              const batColor = b==='good'?'var(--grn)':b==='low'?'#ff4444':b==='ok'?'var(--amb)':'var(--dim)';
+              const batLabel = b?b.charAt(0).toUpperCase()+b.slice(1):'N/A';
+              return {v:batIcon+' '+batLabel, l:'Tracker Battery', w:b==='low', c:batColor};
+            })()
+          ].map(m=>{
+            const border=m.r?';border:1px solid #ff4444':m.w?';border:1px solid #aa8800':'';
+            const bg=m.r?'background:#2a0a0a;':m.w?'background:#1a1200;':'background:#07111e;';
+            const col=m.c||(m.r?'#ff4444':m.w?'#ff0':'#fff');
+            return`<div style="${bg}border-radius:5px;padding:7px${border}">
+            <div style="font-weight:700;font-size:12px;color:${col}">${m.v}</div>
+            <div style="font-size:10px;color:var(--dim)">${m.l}</div></div>`;
+          }).join('');
+        })()}
+      </div>
+      <div style="margin-top:9px;font-size:11px;color:var(--acc)">View tech log →</div>
+    </div>`;
+  }).join('');
+  return`<div class="sgrid3">${stats.map(s=>`<div class="sc" style="${s.bg?'background:'+s.bg+';border-color:'+s.c+';':''}">`+
+    `<div class="sv" style="color:${s.c}">${s.v}</div>`+
+    `<div class="sl">${s.l}</div>`+
+    `${s.sub?`<div style="font-size:10px;color:var(--dim);margin-top:3px">${s.sub}</div>`:''}`+
+    `</div>`).join('')}</div>
+  <div class="acgrid">${cards}</div>`;
+}
+
+// ── TECH LOG PREVIEW ─────────────────────────────
+function hobbsRemaining(ac){
+  // hrs remaining = next check hrs - current hobbs
+  const due = parseFloat(ST.cfg[ac.id]?.maint_due||'0');
+  const cur  = ac.totalHobbs||0;
+  if(!due) return null;
+  const rem = due - cur;
+  if(rem < 0) return 'OVERDUE';
+  return rem.toFixed(1);
+}
+
+function buildPageHTML(ac, chunk, pi, totalChunks, isPreview){
+  const cfg   = ST.cfg[ac.id]||{};
+  const first = chunk[0], last=chunk[chunk.length-1];
+  const dateRange = `${fmtDate(first?.dep_ms)} – ${fmtDate(last?.dep_ms)}`;
+  const editAttr  = isPreview ? '' : ' contenteditable="true"';
+  const editCls   = isPreview ? '' : ' phv-edit';
+
+  // Sheet number: use saved override start + pi, else just pi+1
+  const sheetStart = parseInt(cfg.sheet_start||'1',10);
+  const sheetNum   = String(sheetStart + pi).padStart(3,'0');
+
+  // Hours remaining calc
+  const hrsRem  = hobbsRemaining(ac);
+  const hrsRemDisplay = hrsRem !== null ? hrsRem : '—';
+  const hrsRemWarn    = hrsRem === 'OVERDUE' || (hrsRem !== null && parseFloat(hrsRem) <= 10);
+
+  // Flight rows
+  const rows=chunk.map(f=>{
+    const hs = f.hobbs_start!=null ? f.hobbs_start.toFixed(1) : '';
+    const he = f.hobbs_end  !=null ? f.hobbs_end.toFixed(1)   : '';
+    return`<tr>
+      <td class="dc">${f.dep_ms?fmtDate(f.dep_ms):''}</td>
+      <td class="nc"></td>
+      <td class="nc"></td>
+      <td class="ftc"><span>${esc(f.from)||''}</span><span>${esc(f.to)||''}</span></td>
+      <td class="fc"></td>
+      <td class="sc"></td>
+      <td class="authc"></td>
+      <td class="tc"><span class="top-val"></span><span class="bot-val"></span></td>
+      <td class="tc"><span class="top-val">${f.dep_ms?fmtTime(f.dep_ms):''}</span><span class="bot-val">${f.arr_ms?fmtTime(f.arr_ms):''}</span></td>
+      <td class="stn"><span class="top-val"></span><span class="bot-val"></span></td>
+      <td class="stn"></td>
+      <td class="stn"><span class="top-val">${hs}</span><span class="bot-val">${he}</span></td>
+      <td class="stn"></td>
+      <td class="fc">${f.fuel!=null?f.fuel+' L':''}</td>
+      <td class="fc"></td>
+      <td class="fc"></td>
+      <td class="sc"></td>
+    </tr>`;
+  }).join('');
+
+  const blanks=Array.from({length:7-chunk.length},()=>`<tr>
+    <td class="dc"></td><td class="nc"></td><td class="nc"></td>
+    <td class="ftc"></td><td class="fc"></td>
+    <td class="sc"></td><td class="authc"></td>
+    <td class="tc"></td><td class="tc"></td>
+    <td class="stn"></td><td class="stn"></td><td class="stn"></td><td class="stn"></td>
+    <td class="fc"></td><td class="fc"></td><td class="fc"></td><td class="sc"></td>
+  </tr>`).join('');
+
+  // ── NEW HEADER: big REG + Hrs Remaining + Sheet, then detail boxes below
+  const header = `
+    <div class="pg-hdr-wrap">
+      <!-- TOP ROW: big identifiers -->
+      <div class="hdr-top">
+        <div class="hdr-reg">${esc(ac.reg)}</div>
+        <div class="hdr-divider"></div>
+        <div class="hdr-big-block">
+          <div class="hdr-big-label">HRS REMAINING</div>
+          <div class="hdr-big-val${hrsRemWarn?' hdr-warn':''}">${hrsRemDisplay}</div>
+        </div>
+        <div class="hdr-divider"></div>
+        <div class="hdr-big-block">
+          <div class="hdr-big-label">SHEET NO.</div>
+          <div class="hdr-big-val" contenteditable="true">${sheetNum}</div>
+        </div>
+        <div class="hdr-spacer"></div>
+        <div class="hdr-title-block">
+          <div class="hdr-org-big">LS AIRMOTIVE</div>
+          <div class="hdr-title-small">✈ Aircraft Technical Log</div>
+        </div>
+      </div>
+      <!-- BOTTOM ROW: detail boxes -->
+      <div class="hdr-detail">
+        <div class="hdr-dbox">
+          <div class="hdr-dk">Aircraft Type</div>
+          <div class="hdr-dv">${esc(ac.type)||'—'}</div>
+        </div>
+        <div class="hdr-dbox">
+          <div class="hdr-dk">Next Check Type</div>
+          <div class="hdr-dv${editCls}"${editAttr}>${esc(cfg.check_type||'')}</div>
+        </div>
+        <div class="hdr-dbox">
+          <div class="hdr-dk">Check Due At (hrs)</div>
+          <div class="hdr-dv${editCls}"${editAttr}>${esc(cfg.maint_due||'')}</div>
+        </div>
+        <div class="hdr-dbox">
+          <div class="hdr-dk">Current A/C Hrs</div>
+          <div class="hdr-dv">${ac.totalHobbs.toFixed(1)}</div>
+        </div>
+        <div class="hdr-dbox">
+          <div class="hdr-dk">ARC Due</div>
+          <div class="hdr-dv${editCls}"${editAttr}>${esc(cfg.cofa_exp||'')}</div>
+        </div>
+        <div class="hdr-dbox">
+          <div class="hdr-dk">Annual Due</div>
+          <div class="hdr-dv${editCls}"${editAttr}>${esc(cfg.annual_due||'')}</div>
+        </div>
+      </div>
+    </div>`;
+
+  return`<div class="${isPreview?'preview-page':'pg'}">
+    ${header}
+    <table class="pt">
+      <thead>
+        <tr class="hr1">
+          <th rowspan="2" class="th-date">Date</th>
+          <th rowspan="2" class="th-name">Captain</th>
+          <th rowspan="2" class="th-name">Student</th>
+          <th rowspan="2" class="th-frt">From<br><span style="font-weight:400;font-size:6px;opacity:.8">/To</span></th>
+          <th rowspan="2" class="th-fuel">Min Plan<br>Dep Fuel</th>
+          <th rowspan="2" class="th-sig">PIC<br>Sig</th>
+          <th rowspan="2" class="th-auth">Auth</th>
+          <th colspan="2" class="th-grp">Blocks / Times (UTC)</th>
+          <th colspan="2" class="th-grp">Tacho</th>
+          <th colspan="2" class="th-grp">Hobbs (hrs)</th>
+          <th rowspan="2" class="th-fuel">Fuel<br>Uplift</th>
+          <th rowspan="2" class="th-fuel">Oil<br>Added</th>
+          <th rowspan="2" class="th-fuel">Ldgs/<br>T&amp;Gs<br><span style="font-size:5.5px;font-weight:400;opacity:.8">at EGTK</span></th>
+          <th rowspan="2" class="th-sig">PIC<br>Sign<br>Back In</th>
+        </tr>
+        <tr class="hr2">
+          <th class="th-t">Off Blks<br>T/O</th>
+          <th class="th-t">On Blks<br>Ldg</th>
+          <th class="th-tn">Strt/<br>Fin</th>
+          <th class="th-tn">Total</th>
+          <th class="th-tn">Strt/<br>Fin</th>
+          <th class="th-tn">Total</th>
+        </tr>
+      </thead>
+      <tbody>${rows}${blanks}</tbody>
+    </table>
+    <div class="pfoot">
+      <span>I certify the above flights were conducted in accordance with applicable regulations &amp; that the aircraft was serviceable before each departure.</span>
+      <span>${esc(ac.reg)} &nbsp;·&nbsp; Sheet ${sheetNum} &nbsp;·&nbsp; Generated ${new Date().toLocaleDateString('en-GB')}</span>
+    </div>
+  </div>`;
+}
+
+function rPreview(){
+  const ac=ST.selected;
+  if(!ac) return`<div class="empty">← Select an aircraft from the sidebar to preview its tech log.</div>`;
+  const fl=ST.flights[ac.id]||[];
+  const c=ST.cfg[ac.id]||{};
+  // For manual aircraft show 7 blank rows; for Airbly show last 7 flights
+  const chunk=ac.isManual?[]:fl.slice(-7);
+  const sheetStart=parseInt(c.sheet_start||'1',10);
+  const sheetNum=String(sheetStart).padStart(3,'0');
+
+  // Quick update panel removed — hours managed via Hours Tracker daily log
+  const manPanel='';
+
+  const aid = ac.id ? ("'"+ac.id+"'") : 'null';
+  return manPanel+`
+  <div class="page-nav">
+    <button onclick="changeSheetNum(${aid},-1)">&#8592;</button>
+    <span class="page-info">Sheet Number &nbsp;<strong style="color:#fff;font-size:14px">${sheetNum}</strong></span>
+    <button onclick="changeSheetNum(${aid},+1)">&#8594;</button>
+  </div>
+  <div class="preview-wrap">
+    ${buildPageHTML(ac, chunk, 0, 1, true)}
+  </div>
+  <p style="margin-top:12px;font-size:11px;color:var(--dim)">
+    ${ac.isManual?'Manual aircraft — rows are blank for crew to complete by hand.':'Preview shows the most recent 7 flights.'}
+    Use \u2190 \u2192 to change sheet number. Hit <b style="color:var(--acc)">Print Tech Log</b> to print.
+  </p>`;
+}
+
+
+function setPreviewPage(i){ ST.previewPage=i; render(); }
+function changeSheetNum(id,delta){
+  if(!ST.cfg[id]) ST.cfg[id]={};
+  const cur=parseInt(ST.cfg[id].sheet_start||'1',10);
+  ST.cfg[id].sheet_start=String(Math.max(1,cur+delta));
+  saveCfg();
+  render();
+}
+
+
+// ── DAILY HOURS LOG ───────────────────────────────
+function openDailyLog(id){
+  const ac = allAircraft().find(a=>a.id===id);
+  if(!ac) return;
+  // Switch to hours view if not already there
+  ST.view='hours'; render();
+  // After render, inject panel into the placeholder
+  const panel = document.getElementById('daily-log-panel');
+  if(!panel) return;
+  panel.style.display='block';
+  panel.innerHTML = buildDailyLogPanel(id, ac);
+  panel.scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+function buildDailyLogPanel(id, ac){
+  const log = ST.dailyLog[id] || [];
+  const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD for input default
+  const todayDisplay = new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});
+
+  const historyRows = log.length === 0
+    ? `<tr><td colspan="5" style="text-align:center;color:var(--dim);font-style:italic;padding:10px">No entries yet</td></tr>`
+    : [...log].reverse().map((e,ri)=>{
+        const i = log.length - 1 - ri; // real index for deletion
+        return `<tr>
+          <td style="color:var(--mut)">${esc(e.date)}</td>
+          <td style="text-align:center">${e.tacho.toFixed(2)}</td>
+          <td style="text-align:center">${e.sorties}</td>
+          <td style="text-align:center;color:var(--grn);font-weight:700">+${e.added.toFixed(2)}</td>
+          <td style="text-align:center"><button onclick="deleteDailyEntry('${id}',${i})" style="background:none;border:1px solid var(--red);color:var(--red);border-radius:4px;padding:1px 7px;font-size:10px;cursor:pointer">✕</button></td>
+        </tr>`;
+      }).join('');
+
+  return `
+  <div style="background:var(--panel);border:1px solid var(--amb);border-radius:11px;padding:20px;margin-top:18px" onkeydown="trapTabInForm(event,'daily-log-panel')">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <div>
+        <span style="font-size:16px;font-weight:900;color:#fff">${esc(ac.reg)}</span>
+        <span style="font-size:11px;color:var(--amb);margin-left:8px;background:#2a1a00;border:1px solid var(--amb);padding:2px 7px;border-radius:4px">MANUAL</span>
+        <span style="font-size:12px;color:var(--mut);margin-left:10px">Current total: <strong style="color:var(--acc)">${ac.totalHobbs.toFixed(2)} hrs</strong></span>
+      </div>
+      <button onclick="closeDailyLog()" style="background:none;border:1px solid var(--dim);color:var(--mut);border-radius:6px;padding:4px 12px;font-size:11px;cursor:pointer">✕ Close</button>
+    </div>
+
+    <div style="font-size:13px;font-weight:700;color:var(--amb);margin-bottom:12px;border-bottom:1px solid #2a1a00;padding-bottom:8px">➕ Add Daily Hours Entry</div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:10px;align-items:end;margin-bottom:6px">
+      <div>
+        <label style="font-size:10px;color:var(--dim);display:block;margin-bottom:3px;letter-spacing:1px">DATE</label>
+        <input id="dl-date-${id}" type="date" value="${today}" style="width:100%;background:#0d1e30;border:1px solid var(--border);color:#fff;border-radius:6px;padding:6px 8px;font-size:13px">
+      </div>
+      <div>
+        <label style="font-size:10px;color:var(--dim);display:block;margin-bottom:3px;letter-spacing:1px">TOTAL TACHO TIME (hrs)</label>
+        <input id="dl-tacho-${id}" type="number" step="0.01" min="0" placeholder="e.g. 2.40" style="width:100%;background:#0d1e30;border:1px solid var(--border);color:#fff;border-radius:6px;padding:6px 8px;font-size:13px" oninput="previewDailyCalc('${id}')">
+      </div>
+      <div>
+        <label style="font-size:10px;color:var(--dim);display:block;margin-bottom:3px;letter-spacing:1px">NUMBER OF SORTIES</label>
+        <input id="dl-sorties-${id}" type="number" step="1" min="1" placeholder="e.g. 3" oninput="previewDailyCalc('${id}')" style="width:100%;background:#0d1e30;border:1px solid var(--border);color:#fff;border-radius:6px;padding:6px 8px;font-size:13px">
+      </div>
+      <button onclick="submitDailyLog('${id}')" style="background:var(--amb);color:#000;font-weight:800;border:none;border-radius:6px;padding:8px 16px;font-size:13px;cursor:pointer;white-space:nowrap">Add Entry</button>
+    </div>
+
+    <div id="dl-preview-${id}" style="font-size:11px;color:var(--dim);margin-bottom:4px;min-height:16px"></div>
+    <div id="dl-err-${id}" style="font-size:12px;color:var(--red);display:none;margin-bottom:8px"></div>
+
+    <div style="font-size:13px;font-weight:700;color:#fff;margin:16px 0 10px;border-bottom:1px solid var(--border);padding-bottom:8px">📋 Entry History — ${esc(ac.reg)}</div>
+    <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px">
+      <thead><tr style="color:var(--dim);font-size:10px;letter-spacing:1px">
+        <th style="text-align:left;padding:4px 8px">DATE</th>
+        <th style="padding:4px 8px">TACHO</th>
+        <th style="padding:4px 8px">SORTIES</th>
+        <th style="padding:4px 8px">HRS ADDED</th>
+        <th style="padding:4px 8px"></th>
+      </tr></thead>
+      <tbody>${historyRows}</tbody>
+    </table></div>
+  </div>`;
+}
+
+function previewDailyCalc(id){
+  const tachoEl = document.getElementById('dl-tacho-'+id);
+  const sortiesEl = document.getElementById('dl-sorties-'+id);
+  const previewEl = document.getElementById('dl-preview-'+id);
+  if(!tachoEl||!sortiesEl||!previewEl) return;
+  const tacho = parseFloat(tachoEl.value);
+  const sorties = parseInt(sortiesEl.value);
+  if(!isNaN(tacho) && !isNaN(sorties) && sorties > 0 && tacho > 0){
+    const added = Math.max(0, tacho - (sorties * 0.1));
+    previewEl.textContent = `→ ${tacho.toFixed(2)} − (${sorties} × 0.1) = +${added.toFixed(2)} hrs will be added to aircraft total`;
+    previewEl.style.color = 'var(--grn)';
+  } else {
+    previewEl.textContent = '';
+  }
+}
+
+function submitDailyLog(id){
+  const dateEl    = document.getElementById('dl-date-'+id);
+  const tachoEl   = document.getElementById('dl-tacho-'+id);
+  const sortiesEl = document.getElementById('dl-sorties-'+id);
+  const errEl     = document.getElementById('dl-err-'+id);
+  if(errEl) errEl.style.display='none';
+
+  const dateVal = dateEl?.value;
+  const tacho   = parseFloat(tachoEl?.value);
+  const sorties = parseInt(sortiesEl?.value);
+
+  if(!dateVal){ if(errEl){errEl.textContent='Please enter a date.';errEl.style.display='block';} return; }
+  if(isNaN(tacho)||tacho<=0){ if(errEl){errEl.textContent='Please enter a valid tacho time.';errEl.style.display='block';} tachoEl?.focus(); return; }
+  if(isNaN(sorties)||sorties<1){ if(errEl){errEl.textContent='Please enter at least 1 sortie.';errEl.style.display='block';} sortiesEl?.focus(); return; }
+
+  const added = Math.max(0, tacho - (sorties * 0.1));
+
+  // Format date nicely for display
+  const dateDisplay = new Date(dateVal+'T12:00:00').toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});
+
+  // Save log entry
+  if(!ST.dailyLog[id]) ST.dailyLog[id] = [];
+  ST.dailyLog[id].push({ date: dateDisplay, tacho, sorties, added });
+  saveDailyLog();
+
+  // Update aircraft total hours
+  const m = ST.manualAircraft.find(x=>x.id===id);
+  if(m){
+    const currentHrs = parseFloat(ST.cfg[id]?.man_hours || m.hours || '0');
+    const newHrs = Math.round((currentHrs + added) * 100) / 100;
+    if(!ST.cfg[id]) ST.cfg[id]={};
+    ST.cfg[id].man_hours = String(newHrs);
+    // Update last flight date
+    ST.cfg[id].man_last_flight = dateDisplay;
+    saveCfg();
+    m.hours = String(newHrs);
+    m.last_flight = dateDisplay;
+    saveManual();
+  }
+
+  // Clear inputs and refresh panel
+  if(tachoEl) tachoEl.value='';
+  if(sortiesEl) sortiesEl.value='';
+  const ac = allAircraft().find(a=>a.id===id);
+  const panel = document.getElementById('daily-log-panel');
+  if(panel && ac) panel.innerHTML = buildDailyLogPanel(id, ac);
+}
+
+function deleteDailyEntry(id, index){
+  if(!ST.dailyLog[id]) return;
+  const entry = ST.dailyLog[id][index];
+  if(!entry) return;
+  if(!confirm(`Delete entry: ${entry.date} — +${entry.added.toFixed(2)} hrs?`)) return;
+
+  // Reverse the hours addition
+  const m = ST.manualAircraft.find(x=>x.id===id);
+  if(m){
+    const currentHrs = parseFloat(ST.cfg[id]?.man_hours || m.hours || '0');
+    const newHrs = Math.max(0, Math.round((currentHrs - entry.added) * 100) / 100);
+    if(!ST.cfg[id]) ST.cfg[id]={};
+    ST.cfg[id].man_hours = String(newHrs);
+    saveCfg();
+    m.hours = String(newHrs);
+    saveManual();
+  }
+
+  ST.dailyLog[id].splice(index, 1);
+  saveDailyLog();
+
+  const ac = allAircraft().find(a=>a.id===id);
+  const panel = document.getElementById('daily-log-panel');
+  if(panel && ac) panel.innerHTML = buildDailyLogPanel(id, ac);
+}
+
+function closeDailyLog(){
+  const panel = document.getElementById('daily-log-panel');
+  if(panel){ panel.style.display='none'; panel.innerHTML=''; }
+}
+
+// ── HOURS TRACKER ────────────────────────────────
+function rHours(){
+  const _all=allAircraft();
+  const totH=_all.reduce((a,x)=>a+x.totalHobbs,0);
+  const totFl=Object.values(ST.flights).reduce((a,x)=>a+x.length,0);
+  const rows=_all.map(ac=>{
+    const fl=ST.flights[ac.id]||[];
+    // Find most recent flight that has a departure timestamp
+    const last=fl.slice().reverse().find(f=>f.dep_ms)||fl[fl.length-1]||null;
+    const c=ST.cfg[ac.id]||{};
+    const flag=(v)=>{
+      if(!v) return`<span style="color:var(--dim)">Not set</span>`;
+      // Try to parse the date and warn if within 30 days
+      const d=new Date(v); const now=new Date();
+      const diffDays=(d-now)/(1000*60*60*24);
+      const warn=!isNaN(d)&&diffDays>=0&&diffDays<=30;
+      return`<span style="${warn?'background:#ff0;padding:1px 4px;border-radius:3px;color:#000;font-weight:700;':''}">${esc(v)}${warn?' ⚠':''}</span>`;
+    };
+    const rowClick = ac.isManual ? `openDailyLog('${ac.id}')` : `selAc('${ac.id}')`;
+    return`<tr class="ck" onclick="${rowClick}" title="${ac.isManual?'Click to add daily hours':'Click to preview tech log'}">
+      <td class="tw">${esc(ac.reg)}</td>
+      <td class="tm">${esc(ac.type)||'—'}</td>
+      <td class="tb">${ac.totalHobbs.toFixed(1)}</td>
+      <td>${ac.isManual ? (ST.dailyLog[ac.id]||[]).length : (ac.totalCycles||'—')}</td>
+      <td class="tm">${last&&last.dep_ms?fmtDate(last.dep_ms):(ac.lastFlight?fmtDate(ac.lastFlight*1000):'—')}</td>
+      <td>${flag(c.maint_due)}</td>
+      <td>${flag(c.cofa_exp)}</td>
+      <td>${flag(c.annual_due)}</td>
+    </tr>`;
+  }).join('');
+  return`<div class="tbl"><table>
+    <thead><tr>${['Registration','Type','Aircraft Hrs','Sorties / Entries','Last Flight','Next Maint Due (hrs)','ARC Due','Annual Due']
+      .map(h=>`<th>${h}</th>`).join('')}</tr></thead>
+    <tbody>${rows}</tbody>
+    <tfoot><tr>
+      <td colspan="2" style="color:#fff">FLEET TOTAL</td>
+      <td style="color:var(--acc)">${totH.toFixed(1)}</td>
+      <td>${ST.aircraft.reduce((a,x)=>a+(x.totalCycles||0),0)||'—'}</td>
+      <td colspan="5"></td>
+    </tr></tfoot>
+  </table></div>
+  <p style="margin-top:11px;font-size:11px;color:var(--dim)">Click an <span style='color:var(--amb)'>■</span> manual aircraft row to add daily hours. Click an Airbly row to preview its tech log. Set maintenance dates in ⚙️ Aircraft Settings.</p>
+  <div id="daily-log-panel" style="display:none"></div>`;
+}
+
+// ── SETTINGS ─────────────────────────────────────
+function settingsCardFields(id, ac, c, isManual){
+  return`
+    <div class="sg">
+      <div class="sf">
+        <label>REGISTRATION</label>
+        <input id="f_${id}_reg" value="${esc(ac.reg)}" placeholder="e.g. G-ABCD"${isManual?'':' readonly style="opacity:.6"'}>
+      </div>
+      <div class="sf">
+        <label>AIRCRAFT TYPE</label>
+        <input id="f_${id}_type" value="${esc(ac.type||'')}" placeholder="e.g. Piper PA-28-140">
+      </div>
+      <div class="sf">
+        <label>BASE AIRFIELD (ICAO)</label>
+        <input id="f_${id}_base" value="${esc(c.base||'')}" placeholder="e.g. EGKB">
+      </div>
+      <div class="sf">
+        <label>NEXT MAINTENANCE DUE (DECIMAL HRS)</label>
+        <input id="f_${id}_maint_due" value="${esc(c.maint_due||'')}" placeholder="e.g. 1350.0">
+      </div>
+      <div class="sf">
+        <label>NEXT CHECK TYPE</label>
+        <input id="f_${id}_check_type" value="${esc(c.check_type||'')}" placeholder="e.g. 50hr / 100hr / Annual">
+      </div>
+      <div class="sf">
+        <label>ARC DUE</label>
+        <input id="f_${id}_cofa_exp" value="${esc(c.cofa_exp||'')}" placeholder="e.g. 14 Nov 2025">
+      </div>
+      <div class="sf">
+        <label>ANNUAL DUE</label>
+        <input id="f_${id}_annual_due" value="${esc(c.annual_due||'')}" placeholder="e.g. 31 Mar 2026">
+      </div>
+      <div class="sf">
+        <label>SHEET NUMBERING — START FROM</label>
+        <input id="f_${id}_sheet_start" value="${esc(c.sheet_start||'1')}" placeholder="e.g. 1">
+      </div>
+      ${isManual?`
+      <div class="sf" style="grid-column:1/-1;border-top:1px solid var(--border);padding-top:12px;margin-top:4px">
+        <label style="color:var(--amb)">MANUAL TRACKING — CURRENT TOTAL HOURS</label>
+        <input id="f_${id}_man_hours" value="${esc(c.man_hours||'')}" placeholder="e.g. 1247.5" type="number" step="0.1">
+      </div>
+      <div class="sf">
+        <label style="color:var(--amb)">LAST FLIGHT DATE</label>
+        <input id="f_${id}_man_last_flight" value="${esc(c.man_last_flight||'')}" placeholder="e.g. 2025-12-01" type="date">
+      </div>`:''}
+    </div>`;
+}
+
+function rSettings(){
+  const savedKey=localStorage.getItem('tl_key');
+  const keyBlock=savedKey?`
+    <div class="card" style="margin-bottom:20px">
+      <div style="font-size:13px;font-weight:700;color:#fff;margin-bottom:12px">API Key</div>
+      <div class="key-row">
+        <span>Saved API key:</span>
+        <code>${savedKey.substring(0,8)}••••••••••••••••••••••</code>
+        <button onclick="clearSavedKey();goLogin()">Clear &amp; re-enter</button>
+      </div>
+      <p style="font-size:11px;color:var(--dim)">Your key is stored locally in this browser. It is never sent anywhere except directly to Airbly.</p>
+    </div>`:'';
+
+  // Airbly aircraft cards (cannot be deleted)
+  const airblyCards=ST.aircraft.map(ac=>{
+    const c=ST.cfg[ac.id]||{};
+    return`<div class="card" style="margin-bottom:16px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--border)">
+        <div>
+          <span style="font-size:15px;font-weight:800;color:#fff">${esc(ac.reg)}</span>
+          <span style="font-size:12px;font-weight:400;color:var(--mut);margin-left:8px">${esc(ac.type)||''}</span>
+        </div>
+        <span style="font-size:10px;background:#0d2e45;border:1px solid var(--acc);color:var(--acc);padding:2px 8px;border-radius:5px">AIRBLY</span>
+      </div>
+      ${settingsCardFields(ac.id, ac, c, false)}
+      <button class="ssave" onclick="saveAcCfg('${ac.id}')">Save Changes</button>
+      <span class="sflash" id="fl_${ac.id}">✓ Saved</span>
+    </div>`;
+  }).join('');
+
+  // Manual aircraft cards (can be deleted)
+  const manualCards=ST.manualAircraft.map(m=>{
+    const ac=manToAc(m);
+    const c=ST.cfg[m.id]||{};
+    return`<div class="card" style="margin-bottom:16px;border-color:var(--amb)">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--border)">
+        <div>
+          <span style="font-size:15px;font-weight:800;color:#fff">${esc(ac.reg)}</span>
+          <span style="font-size:12px;font-weight:400;color:var(--mut);margin-left:8px">${esc(ac.type)||''}</span>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <span style="font-size:10px;background:#2a1a00;border:1px solid var(--amb);color:var(--amb);padding:2px 8px;border-radius:5px">MANUAL</span>
+          <button onclick="deleteManualAc('${m.id}')" style="background:none;border:1px solid var(--red);color:var(--red);border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer">🗑 Delete Aircraft</button>
+        </div>
+      </div>
+      ${settingsCardFields(m.id, ac, c, true)}
+      <button class="ssave" onclick="saveAcCfg('${m.id}')">Save Changes</button>
+      <span class="sflash" id="fl_${m.id}">✓ Saved</span>
+    </div>`;
+  }).join('');
+
+  const addBtn=`
+    <div style="margin-bottom:20px">
+      <button class="ssave" style="background:var(--grn);color:#000;font-weight:800" onclick="showAddManualForm()">+ Add Manual Aircraft</button>
+    </div>
+    <div id="add-manual-form" style="display:none;background:var(--panel);border:1px solid var(--grn);border-radius:11px;padding:18px 20px;margin-bottom:20px" onkeydown="trapTabInForm(event,'add-manual-form')">
+      <div style="font-size:14px;font-weight:800;color:var(--grn);margin-bottom:14px">New Manual Aircraft</div>
+      <div class="sg">
+        <div class="sf">
+          <label>REGISTRATION *</label>
+          <input id="new-man-reg" placeholder="e.g. G-WXYZ">
+        </div>
+        <div class="sf">
+          <label>AIRCRAFT TYPE</label>
+          <input id="new-man-type" placeholder="e.g. Piper PA-28-140">
+        </div>
+        <div class="sf">
+          <label>BASE AIRFIELD (ICAO)</label>
+          <input id="new-man-base" placeholder="e.g. EGKB">
+        </div>
+        <div class="sf">
+          <label>NEXT MAINTENANCE DUE (DECIMAL HRS)</label>
+          <input id="new-man-maint_due" placeholder="e.g. 1350.0" type="number" step="0.1">
+        </div>
+        <div class="sf">
+          <label>NEXT CHECK TYPE</label>
+          <input id="new-man-check_type" placeholder="e.g. 50hr / 100hr / Annual">
+        </div>
+        <div class="sf">
+          <label>ARC DUE</label>
+          <input id="new-man-cofa_exp" placeholder="e.g. 14 Nov 2025">
+        </div>
+        <div class="sf">
+          <label>ANNUAL DUE</label>
+          <input id="new-man-annual_due" placeholder="e.g. 31 Mar 2026">
+        </div>
+        <div class="sf">
+          <label>SHEET NUMBERING — START FROM</label>
+          <input id="new-man-sheet_start" placeholder="1" value="1">
+        </div>
+        <div class="sf" style="grid-column:1/-1;border-top:1px solid var(--border);padding-top:12px;margin-top:4px">
+          <label style="color:var(--amb)">CURRENT TOTAL HOURS *</label>
+          <input id="new-man-hours" placeholder="e.g. 1247.5" type="number" step="0.1">
+        </div>
+        <div class="sf">
+          <label style="color:var(--amb)">LAST FLIGHT DATE</label>
+          <input id="new-man-lastflight" type="date">
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:12px">
+        <button class="ssave" onclick="addManualAc()">Add Aircraft</button>
+        <button onclick="hideAddManualForm()" style="background:none;border:1px solid var(--border);border-radius:8px;padding:9px 20px;color:var(--mut);cursor:pointer">Cancel</button>
+      </div>
+      <div id="new-man-err" style="color:var(--red);font-size:12px;margin-top:8px;display:none"></div>
+      <div style="font-size:10px;color:var(--dim);margin-top:8px">Tab moves between fields &nbsp;·&nbsp; Esc closes form</div>
+    </div>`;
+
+  return`${keyBlock}
+  <p style="font-size:13px;color:var(--mut);margin-bottom:16px">
+    Airbly aircraft settings pre-fill the printed tech log header. Manual aircraft are tracked locally only.
+  </p>
+  <div style="font-size:11px;color:var(--dim);margin-bottom:14px">AIRBLY AIRCRAFT (${ST.aircraft.length})</div>
+  ${airblyCards}
+  <div style="font-size:11px;color:var(--dim);margin:20px 0 14px">MANUAL AIRCRAFT (${ST.manualAircraft.length})</div>
+  ${manualCards}
+  ${addBtn}
+  <div style="margin-top:24px;padding-top:16px;border-top:1px solid var(--border)">
+    <button onclick="debugAirblyFields()" style="background:none;border:1px solid var(--dim);color:var(--dim);border-radius:7px;padding:7px 16px;font-size:11px;cursor:pointer">🔍 Inspect raw Airbly field names (debug)</button>
+    <button onclick="forcePull()" style="background:none;border:1px solid var(--acc);color:var(--acc);border-radius:7px;padding:7px 16px;font-size:11px;cursor:pointer;margin-left:8px">☁ Pull latest from cloud</button>
+    <button onclick="forcePush()" style="background:none;border:1px solid var(--grn);color:var(--grn);border-radius:7px;padding:7px 16px;font-size:11px;cursor:pointer;margin-left:8px">☁ Push my settings to cloud</button>
+    <p style="font-size:11px;color:var(--dim);margin-top:6px">Opens a window showing every field name returned by the Airbly API — use this to diagnose missing last flight dates.</p>
+  </div>`;
+}
+
+// ── MANUAL AIRCRAFT CRUD ─────────────────────────────
+// ── TAB TRAP: keep keyboard focus inside a form ──────
+function trapTabInForm(e, formId){
+  if(e.key==='Escape'){ hideAddManualForm(); return; }
+  if(e.key!=='Tab') return;
+  const form=document.getElementById(formId);
+  if(!form) return;
+  const focusable=[...form.querySelectorAll('input,button,select,textarea')].filter(el=>!el.disabled);
+  if(!focusable.length) return;
+  const first=focusable[0], last=focusable[focusable.length-1];
+  if(e.shiftKey){
+    if(document.activeElement===first){ e.preventDefault(); last.focus(); }
+  } else {
+    if(document.activeElement===last){ e.preventDefault(); first.focus(); }
+  }
+}
+
+function showAddManualForm(){
+  const f=$('add-manual-form');
+  if(f){ f.style.display='block'; f.scrollIntoView({behavior:'smooth'}); }
+}
+function hideAddManualForm(){
+  const f=$('add-manual-form'); if(f) f.style.display='none';
+  ['reg','type','base','maint_due','check_type','cofa_exp','annual_due','sheet_start','hours','landings','lastflight'].forEach(k=>{
+    const el=$('new-man-'+k); if(el) el.value='';
+  });
+}
+function addManualAc(){
+  const g=k=>($('new-man-'+k)?.value||'').trim();
+  const reg=g('reg').toUpperCase();
+  const hours=g('hours');
+  const err=$('new-man-err');
+  if(!reg){ if(err){err.textContent='Registration is required.';err.style.display='block';} $('new-man-reg')?.focus(); return; }
+  if(!hours||isNaN(hours)){ if(err){err.textContent='Current total hours is required.';err.style.display='block';} $('new-man-hours')?.focus(); return; }
+  if(allAircraft().find(a=>a.reg===reg)){
+    if(err){err.textContent=`Aircraft ${reg} already exists.`;err.style.display='block';} $('new-man-reg')?.focus(); return;
+  }
+  const id='man_'+Date.now();
+  const newAc={id, reg, type:g('type'), hours, landings:g('landings'), last_flight:g('lastflight')};
+  ST.manualAircraft.push(newAc);
+  saveManual();
+  if(!ST.cfg[id]) ST.cfg[id]={};
+  // Save all fields into cfg
+  ['base','maint_due','check_type','cofa_exp','annual_due','sheet_start'].forEach(k=>{
+    ST.cfg[id][k]=g(k);
+  });
+  ST.cfg[id].man_hours=hours;
+  ST.cfg[id].man_landings=g('landings');
+  ST.cfg[id].man_last_flight=g('lastflight');
+  saveCfg();
+  ST.flights[id]=[];
+  hideAddManualForm();
+  buildAcList();
+  render();
+}
+function deleteManualAc(id){
+  const ac=ST.manualAircraft.find(m=>m.id===id);
+  if(!ac) return;
+  if(!confirm(`Are you sure you want to delete ${ac.reg}?\n\nThis cannot be undone.`)) return;
+  ST.manualAircraft=ST.manualAircraft.filter(m=>m.id!==id);
+  saveManual();
+  delete ST.cfg[id];
+  saveCfg();
+  delete ST.flights[id];
+  delete ST.dailyLog[id];
+  saveDailyLog();
+  if(ST.selected?.id===id) ST.selected=ST.aircraft[0]||null;
+  buildAcList();
+  render();
+}
+
+function saveAcCfg(id){
+  const fields=['reg','type','base','maint_due','check_type','cofa_exp','annual_due','sheet_start','man_hours','man_landings','man_last_flight'];
+  if(!ST.cfg[id]) ST.cfg[id]={};
+  fields.forEach(f=>{
+    const el=document.getElementById(`f_${id}_${f}`);
+    if(el) ST.cfg[id][f]=el.value.trim();
+  });
+  saveCfg();
+
+  // Update live aircraft object (Airbly or manual)
+  const ac=ST.aircraft.find(a=>a.id===id);
+  if(ac){
+    ac.reg  = (ST.cfg[id].reg  || ac.reg ).toUpperCase();
+    ac.type =  ST.cfg[id].type || ac.type;
+  }
+  // Also update manual aircraft fields if applicable
+  const man=ST.manualAircraft.find(m=>m.id===id);
+  if(man){
+    man.reg     = ST.cfg[id].reg     || man.reg;
+    man.type    = ST.cfg[id].type    || man.type;
+    man.hours   = ST.cfg[id].man_hours   || man.hours;
+    man.landings= ST.cfg[id].man_landings|| man.landings;
+    man.last_flight = ST.cfg[id].man_last_flight || man.last_flight;
+    saveManual();
+  }
+  // If this is the currently selected aircraft, keep ST.selected in sync
+  const freshAc = allAircraft().find(a=>a.id===id);
+  if(ST.selected?.id===id) ST.selected=freshAc;
+
+  // Rebuild sidebar and re-render the whole view so topbar title,
+  // preview header, hours table, and settings card all reflect the new values
+  buildAcList();
+  render();
+
+  // Flash confirmation — element is recreated by render() so grab it fresh
+  const fl=document.getElementById(`fl_${id}`);
+  if(fl){ fl.style.opacity=1; setTimeout(()=>fl.style.opacity=0,2200); }
+}
+
+// ══ PRINT ═══════════════════════════════════════
+function printCSS(){
+  return`<style>
+    @page{size:A4 landscape;margin:8mm 10mm;}
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{font-family:Arial,sans-serif;font-size:9px;color:#000;background:#fff;}
+    .pg{padding:3mm 2mm;min-height:190mm;display:flex;flex-direction:column;gap:4px;}
+    .pg-hdr-wrap{border:2px solid #000;margin-bottom:4px;}
+    .hdr-top{display:flex;align-items:center;border-bottom:1px solid #000;padding:4px 6px;}
+    .hdr-reg{font-size:28px;font-weight:900;color:#000;letter-spacing:2px;min-width:90px;}
+    .hdr-divider{width:1px;background:#000;height:32px;margin:0 10px;}
+    .hdr-big-block{text-align:center;min-width:60px;}
+    .hdr-big-label{font-size:6.5px;font-weight:700;color:#444;letter-spacing:1px;text-transform:uppercase;}
+    .hdr-big-val{font-size:22px;font-weight:900;color:#000;line-height:1;}
+    .hdr-big-val[contenteditable]{outline:none;}
+    .hdr-warn{font-weight:900;background:#ff0;padding:1px 3px;border-radius:2px;}
+    .hdr-spacer{flex:1;}
+    .hdr-org-big{font-size:16px;font-weight:900;color:#000;letter-spacing:1px;text-align:right;}
+    .hdr-title-small{font-size:9px;color:#444;text-align:right;margin-top:1px;}
+    .hdr-detail{display:flex;flex-wrap:nowrap;border-top:1px solid #000;}
+    .hdr-dbox{flex:1;border-right:1px solid #000;padding:3px 5px;min-width:0;}
+    .hdr-dbox:last-child{border-right:none;}
+    .hdr-dk{font-size:7px;font-weight:700;color:#333;text-transform:uppercase;letter-spacing:.3px;white-space:nowrap;overflow:hidden;}
+    .hdr-dv{font-size:10px;font-weight:600;color:#000;min-height:13px;}
+    .pt{width:100%;border-collapse:collapse;flex:1;font-size:8px;table-layout:fixed;}
+    .pt th{background:#fff;color:#000;padding:3px 4px;text-align:center;border:1px solid #000;font-size:7px;line-height:1.25;vertical-align:middle;font-weight:700;}
+    .pt td{border:1px solid #000;padding:2px 3px;text-align:center;vertical-align:middle;height:19mm;}
+    .th-date{width:14mm;}.th-name{width:20mm;}.th-frt{width:12mm;}.th-fuel{width:13mm;}.th-sig{width:14mm;}.th-auth{width:14mm;}.th-t{width:11mm;}.th-tn{width:9mm;}
+    .pt td.dc{width:14mm;font-size:7.5px;}
+    .pt td.nc{width:20mm;}.pt td.ftc{width:12mm;padding:0;font-weight:700;font-size:8px;}
+    .pt td.fc{width:13mm;}.pt td.sc{width:14mm;}.pt td.authc{width:14mm;}.pt td.tc{width:11mm;}.pt td.stn{width:9mm;padding:0;}
+    .top-val,.bot-val{display:block;padding:2px 3px;font-size:7.5px;}
+    .top-val{border-bottom:1px solid #000;}
+    .pt td.ftc span{display:block;padding:2px 3px;font-size:8px;font-weight:700;color:#000;line-height:1.3;}
+    .pt td.ftc span:first-child{border-bottom:1px solid #000;}
+    .pfoot{display:flex;justify-content:space-between;font-size:7px;color:#666;border-top:1px solid #aaa;padding-top:3px;margin-top:auto;}
+    @media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}}
+  </style>`;
+}
+function openPrintWin(title, pages, onPrinted){
+  const w=window.open('','_blank');
+  w.document.write('<!DOCTYPE html><html><head><title>'+title+'</title>'+printCSS()+'</head><body>'+pages+'</body></html>');
+  w.document.close();
+  // Only increment sheet numbers AFTER the print dialog closes (confirmed print)
+  // onafterprint fires reliably in Chrome after the dialog closes following a real print
+  w.addEventListener('afterprint', ()=>{
+    if(onPrinted) onPrinted();
+    render(); // refresh preview to show updated sheet numbers
+  });
+  setTimeout(()=>w.print(),700);
+}
+function doPrint(printAll){
+  if(printAll){
+    // Build all pages first — capture which ids to bump AFTER confirmed print
+    const idsTobump=allAircraft().map(ac=>ac.id);
+    const allPages=allAircraft().map(ac=>{
+      const fl=ST.flights[ac.id]||[];
+      const chunk=ac.isManual?[]:fl.slice(-7);
+      return buildPageHTML(ac,chunk,0,1,false);
+    }).join('<div style="page-break-after:always"></div>');
+    openPrintWin('Tech Log – All Aircraft', allPages, ()=>{
+      idsTobump.forEach(id=>bumpSheetNum(id));
+    });
+    return;
+  }
+  // Print THIS — single sheet currently on screen
+  const ac=ST.selected;
+  if(!ac) return;
+  const fl=ST.flights[ac.id]||[];
+  const chunk=ac.isManual?[]:fl.slice(-7);
+  const page=buildPageHTML(ac,chunk,0,1,false);
+  openPrintWin('Tech Log – '+ac.reg, page, ()=>{
+    bumpSheetNum(ac.id);
+  });
+}
+
+// Auto-increment sheet number after each print
+function bumpSheetNum(id){
+  if(!ST.cfg[id]) ST.cfg[id]={};
+  const cur=parseInt(ST.cfg[id].sheet_start||'1',10);
+  ST.cfg[id].sheet_start=String(cur+1);
+  saveCfg();
+}
+
+// ══ DEBUG: expose raw Airbly data for inspection ═════
+function debugAirblyFields(){
+  const key=localStorage.getItem('tl_key');
+  if(!key){alert('No API key saved.'); return;}
+  fetch(`https://airbly.com/api/v3/assetList?groupKey=${encodeURIComponent(key)}&log_types=flight&log_limit_per_asset=1`)
+    .then(r=>r.json())
+    .then(raw=>{
+      const a=raw?.assetList?.assets?.[0];
+      if(!a){alert('No assets found.'); return;}
+      const usageKeys=Object.keys(a.usage||{});
+      const topKeys=Object.keys(a).filter(k=>k!=='logs');
+      const msg='=== TOP-LEVEL FIELDS ===\n'+topKeys.map(k=>`${k}: ${JSON.stringify(a[k])}`).join('\n')
+        +'\n\n=== USAGE FIELDS ===\n'+usageKeys.map(k=>`usage.${k}: ${JSON.stringify(a.usage[k])}`).join('\n');
+      // Copy to clipboard and show in a readable modal
+      const win=window.open('','_blank','width=700,height=600');
+      win.document.write('<pre style="font-size:12px;padding:20px;font-family:monospace;white-space:pre-wrap">'+msg+'</pre>');
+      win.document.close();
+    })
+    .catch(e=>alert('Error: '+e.message));
+}
+
+// ══ MANUAL SYNC CONTROLS ═════════════════════════
+async function forcePull(){
+  syncStatus('syncing','Pulling from cloud…');
+  const ok=await syncPull();
+  if(ok){ buildAcList(); render(); syncStatus('ok','Pulled — settings updated'); }
+  else syncStatus('error','Pull failed — check connection');
+}
+async function forcePush(){
+  syncStatus('syncing','Pushing to cloud…');
+  // Push immediately (bypass debounce)
+  clearTimeout(JB._timer);
+  JB._pushing=false;
+  syncPush();
+  syncStatus('ok','Pushed to cloud');
+}
+
+// ══ DEBUG: raw Airbly field inspector ════════════════
+function debugAirblyFields(){
+  const key=localStorage.getItem('tl_key');
+  if(!key){alert('No API key saved.'); return;}
+  fetch(`https://airbly.com/api/v3/assetList?groupKey=${encodeURIComponent(key)}&log_types=flight&log_limit_per_asset=1`)
+    .then(r=>r.json())
+    .then(raw=>{
+      const a=raw?.assetList?.assets?.[0];
+      if(!a){alert('No assets found.'); return;}
+      const topKeys=Object.keys(a).filter(k=>k!=='logs');
+      const usageKeys=Object.keys(a.usage||{});
+      const logKeys=a.logs?.[0]?Object.keys(a.logs[0]):[];
+      const lines=[
+        `=== ASSET: ${a.ident} (${a.logs?.length||0} logs returned) ===`,
+        '',
+        '=== TOP-LEVEL FIELDS ===',
+        ...topKeys.map(k=>`  ${k}: ${JSON.stringify(a[k])}`),
+        '',
+        '=== USAGE FIELDS ===',
+        ...usageKeys.map(k=>`  usage.${k}: ${JSON.stringify(a.usage[k])}`),
+        '',
+        `=== FIRST LOG ENTRY (of ${a.logs?.length||0}) ===`,
+        ...logKeys.map(k=>`  log.${k}: ${JSON.stringify(a.logs[0][k])}`),
+        logKeys.length===0?'  (no log entries returned — check API limit param)':'',
+      ].join('\n');
+      const win=window.open('','_blank','width=750,height=650');
+      win.document.write(`<!DOCTYPE html><html><body style="font-family:monospace;font-size:12px;padding:20px;white-space:pre-wrap;background:#0b1a2e;color:#c8dff0">${lines}</body></html>`);
+      win.document.close();
+    })
+    .catch(e=>alert('Fetch error: '+e.message));
+}
+
+// ══ INIT ══════════════════════════════════════════
+initPassword();
+</script>
+</body>
+</html>
