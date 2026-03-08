@@ -604,14 +604,6 @@ async function fetchFlights() {
     const url = `https://airbly.com/api/v3/assetList?groupKey=${AIRBLY_KEY}&log_types=flight&log_limit_per_asset=1`;
     const res = await fetch(url);
     const data = await res.json();
-    // Log full first asset if available
-    const firstAsset = Array.isArray(data) ? data[0] : (data.assets || data.data || data.items || data.asset_list || [])[0];
-    if (firstAsset) {
-      console.log('Asset fields:', Object.keys(firstAsset));
-      console.log('Asset data:', JSON.stringify(firstAsset));
-    } else {
-      console.log('Airbly top-level keys:', Object.keys(data));
-    }
     const assets = (data.assetList && data.assetList.assets) ? data.assetList.assets : [];
     liveFlights = assets
       .filter(a => a.asset_type === 'aircraft')
