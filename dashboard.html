@@ -165,6 +165,7 @@
   .raw-text .h  { color:var(--accent); }
   .raw-text .hg { color:var(--green); }
   .raw-text .ha { color:var(--amber); }
+  .raw-text .hr { color:var(--red); }
   .taf-text { font-family:var(--mono); font-size:9px; color:var(--dim); line-height:1.7; word-break:break-all; white-space:pre-wrap; }
 
   /* ── NEARBY AIRFIELDS ── */
@@ -183,6 +184,7 @@
   .af-metar .h  { color:var(--accent); }
   .af-metar .hg { color:var(--green); }
   .af-metar .ha { color:var(--amber); }
+  .af-metar .hr { color:var(--red); }
   .af-taf-toggle { font-family:var(--mono); font-size:8px; color:var(--dim); letter-spacing:0.1em; padding:4px 12px; border-top:1px solid var(--border); cursor:pointer; display:flex; justify-content:space-between; user-select:none; }
   .af-taf-toggle:hover { color:var(--text); }
   .af-taf-body { font-family:var(--mono); font-size:9px; color:var(--dim); line-height:1.7; word-break:break-all; white-space:pre-wrap; padding:6px 12px 8px; border-top:1px solid var(--border); display:none; }
@@ -457,22 +459,40 @@ function flightCat(metarText) {
 // ── HIGHLIGHT METAR ──
 function highlightMetar(raw) {
   if(!raw) return '';
+  // ICAO identifier
   let h = raw.replace(/^([A-Z]{4})\s/,'<span class="h">$1</span> ');
-  h = h.replace(/(\b(?:\d{3}|VRB)\d{2,3}(?:G\d{2,3})?(?:KT|MPS)\b)/g, m=>{
-    const kts=parseInt(m.match(/\d{2,3}/g)?.[1]||'0');
-    return `<span class="${(kts>=20||m.includes('G'))?'ha':'hg'}">${m}</span>`;
-  });
-  h = h.replace(/\b9999\b/g,'<span class="hg">9999</span>');
-  h = h.replace(/\b(\d{3,4})\b(?!\d)(?!Z)/g,(m,v)=>{
-    const metres=parseInt(v);
-    if(metres<=9000&&metres>0) return metres<5000?`<span class="ha">${v}</span>`:`<span class="hg">${v}</span>`;
-    return m;
-  });
-  h = h.replace(/\b(FEW|SCT|BKN|OVC)(\d{3})\b/g,(m,cov,ht)=>{
-    const ft=parseInt(ht)*100;
-    const cls=(cov==='BKN'||cov==='OVC')&&ft<3000?'ha':'ha';
+
+  // Wind — club rules: green <17kt, amber 17-24kt, red 25kt+
+  h = h.replace(/(\b(?:\d{3}|VRB)\d{2,3}(?:G\d{2,3})?(?:KT|MPS)\b)/g, m => {
+    const parts = m.match(/(\d{2,3})/g) || [];
+    const spd   = parseInt(parts[1] || parts[0] || '0');
+    const gust  = m.match(/G(\d{2,3})/);
+    const max   = gust ? Math.max(spd, parseInt(gust[1])) : spd;
+    const cls   = max >= 25 ? 'hr' : max >= 17 ? 'ha' : 'hg';
     return `<span class="${cls}">${m}</span>`;
   });
+
+  // Visibility — green 5000m+, amber 1500-4999m, red <1500m
+  h = h.replace(/\b9999\b/g, '<span class="hg">9999</span>');
+  h = h.replace(/\b(\d{3,4})\b(?!\d)(?!Z)/g, (m, v) => {
+    const metres = parseInt(v);
+    if (metres > 0 && metres <= 9000) {
+      const cls = metres < 1500 ? 'hr' : metres < 5000 ? 'ha' : 'hg';
+      return `<span class="${cls}">${v}</span>`;
+    }
+    return m;
+  });
+
+  // Cloud — FEW/SCT always green; BKN/OVC: green >3000ft, amber 1500-3000ft, red <1500ft
+  h = h.replace(/\b(FEW|SCT|BKN|OVC)(\d{3})\b/g, (m, cov, ht) => {
+    const ft = parseInt(ht) * 100;
+    let cls = 'hg';
+    if (cov === 'BKN' || cov === 'OVC') {
+      cls = ft < 1500 ? 'hr' : ft < 3000 ? 'ha' : 'hg';
+    }
+    return `<span class="${cls}">${m}</span>`;
+  });
+
   return h;
 }
 
@@ -555,6 +575,7 @@ async function fetchNotams() {
     const data = await res.json();
     // AutoRouter returns { total: N, rows: [...] }
     const notams = data.rows || [];
+    window.liveNotamsActive = notams.length > 0;
     renderNotams(notams);
   } catch(e) {
     console.warn('NOTAM fetch failed:', e.message);
@@ -599,6 +620,8 @@ async function fetchNotices() {
     });
     window.binNotams = data.record?.notams || [];
     renderNotices(notices);
+    // Re-render NOTAMs only if AutoRouter isn't providing live data
+    if (!window.liveNotamsActive) renderNotams([]);
   } catch(e) {
     console.warn('Notices fetch failed:', e.message);
     renderNotices([]);
