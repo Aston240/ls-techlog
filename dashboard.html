@@ -601,16 +601,23 @@ let liveFlights = [];
 
 async function fetchFlights() {
   try {
-    const res = await fetch('https://app.airbly.com/api/fleet/status', {
-      headers: { 'Authorization': 'Bearer ' + AIRBLY_KEY }
-    });
+    const url = `https://app.airbly.com/api/assetList?groupKey=${AIRBLY_KEY}&log_types=flight&log_limit_per_asset=1`;
+    const res = await fetch(url);
     const data = await res.json();
-    const aircraft = Array.isArray(data) ? data : (data.aircraft || data.fleet || data.data || []);
-    liveFlights = aircraft.map(a => ({
-      reg:      a.registration || a.reg || a.callsign || '?',
-      airborne: a.airborne || a.flying || a.status === 'airborne' || a.status === 'flying' || false,
-      depTime:  a.departure_time || a.dep_time || a.takeoff_time || null,
-    }));
+    console.log('Airbly raw:', JSON.stringify(data).slice(0, 500));
+    const assets = Array.isArray(data) ? data : (data.assets || data.data || data.items || []);
+    liveFlights = assets.map(a => {
+      // Log first asset structure to console so we can see field names
+      console.log('Asset fields:', Object.keys(a));
+      const airborne = a.airborne || a.flying || a.is_airborne || a.inFlight ||
+                       a.status === 'airborne' || a.status === 'flying' ||
+                       a.flightStatus === 'airborne' || false;
+      return {
+        reg:      a.registration || a.reg || a.callsign || a.tail || a.name || '?',
+        airborne: airborne,
+        depTime:  a.departure_time || a.dep_time || a.takeoff_time || a.departureTime || null,
+      };
+    });
     renderFlights();
   } catch(e) {
     console.warn('Airbly fetch failed:', e.message);
