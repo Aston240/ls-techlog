@@ -274,7 +274,7 @@
   .collapse-hint { font-family:var(--mono); font-size:8px; color:var(--dim); text-align:center; letter-spacing:0.1em; opacity:0.5; padding:2px 0 0; }
   .footer { text-align:center; font-family:var(--mono); font-size:9px; color:var(--dim); letter-spacing:0.1em; padding-top:4px; }
   .rbar  { height:2px; background:var(--border); border-radius:1px; margin-bottom:8px; overflow:hidden; }
-  .rfill { height:100%; background:var(--accent); width:0%; animation:refill 30s linear infinite; }
+  .rfill { height:100%; background:var(--accent); width:0%; animation:refill 60s linear infinite; }
   @keyframes refill { from{width:0} to{width:100%} }
 </style>
 </head>
@@ -409,7 +409,7 @@
 
   <div class="footer">
     <div class="rbar"><div class="rfill"></div></div>
-    AUTO-REFRESH 30s &nbsp;·&nbsp; <span id="lastUp">UPDATED --:--</span>
+    AUTO-REFRESH 60s &nbsp;·&nbsp; <span id="lastUp">UPDATED --:--</span>
   </div>
 
 </div>
@@ -424,7 +424,7 @@ const HOME_ICAO    = 'EGTK';
 const NEARBY_ICAOS = [
   { icao:'EGVN', name:'Brize Norton' },
   { icao:'EGBJ', name:'Gloucester' },
-  { icao:'EGVP', name:'Middle Wallop' },
+  { icao:'EGHI', name:'Southampton' },
   { icao:'EGBB', name:'Birmingham' },
 ];
 const ALL_ICAOS = [HOME_ICAO, ...NEARBY_ICAOS.map(a=>a.icao)];
@@ -434,26 +434,7 @@ const ALL_ICAOS = [HOME_ICAO, ...NEARBY_ICAOS.map(a=>a.icao)];
 //  type options: 'rwy' (yellow) | 'nav' (blue) | 'obst' (red)
 //  Remove items by deleting the { } block. Add new ones at the top.
 // ════════════════════════════════════════════════════════════════
-const MANUAL_NOTAMS = [
-  {
-    type: 'rwy',
-    label: 'RWY',
-    text: 'Add your NOTAM text here — e.g. RWY 01/19 closed for maintenance.',
-    valid: 'Until further notice'
-  },
-  // {
-  //   type: 'nav',
-  //   label: 'NAV',
-  //   text: 'Example: Oxford VOR unserviceable.',
-  //   valid: '08–21 MAR 2026'
-  // },
-  // {
-  //   type: 'obst',
-  //   label: 'OBST',
-  //   text: 'Example: Crane 2NM north, 350ft AGL.',
-  //   valid: 'Until further notice'
-  // },
-];
+const MANUAL_NOTAMS = []; // now sourced from JSONBin via fetchNotices
 
 // ── FLIGHT CATEGORY CALCULATION ──
 function flightCat(metarText) {
@@ -613,6 +594,7 @@ async function fetchNotices() {
       if (!n.expiry) return true;
       return new Date(n.expiry) >= new Date();
     });
+    window.binNotams = data.record?.notams || [];
     renderNotices(notices);
   } catch(e) {
     console.warn('Notices fetch failed:', e.message);
@@ -980,12 +962,16 @@ function renderNotams(liveNotams) {
     return;
   }
 
-  // Fall back to manual NOTAMs
-  if (MANUAL_NOTAMS.length) {
-    wrap.innerHTML = MANUAL_NOTAMS.map((n, i) => `
+  // Fall back to manual NOTAMs from JSONBin
+  const manualNotams = (window.binNotams || []).filter(n => {
+    if (n.to && new Date(n.to) < new Date()) return false;
+    return true;
+  });
+  if (manualNotams.length) {
+    wrap.innerHTML = manualNotams.map((n, i) => `
       <div class="notam-item" style="animation-delay:${i*0.07}s">
-        <div class="notam-qcode ${n.type}">${n.label}</div>
-        <div><div class="notam-text">${n.text}</div><div class="notam-valid">${n.valid}</div></div>
+        <div class="notam-qcode rwy">NOTAM</div>
+        <div><div class="notam-text">${n.text}</div><div class="notam-valid">${n.from||''}${n.to?' → '+n.to:''}</div></div>
       </div>`).join('');
     return;
   }
@@ -1219,12 +1205,12 @@ fetchNotams();
 fetchNotices();
 fetchFlights();
 refreshSlots();
-setInterval(updateElapsed, 30000);
-setInterval(init, 30000);
-setInterval(()=>{ if(cachedSlots) renderSlots(cachedSlots); }, 30000);
+setInterval(updateElapsed, 60000);
+setInterval(init, 60000);
+setInterval(()=>{ if(cachedSlots) renderSlots(cachedSlots); }, 60000);
 setInterval(fetchWeather,  600000);   // weather every 10 mins
 setInterval(fetchNotams,  1800000);   // NOTAMs every 30 mins
-setInterval(fetchNotices,  300000);   // notices every 5 mins
+setInterval(fetchNotices,   60000);   // notices every 60 secs
 setInterval(fetchFlights,   30000);   // flights every 30 secs
 setInterval(refreshSlots,  120000);   // slots every 2 mins
 </script>

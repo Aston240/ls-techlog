@@ -3,129 +3,107 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>LS Airmotive — School Notices</title>
+<title>LS Airmotive — Notices & NOTAMs Admin</title>
 <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow+Condensed:wght@400;600;700;900&family=Barlow:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg:     #080c12;
-    --panel:  #0d1420;
-    --panel2: #111825;
-    --border: #1a2840;
-    --accent: #00aaff;
-    --green:  #00e676;
-    --amber:  #ffab00;
-    --red:    #ff3d3d;
-    --text:   #b8d4ee;
-    --dim:    #3a5570;
-    --bright: #e4f2ff;
-    --mono:   'Share Tech Mono', monospace;
-    --head:   'Barlow Condensed', sans-serif;
-    --body:   'Barlow', sans-serif;
+    --bg:#080c12; --panel:#0d1420; --panel2:#111825; --border:#1a2840;
+    --accent:#00aaff; --green:#00e676; --amber:#ffab00; --red:#ff3d3d;
+    --text:#b8d4ee; --dim:#3a5570; --bright:#e4f2ff;
+    --mono:'Share Tech Mono',monospace; --head:'Barlow Condensed',sans-serif; --body:'Barlow',sans-serif;
   }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  html,body{background:var(--bg);color:var(--text);font-family:var(--body);min-height:100vh;}
+  body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(0,170,255,0.025) 1px,transparent 1px),linear-gradient(90deg,rgba(0,170,255,0.025) 1px,transparent 1px);background-size:32px 32px;pointer-events:none;z-index:0;}
 
-  * { margin:0; padding:0; box-sizing:border-box; }
-
-  html, body {
-    background:var(--bg); color:var(--text);
-    font-family:var(--body); min-height:100vh;
-  }
-
-  body::before {
-    content:''; position:fixed; inset:0;
-    background-image:
-      linear-gradient(rgba(0,170,255,0.025) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(0,170,255,0.025) 1px, transparent 1px);
-    background-size:32px 32px; pointer-events:none; z-index:0;
-  }
-
-  .wrap { position:relative; z-index:1; max-width:560px; margin:0 auto; padding:24px 16px 40px; }
+  .wrap{position:relative;z-index:1;max-width:1100px;margin:0 auto;padding:24px 20px 40px;}
 
   /* ── HEADER ── */
-  .header { display:flex; align-items:flex-start; justify-content:space-between; padding-bottom:16px; border-bottom:1px solid var(--border); margin-bottom:24px; }
-  .logo { font-family:var(--head); font-weight:900; font-size:26px; letter-spacing:0.08em; color:var(--bright); line-height:1; }
-  .logo span { color:var(--accent); }
-  .logo-sub { font-family:var(--mono); font-size:9px; color:var(--dim); letter-spacing:0.18em; margin-top:3px; }
-  .logout-btn { font-family:var(--mono); font-size:9px; color:var(--dim); letter-spacing:0.1em; background:none; border:1px solid var(--border); padding:5px 10px; border-radius:3px; cursor:pointer; transition:all 0.2s; }
-  .logout-btn:hover { color:var(--red); border-color:var(--red); }
+  .header{display:flex;align-items:flex-start;justify-content:space-between;padding-bottom:16px;border-bottom:1px solid var(--border);margin-bottom:24px;}
+  .logo{font-family:var(--head);font-weight:900;font-size:26px;letter-spacing:0.08em;color:var(--bright);line-height:1;}
+  .logo span{color:var(--accent);}
+  .logo-sub{font-family:var(--mono);font-size:9px;color:var(--dim);letter-spacing:0.18em;margin-top:3px;}
+  .logout-btn{font-family:var(--mono);font-size:9px;color:var(--dim);letter-spacing:0.1em;background:none;border:1px solid var(--border);padding:5px 10px;border-radius:3px;cursor:pointer;transition:all 0.2s;}
+  .logout-btn:hover{color:var(--red);border-color:var(--red);}
 
   /* ── LOGIN ── */
-  .login-screen { display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:70vh; gap:16px; }
-  .login-box { background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:32px; width:100%; max-width:320px; }
-  .login-title { font-family:var(--head); font-weight:900; font-size:20px; letter-spacing:0.1em; color:var(--bright); margin-bottom:6px; }
-  .login-sub { font-family:var(--mono); font-size:9px; color:var(--dim); letter-spacing:0.12em; margin-bottom:20px; }
-  .login-err { font-family:var(--mono); font-size:9px; color:var(--red); letter-spacing:0.1em; margin-bottom:12px; display:none; }
-  .login-err.show { display:block; }
+  .login-screen{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:70vh;gap:16px;}
+  .login-box{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:32px;width:100%;max-width:320px;}
+  .login-title{font-family:var(--head);font-weight:900;font-size:20px;letter-spacing:0.1em;color:var(--bright);margin-bottom:6px;}
+  .login-sub{font-family:var(--mono);font-size:9px;color:var(--dim);letter-spacing:0.12em;margin-bottom:20px;}
+  .login-err{font-family:var(--mono);font-size:9px;color:var(--red);letter-spacing:0.1em;margin-bottom:12px;display:none;}
+  .login-err.show{display:block;}
+
+  /* ── COLUMNS ── */
+  .columns{display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start;}
+  @media(max-width:700px){.columns{grid-template-columns:1fr;}}
 
   /* ── FORM ELEMENTS ── */
-  .field { margin-bottom:14px; }
-  .field label { display:block; font-family:var(--head); font-size:10px; font-weight:700; letter-spacing:0.15em; text-transform:uppercase; color:var(--dim); margin-bottom:5px; }
-  .field input, .field textarea, .field select {
-    width:100%; background:var(--panel2); border:1px solid var(--border); border-radius:5px;
-    padding:9px 12px; color:var(--bright); font-family:var(--mono); font-size:12px;
-    outline:none; transition:border-color 0.2s;
-  }
-  .field input:focus, .field textarea:focus, .field select:focus { border-color:var(--accent); }
-  .field textarea { resize:vertical; min-height:80px; line-height:1.5; }
-  .field select option { background:var(--panel2); }
+  .field{margin-bottom:14px;}
+  .field label{display:block;font-family:var(--head);font-size:10px;font-weight:700;letter-spacing:0.15em;text-transform:uppercase;color:var(--dim);margin-bottom:5px;}
+  .field input,.field textarea,.field select{width:100%;background:var(--panel2);border:1px solid var(--border);border-radius:5px;padding:9px 12px;color:var(--bright);font-family:var(--mono);font-size:12px;outline:none;transition:border-color 0.2s;}
+  .field input:focus,.field textarea:focus,.field select:focus{border-color:var(--accent);}
+  .field textarea{resize:vertical;min-height:80px;line-height:1.5;}
+  .field select option{background:var(--panel2);}
 
   /* ── BUTTONS ── */
-  .btn { font-family:var(--head); font-weight:700; font-size:13px; letter-spacing:0.12em; text-transform:uppercase; border:none; border-radius:5px; padding:10px 20px; cursor:pointer; transition:all 0.2s; width:100%; }
-  .btn-primary { background:var(--accent); color:#000; }
-  .btn-primary:hover { background:#33bbff; }
-  .btn-primary:disabled { background:var(--border); color:var(--dim); cursor:not-allowed; }
-  .btn-danger { background:rgba(255,61,61,0.12); color:var(--red); border:1px solid rgba(255,61,61,0.25); padding:5px 10px; font-size:10px; width:auto; }
-  .btn-danger:hover { background:rgba(255,61,61,0.2); }
-  .btn-edit { background:rgba(0,170,255,0.1); color:var(--accent); border:1px solid rgba(0,170,255,0.2); padding:5px 10px; font-size:10px; width:auto; }
-  .btn-edit:hover { background:rgba(0,170,255,0.2); }
+  .btn{font-family:var(--head);font-weight:700;font-size:13px;letter-spacing:0.12em;text-transform:uppercase;border:none;border-radius:5px;padding:10px 20px;cursor:pointer;transition:all 0.2s;width:100%;}
+  .btn-primary{background:var(--accent);color:#000;}
+  .btn-primary:hover{background:#33bbff;}
+  .btn-primary:disabled{background:var(--border);color:var(--dim);cursor:not-allowed;}
+  .btn-warn{background:rgba(255,171,0,0.15);color:var(--amber);border:1px solid rgba(255,171,0,0.3);}
+  .btn-warn:hover{background:rgba(255,171,0,0.25);}
+  .btn-warn:disabled{background:var(--border);color:var(--dim);cursor:not-allowed;}
+  .btn-danger{background:rgba(255,61,61,0.12);color:var(--red);border:1px solid rgba(255,61,61,0.25);padding:5px 10px;font-size:10px;width:auto;}
+  .btn-danger:hover{background:rgba(255,61,61,0.2);}
+  .btn-edit{background:rgba(0,170,255,0.1);color:var(--accent);border:1px solid rgba(0,170,255,0.2);padding:5px 10px;font-size:10px;width:auto;}
+  .btn-edit:hover{background:rgba(0,170,255,0.2);}
 
   /* ── PANEL ── */
-  .panel { background:var(--panel); border:1px solid var(--border); border-radius:8px; padding:18px; margin-bottom:16px; position:relative; overflow:hidden; }
-  .panel::before { content:''; position:absolute; top:0;left:0;right:0; height:2px; background:linear-gradient(90deg,#0055aa,var(--accent),transparent); }
-  .panel.amber::before { background:linear-gradient(90deg,#995500,var(--amber),transparent); }
-  .panel-title { font-family:var(--head); font-weight:900; font-size:14px; letter-spacing:0.15em; text-transform:uppercase; color:var(--bright); margin-bottom:14px; }
+  .panel{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:18px;margin-bottom:16px;position:relative;overflow:hidden;}
+  .panel::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,#0055aa,var(--accent),transparent);}
+  .panel.amber::before{background:linear-gradient(90deg,#995500,var(--amber),transparent);}
+  .panel.red::before{background:linear-gradient(90deg,#660000,var(--red),transparent);}
+  .panel-title{font-family:var(--head);font-weight:900;font-size:14px;letter-spacing:0.15em;text-transform:uppercase;color:var(--bright);margin-bottom:14px;}
 
-  /* ── NOTICE LIST ── */
-  .notice-item {
-    display:flex; gap:12px; align-items:flex-start;
-    padding:10px 0; border-bottom:1px solid var(--border);
-    animation: fadeUp 0.3s ease both;
-  }
-  .notice-item:first-child { padding-top:0; }
-  .notice-item:last-child { border-bottom:none; padding-bottom:0; }
-  .ntag { font-family:var(--mono); font-size:8px; letter-spacing:0.1em; text-transform:uppercase; padding:3px 7px; border-radius:2px; flex-shrink:0; margin-top:2px; }
-  .ntag.info { background:rgba(0,170,255,0.12); color:var(--accent); border:1px solid rgba(0,170,255,0.25); }
-  .ntag.warn { background:rgba(255,171,0,0.12); color:var(--amber); border:1px solid rgba(255,171,0,0.25); }
-  .ntag.ops  { background:rgba(0,230,118,0.12); color:#00e676; border:1px solid rgba(0,230,118,0.25); }
-  .notice-body { flex:1; }
-  .notice-text { font-size:13px; color:var(--bright); line-height:1.45; }
-  .notice-meta { font-family:var(--mono); font-size:9px; color:var(--dim); margin-top:3px; }
-  .notice-actions { display:flex; gap:6px; margin-top:6px; }
-  .empty-state { font-family:var(--mono); font-size:10px; color:var(--dim); letter-spacing:0.12em; text-align:center; padding:20px 0; }
+  /* ── NOTICE / NOTAM LIST ── */
+  .notice-item{display:flex;gap:12px;align-items:flex-start;padding:10px 0;border-bottom:1px solid var(--border);animation:fadeUp 0.3s ease both;}
+  .notice-item:first-child{padding-top:0;}
+  .notice-item:last-child{border-bottom:none;padding-bottom:0;}
+  .ntag{font-family:var(--mono);font-size:8px;letter-spacing:0.1em;text-transform:uppercase;padding:3px 7px;border-radius:2px;flex-shrink:0;margin-top:2px;}
+  .ntag.info{background:rgba(0,170,255,0.12);color:var(--accent);border:1px solid rgba(0,170,255,0.25);}
+  .ntag.warn{background:rgba(255,171,0,0.12);color:var(--amber);border:1px solid rgba(255,171,0,0.25);}
+  .ntag.ops{background:rgba(0,230,118,0.12);color:#00e676;border:1px solid rgba(0,230,118,0.25);}
+  .ntag.notam{background:rgba(255,61,61,0.12);color:var(--red);border:1px solid rgba(255,61,61,0.25);}
+  .notice-body{flex:1;}
+  .notice-text{font-size:13px;color:var(--bright);line-height:1.45;}
+  .notice-meta{font-family:var(--mono);font-size:9px;color:var(--dim);margin-top:3px;}
+  .notice-actions{display:flex;gap:6px;margin-top:6px;}
+  .empty-state{font-family:var(--mono);font-size:10px;color:var(--dim);letter-spacing:0.12em;text-align:center;padding:20px 0;}
 
   /* ── STATUS ── */
-  .status-bar { font-family:var(--mono); font-size:9px; letter-spacing:0.1em; padding:8px 12px; border-radius:4px; margin-bottom:14px; display:none; }
-  .status-bar.show { display:block; }
-  .status-bar.ok   { background:rgba(0,230,118,0.1); color:var(--green); border:1px solid rgba(0,230,118,0.2); }
-  .status-bar.err  { background:rgba(255,61,61,0.1);  color:var(--red);   border:1px solid rgba(255,61,61,0.2); }
-  .status-bar.load { background:rgba(0,170,255,0.1); color:var(--accent); border:1px solid rgba(0,170,255,0.2); }
+  .status-bar{font-family:var(--mono);font-size:9px;letter-spacing:0.1em;padding:8px 12px;border-radius:4px;margin-bottom:14px;display:none;}
+  .status-bar.show{display:block;}
+  .status-bar.ok{background:rgba(0,230,118,0.1);color:var(--green);border:1px solid rgba(0,230,118,0.2);}
+  .status-bar.err{background:rgba(255,61,61,0.1);color:var(--red);border:1px solid rgba(255,61,61,0.2);}
+  .status-bar.load{background:rgba(0,170,255,0.1);color:var(--accent);border:1px solid rgba(0,170,255,0.2);}
 
-  /* ── SECTION DIVIDER ── */
-  .slabel { font-family:var(--head); font-size:10px; font-weight:700; letter-spacing:0.2em; color:var(--dim); display:flex; align-items:center; gap:8px; margin-bottom:10px; }
-  .slabel::after { content:''; flex:1; height:1px; background:var(--border); }
+  .slabel{font-family:var(--head);font-size:10px;font-weight:700;letter-spacing:0.2em;color:var(--dim);display:flex;align-items:center;gap:8px;margin-bottom:10px;}
+  .slabel::after{content:'';flex:1;height:1px;background:var(--border);}
 
-  @keyframes fadeUp { from{opacity:0;transform:translateY(4px)} to{opacity:1;transform:none} }
-  @keyframes spin   { to{transform:rotate(360deg)} }
-  .spinner { display:inline-block; width:12px; height:12px; border:2px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin 0.8s linear infinite; vertical-align:middle; margin-right:6px; }
+  @keyframes fadeUp{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .spinner{display:inline-block;width:12px;height:12px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 0.8s linear infinite;vertical-align:middle;margin-right:6px;}
 </style>
 </head>
 <body>
 <div class="wrap">
 
-  <!-- LOGIN SCREEN -->
+  <!-- LOGIN -->
   <div id="loginScreen" class="login-screen">
     <div class="login-box">
       <div class="login-title">LS AIRMOTIVE</div>
-      <div class="login-sub">NOTICES ADMIN · ENTER PASSWORD</div>
+      <div class="login-sub">ADMIN · ENTER PASSWORD</div>
       <div class="login-err" id="loginErr">INCORRECT PASSWORD</div>
       <div class="field">
         <label>Password</label>
@@ -135,60 +113,91 @@
     </div>
   </div>
 
-  <!-- ADMIN SCREEN -->
+  <!-- ADMIN -->
   <div id="adminScreen" style="display:none">
 
     <div class="header">
       <div>
         <div class="logo">LS <span>Airmotive</span></div>
-        <div class="logo-sub">SCHOOL NOTICES ADMIN</div>
+        <div class="logo-sub">NOTICES &amp; NOTAMs ADMIN</div>
       </div>
       <button class="logout-btn" onclick="doLogout()">SIGN OUT</button>
     </div>
 
     <div id="statusBar" class="status-bar"></div>
 
-    <!-- ADD / EDIT FORM -->
-    <div class="panel" id="formPanel">
-      <div class="panel-title" id="formTitle">ADD NOTICE</div>
-      <div class="field">
-        <label>Tag</label>
-        <select id="nTag">
-          <option value="info">INFO</option>
-          <option value="ops">OPS</option>
-          <option value="warn">WARN</option>
-        </select>
-      </div>
-      <div class="field">
-        <label>Notice Text</label>
-        <textarea id="nText" placeholder="Enter notice text..."></textarea>
-      </div>
-      <div class="field">
-        <label>Expires (optional)</label>
-        <input type="date" id="nExpiry">
-      </div>
-      <input type="hidden" id="editId">
-      <button class="btn btn-primary" id="submitBtn" onclick="submitNotice()">POST NOTICE</button>
-    </div>
+    <div class="columns">
 
-    <!-- EXISTING NOTICES -->
-    <div class="panel amber">
-      <div class="panel-title">CURRENT NOTICES</div>
-      <div id="noticesList"><div class="empty-state">LOADING...</div></div>
-    </div>
+      <!-- ══ LEFT: NOTICES ══ -->
+      <div>
+        <div class="panel" id="noticeFormPanel">
+          <div class="panel-title" id="noticeFormTitle">ADD NOTICE</div>
+          <div class="field">
+            <label>Tag</label>
+            <select id="nTag">
+              <option value="info">INFO</option>
+              <option value="ops">OPS</option>
+              <option value="warn">WARN</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Notice Text</label>
+            <textarea id="nText" placeholder="Enter notice text..."></textarea>
+          </div>
+          <div class="field">
+            <label>Expires (optional)</label>
+            <input type="date" id="nExpiry">
+          </div>
+          <input type="hidden" id="editNoticeId">
+          <button class="btn btn-primary" id="noticeSubmitBtn" onclick="submitNotice()">POST NOTICE</button>
+        </div>
 
-    <div style="text-align:center; font-family:var(--mono); font-size:9px; color:var(--dim); letter-spacing:0.1em; margin-top:8px;">
-      <a href="dashboard.html" style="color:var(--accent); text-decoration:none;">← BACK TO DASHBOARD</a>
+        <div class="panel amber">
+          <div class="panel-title">CURRENT NOTICES</div>
+          <div id="noticesList"><div class="empty-state">LOADING...</div></div>
+        </div>
+      </div>
+
+      <!-- ══ RIGHT: NOTAMs ══ -->
+      <div>
+        <div class="panel" id="notamFormPanel">
+          <div class="panel-title" id="notamFormTitle">ADD MANUAL NOTAM</div>
+          <div class="field">
+            <label>NOTAM Text</label>
+            <textarea id="nmText" placeholder="e.g. RWY 15/33 CLSD TIL 15 MAR 2026..."></textarea>
+          </div>
+          <div class="field">
+            <label>Valid From</label>
+            <input type="date" id="nmFrom">
+          </div>
+          <div class="field">
+            <label>Valid To</label>
+            <input type="date" id="nmTo">
+          </div>
+          <input type="hidden" id="editNotamId">
+          <button class="btn btn-warn" id="notamSubmitBtn" onclick="submitNotam()">POST NOTAM</button>
+        </div>
+
+        <div class="panel red">
+          <div class="panel-title">CURRENT MANUAL NOTAMs</div>
+          <div id="notamsList"><div class="empty-state">LOADING...</div></div>
+        </div>
+      </div>
+
+    </div><!-- /columns -->
+
+    <div style="text-align:center;font-family:var(--mono);font-size:9px;color:var(--dim);letter-spacing:0.1em;margin-top:8px;">
+      <a href="dashboard.html" style="color:var(--accent);text-decoration:none;">← BACK TO DASHBOARD</a>
     </div>
 
   </div>
 </div>
 
 <script>
-const PASSWORD  = 'limasierra';
+const PASSWORD    = 'limasierra';
 const JSONBIN_ID  = '69ac06bf43b1c97be9bd5667';
 const JSONBIN_KEY = '$2a$10$wjZldGseV25iurze/grlbOQ1ZxUVCugh.kmmRH3LOo3zEiUF4RKPS';
-const BIN_URL   = `https://api.jsonbin.io/v3/b/${JSONBIN_ID}`;
+const BIN_URL     = `https://api.jsonbin.io/v3/b/${JSONBIN_ID}`;
 
 // ── AUTH ──
 function doLogin() {
@@ -197,7 +206,7 @@ function doLogin() {
     sessionStorage.setItem('noticesAuth', '1');
     document.getElementById('loginScreen').style.display = 'none';
     document.getElementById('adminScreen').style.display = 'block';
-    loadNotices();
+    loadData();
   } else {
     document.getElementById('loginErr').classList.add('show');
     document.getElementById('pwInput').value = '';
@@ -211,12 +220,6 @@ function doLogout() {
   document.getElementById('pwInput').value = '';
 }
 
-// Check if already logged in
-if (sessionStorage.getItem('noticesAuth') === '1') {
-  document.getElementById('loginScreen').style.display = 'none';
-  document.getElementById('adminScreen').style.display = 'block';
-}
-
 // ── STATUS ──
 function showStatus(msg, type) {
   const bar = document.getElementById('statusBar');
@@ -227,9 +230,7 @@ function showStatus(msg, type) {
 
 // ── JSONBIN ──
 async function readBin() {
-  const res = await fetch(BIN_URL + '/latest', {
-    headers: { 'X-Master-Key': JSONBIN_KEY }
-  });
+  const res = await fetch(BIN_URL + '/latest', { headers: { 'X-Master-Key': JSONBIN_KEY } });
   const data = await res.json();
   return data.record || {};
 }
@@ -243,83 +244,66 @@ async function writeBin(record) {
   return res.ok;
 }
 
-// ── LOAD NOTICES ──
+// ── LOAD ──
 let allData = {};
 
-async function loadNotices() {
-  showStatus('LOADING NOTICES...', 'load');
+async function loadData() {
+  showStatus('LOADING...', 'load');
   try {
     allData = await readBin();
     if (!allData.notices) allData.notices = [];
+    if (!allData.notams)  allData.notams  = [];
     renderNotices();
+    renderNotams();
     document.getElementById('statusBar').classList.remove('show');
   } catch(e) {
     showStatus('ERROR LOADING DATA — ' + e.message, 'err');
   }
 }
 
-// ── RENDER ──
+// ══════════════════════════════════════════════
+//  NOTICES
+// ══════════════════════════════════════════════
 function renderNotices() {
   const wrap = document.getElementById('noticesList');
-  const notices = (allData.notices || []).slice().reverse(); // newest first
-
-  if (!notices.length) {
-    wrap.innerHTML = '<div class="empty-state">NO NOTICES YET</div>';
-    return;
-  }
-
+  const notices = (allData.notices || []).slice().reverse();
+  if (!notices.length) { wrap.innerHTML = '<div class="empty-state">NO NOTICES YET</div>'; return; }
   wrap.innerHTML = notices.map((n, i) => {
-    const expiry = n.expiry ? ` · Expires ${n.expiry}` : '';
+    const expiry  = n.expiry ? ` · Expires ${n.expiry}` : '';
     const expired = n.expiry && new Date(n.expiry) < new Date();
-    return `
-      <div class="notice-item" style="animation-delay:${i*0.05}s; opacity:${expired?0.4:1}">
-        <div class="ntag ${n.tag}">${n.tag.toUpperCase()}</div>
-        <div class="notice-body">
-          <div class="notice-text">${n.text}</div>
-          <div class="notice-meta">${n.date}${expiry}${expired?' · EXPIRED':''}</div>
-          <div class="notice-actions">
-            <button class="btn btn-edit" onclick="editNotice('${n.id}')">EDIT</button>
-            <button class="btn btn-danger" onclick="deleteNotice('${n.id}')">DELETE</button>
-          </div>
+    return `<div class="notice-item" style="animation-delay:${i*0.05}s;opacity:${expired?0.4:1}">
+      <div class="ntag ${n.tag}">${n.tag.toUpperCase()}</div>
+      <div class="notice-body">
+        <div class="notice-text">${n.text}</div>
+        <div class="notice-meta">${n.date}${expiry}${expired?' · EXPIRED':''}</div>
+        <div class="notice-actions">
+          <button class="btn btn-edit" onclick="editNotice('${n.id}')">EDIT</button>
+          <button class="btn btn-danger" onclick="deleteNotice('${n.id}')">DELETE</button>
         </div>
-      </div>`;
+      </div>
+    </div>`;
   }).join('');
 }
 
-// ── SUBMIT ──
 async function submitNotice() {
   const tag    = document.getElementById('nTag').value;
   const text   = document.getElementById('nText').value.trim();
   const expiry = document.getElementById('nExpiry').value;
-  const editId = document.getElementById('editId').value;
-
+  const editId = document.getElementById('editNoticeId').value;
   if (!text) { showStatus('PLEASE ENTER NOTICE TEXT', 'err'); return; }
-
-  const btn = document.getElementById('submitBtn');
+  const btn = document.getElementById('noticeSubmitBtn');
   btn.disabled = true;
   showStatus('SAVING...', 'load');
-
   try {
     if (!allData.notices) allData.notices = [];
-
     if (editId) {
-      // Edit existing
       const idx = allData.notices.findIndex(n => n.id === editId);
-      if (idx >= 0) {
-        allData.notices[idx] = { ...allData.notices[idx], tag, text, expiry };
-      }
-      document.getElementById('editId').value = '';
-      document.getElementById('formTitle').textContent = 'ADD NOTICE';
-      document.getElementById('submitBtn').textContent = 'POST NOTICE';
+      if (idx >= 0) allData.notices[idx] = { ...allData.notices[idx], tag, text, expiry };
+      resetNoticeForm();
     } else {
-      // New notice
-      allData.notices.push({
-        id:     Date.now().toString(),
-        tag, text, expiry,
-        date:   new Date().toLocaleDateString('en-GB', {day:'2-digit', month:'short', year:'numeric'})
-      });
+      allData.notices.push({ id: Date.now().toString(), tag, text, expiry,
+        date: new Date().toLocaleDateString('en-GB', {day:'2-digit',month:'short',year:'numeric'}) });
     }
-
     const ok = await writeBin(allData);
     if (ok) {
       showStatus('NOTICE SAVED ✓', 'ok');
@@ -327,30 +311,29 @@ async function submitNotice() {
       document.getElementById('nExpiry').value = '';
       document.getElementById('nTag').value = 'info';
       renderNotices();
-    } else {
-      showStatus('SAVE FAILED — try again', 'err');
-    }
-  } catch(e) {
-    showStatus('ERROR: ' + e.message, 'err');
-  }
-
+    } else showStatus('SAVE FAILED — try again', 'err');
+  } catch(e) { showStatus('ERROR: ' + e.message, 'err'); }
   btn.disabled = false;
 }
 
-// ── EDIT ──
 function editNotice(id) {
   const n = allData.notices.find(n => n.id === id);
   if (!n) return;
   document.getElementById('nTag').value    = n.tag;
   document.getElementById('nText').value   = n.text;
   document.getElementById('nExpiry').value = n.expiry || '';
-  document.getElementById('editId').value  = id;
-  document.getElementById('formTitle').textContent = 'EDIT NOTICE';
-  document.getElementById('submitBtn').textContent = 'SAVE CHANGES';
-  document.getElementById('formPanel').scrollIntoView({ behavior:'smooth' });
+  document.getElementById('editNoticeId').value = id;
+  document.getElementById('noticeFormTitle').textContent = 'EDIT NOTICE';
+  document.getElementById('noticeSubmitBtn').textContent = 'SAVE CHANGES';
+  document.getElementById('noticeFormPanel').scrollIntoView({ behavior:'smooth' });
 }
 
-// ── DELETE ──
+function resetNoticeForm() {
+  document.getElementById('editNoticeId').value = '';
+  document.getElementById('noticeFormTitle').textContent = 'ADD NOTICE';
+  document.getElementById('noticeSubmitBtn').textContent = 'POST NOTICE';
+}
+
 async function deleteNotice(id) {
   if (!confirm('Delete this notice?')) return;
   showStatus('DELETING...', 'load');
@@ -360,9 +343,95 @@ async function deleteNotice(id) {
   else showStatus('DELETE FAILED', 'err');
 }
 
-// Auto-login check on load
+// ══════════════════════════════════════════════
+//  NOTAMs
+// ══════════════════════════════════════════════
+function renderNotams() {
+  const wrap = document.getElementById('notamsList');
+  const notams = (allData.notams || []).slice().reverse();
+  if (!notams.length) { wrap.innerHTML = '<div class="empty-state">NO MANUAL NOTAMs</div>'; return; }
+  wrap.innerHTML = notams.map((n, i) => {
+    const validity = (n.from || n.to) ? ` · ${n.from||''}${n.to?' → '+n.to:''}` : '';
+    const expired  = n.to && new Date(n.to) < new Date();
+    return `<div class="notice-item" style="animation-delay:${i*0.05}s;opacity:${expired?0.4:1}">
+      <div class="ntag notam">NOTAM</div>
+      <div class="notice-body">
+        <div class="notice-text">${n.text}</div>
+        <div class="notice-meta">${n.date}${validity}${expired?' · EXPIRED':''}</div>
+        <div class="notice-actions">
+          <button class="btn btn-edit" onclick="editNotam('${n.id}')">EDIT</button>
+          <button class="btn btn-danger" onclick="deleteNotam('${n.id}')">DELETE</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function submitNotam() {
+  const text   = document.getElementById('nmText').value.trim();
+  const from   = document.getElementById('nmFrom').value;
+  const to     = document.getElementById('nmTo').value;
+  const editId = document.getElementById('editNotamId').value;
+  if (!text) { showStatus('PLEASE ENTER NOTAM TEXT', 'err'); return; }
+  const btn = document.getElementById('notamSubmitBtn');
+  btn.disabled = true;
+  showStatus('SAVING...', 'load');
+  try {
+    if (!allData.notams) allData.notams = [];
+    if (editId) {
+      const idx = allData.notams.findIndex(n => n.id === editId);
+      if (idx >= 0) allData.notams[idx] = { ...allData.notams[idx], text, from, to };
+      resetNotamForm();
+    } else {
+      allData.notams.push({ id: Date.now().toString(), text, from, to,
+        date: new Date().toLocaleDateString('en-GB', {day:'2-digit',month:'short',year:'numeric'}) });
+    }
+    const ok = await writeBin(allData);
+    if (ok) {
+      showStatus('NOTAM SAVED ✓', 'ok');
+      document.getElementById('nmText').value = '';
+      document.getElementById('nmFrom').value = '';
+      document.getElementById('nmTo').value   = '';
+      renderNotams();
+    } else showStatus('SAVE FAILED — try again', 'err');
+  } catch(e) { showStatus('ERROR: ' + e.message, 'err'); }
+  btn.disabled = false;
+}
+
+function editNotam(id) {
+  const n = allData.notams.find(n => n.id === id);
+  if (!n) return;
+  document.getElementById('nmText').value  = n.text;
+  document.getElementById('nmFrom').value  = n.from || '';
+  document.getElementById('nmTo').value    = n.to   || '';
+  document.getElementById('editNotamId').value = id;
+  document.getElementById('notamFormTitle').textContent  = 'EDIT NOTAM';
+  document.getElementById('notamSubmitBtn').textContent  = 'SAVE CHANGES';
+  document.getElementById('notamFormPanel').scrollIntoView({ behavior:'smooth' });
+}
+
+function resetNotamForm() {
+  document.getElementById('editNotamId').value = '';
+  document.getElementById('notamFormTitle').textContent = 'ADD MANUAL NOTAM';
+  document.getElementById('notamSubmitBtn').textContent = 'POST NOTAM';
+}
+
+async function deleteNotam(id) {
+  if (!confirm('Delete this NOTAM?')) return;
+  showStatus('DELETING...', 'load');
+  allData.notams = allData.notams.filter(n => n.id !== id);
+  const ok = await writeBin(allData);
+  if (ok) { showStatus('NOTAM DELETED ✓', 'ok'); renderNotams(); }
+  else showStatus('DELETE FAILED', 'err');
+}
+
+// ── INIT ──
 window.addEventListener('load', () => {
-  if (sessionStorage.getItem('noticesAuth') === '1') loadNotices();
+  if (sessionStorage.getItem('noticesAuth') === '1') {
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('adminScreen').style.display = 'block';
+    loadData();
+  }
 });
 </script>
 </body>
