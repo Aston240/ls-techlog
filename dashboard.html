@@ -601,7 +601,7 @@ let liveFlights = [];
 
 async function fetchFlights() {
   try {
-    const url = `https://app.airbly.com/api/assetList?groupKey=${AIRBLY_KEY}&log_types=flight&log_limit_per_asset=1`;
+    const url = `https://airbly.com/api/v3/assetList?groupKey=${AIRBLY_KEY}&log_types=flight&log_limit_per_asset=1`;
     const res = await fetch(url);
     const data = await res.json();
     console.log('Airbly raw:', JSON.stringify(data).slice(0, 500));
