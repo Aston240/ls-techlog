@@ -1,0 +1,1157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>LS Airmotive — Ops Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow+Condensed:wght@400;600;700;900&family=Barlow:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:     #080c12;
+    --panel:  #0d1420;
+    --panel2: #111825;
+    --border: #1a2840;
+    --accent: #00aaff;
+    --green:  #00e676;
+    --amber:  #ffab00;
+    --red:    #ff3d3d;
+    --purple: #cc44ff;
+    --text:   #b8d4ee;
+    --dim:    #3a5570;
+    --bright: #e4f2ff;
+    --mono:   'Share Tech Mono', monospace;
+    --head:   'Barlow Condensed', sans-serif;
+    --body:   'Barlow', sans-serif;
+    --vfr:    #00e676;
+    --mvfr:   #00aaff;
+    --ifr:    #ff3d3d;
+    --lifr:   #cc44ff;
+  }
+
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+
+  html, body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--body);
+    min-height: 100vh;
+    width: 100%;
+  }
+
+  body::before {
+    content:''; position:fixed; inset:0;
+    background-image:
+      linear-gradient(rgba(0,170,255,0.025) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,170,255,0.025) 1px, transparent 1px);
+    background-size:32px 32px;
+    pointer-events:none; z-index:0;
+  }
+
+  .wrap {
+    position:relative; z-index:1;
+    max-width:480px; margin:0 auto;
+    padding:16px 14px 28px;
+    display:flex; flex-direction:column; gap:14px;
+  }
+
+  /* ── HEADER ── */
+  .header {
+    display:flex; align-items:flex-start; justify-content:space-between;
+    padding-bottom:12px; border-bottom:1px solid var(--border);
+  }
+  .logo { font-family:var(--head); font-weight:900; font-size:26px; letter-spacing:0.08em; text-transform:uppercase; color:var(--bright); line-height:1; }
+  .logo span { color:var(--accent); }
+  .logo-sub { font-family:var(--mono); font-size:9px; color:var(--dim); letter-spacing:0.18em; margin-top:3px; }
+  .live-row { display:flex; align-items:center; gap:6px; margin-top:6px; }
+  .live-dot { width:7px; height:7px; border-radius:50%; background:var(--green); animation:pulse 2s infinite; }
+  .live-txt { font-family:var(--mono); font-size:9px; color:var(--green); letter-spacing:0.1em; }
+  .clock-time { font-family:var(--mono); font-size:26px; color:var(--accent); line-height:1; letter-spacing:0.05em; text-align:right; }
+  .clock-date { font-family:var(--mono); font-size:9px; color:var(--dim); margin-top:2px; letter-spacing:.1em; text-align:right; }
+  .clock-utc  { font-family:var(--mono); font-size:9px; color:var(--dim); margin-top:1px; text-align:right; }
+
+  /* ── COLLAPSIBLE SECTION ── */
+  .slabel {
+    font-family:var(--head); font-size:11px; font-weight:700;
+    letter-spacing:0.25em; text-transform:uppercase; color:var(--dim);
+    margin-bottom:8px;
+    display:flex; align-items:center; gap:8px;
+    cursor:pointer; user-select:none; padding:4px 0;
+    transition:color 0.2s;
+  }
+  .slabel:hover { color:var(--text); }
+  .slabel::after { content:''; flex:1; height:1px; background:var(--border); }
+  .slabel .chevron { font-size:10px; color:var(--dim); transition:transform 0.3s ease; margin-left:2px; flex-shrink:0; }
+  .slabel.collapsed .chevron { transform:rotate(-90deg); }
+  .drag-handle { cursor:grab; color:var(--dim); font-size:12px; margin-right:4px; opacity:0.5; flex-shrink:0; transition:opacity 0.2s; }
+  .drag-handle:hover { opacity:1; }
+  .section { transition:opacity 0.2s; }
+  .section.dragging { opacity:0.4; }
+  .section.drag-over { border-top:2px solid var(--accent); margin-top:-2px; }
+
+  .section-body { overflow:hidden; transition:max-height 0.35s ease, opacity 0.3s ease; max-height:3000px; opacity:1; }
+  .section-body.collapsed { max-height:0; opacity:0; }
+
+  /* ── PANEL ── */
+  .panel { background:var(--panel); border:1px solid var(--border); border-radius:8px; padding:14px; position:relative; overflow:hidden; }
+  .panel.accent-top::before { content:''; position:absolute; top:0;left:0;right:0; height:2px; background:linear-gradient(90deg,#0055aa,var(--accent),transparent); }
+  .panel.amber-top::before  { content:''; position:absolute; top:0;left:0;right:0; height:2px; background:linear-gradient(90deg,#995500,var(--amber),transparent); }
+  .panel.red-top::before    { content:''; position:absolute; top:0;left:0;right:0; height:2px; background:linear-gradient(90deg,#660000,var(--red),transparent); }
+  .panel.green-top::before  { content:''; position:absolute; top:0;left:0;right:0; height:2px; background:linear-gradient(90deg,#006633,var(--green),transparent); }
+  .panel.purple-top::before { content:''; position:absolute; top:0;left:0;right:0; height:2px; background:linear-gradient(90deg,#660088,var(--purple),transparent); }
+
+  /* ── FLIGHT CATEGORY BADGE ── */
+  .flt-cat {
+    display:flex; align-items:center; justify-content:center;
+    font-family:var(--head); font-weight:900; font-size:20px; letter-spacing:0.12em;
+    width:78px; height:78px; border-radius:50%; border:3px solid; flex-shrink:0;
+  }
+  .flt-cat.VFR  { color:var(--vfr);  border-color:var(--vfr);  background:rgba(0,230,118,0.08);  animation:glowGreen 3s ease-in-out infinite; }
+  .flt-cat.MVFR { color:var(--mvfr); border-color:var(--mvfr); background:rgba(0,170,255,0.08);  animation:glowBlue  3s ease-in-out infinite; }
+  .flt-cat.IFR  { color:var(--ifr);  border-color:var(--ifr);  background:rgba(255,61,61,0.08);  animation:glowRed   3s ease-in-out infinite; }
+  .flt-cat.LIFR { color:var(--lifr); border-color:var(--lifr); background:rgba(204,68,255,0.08); animation:glowPurp  3s ease-in-out infinite; }
+
+  @keyframes glowGreen { 0%,100%{box-shadow:0 0 16px rgba(0,230,118,0.2)} 50%{box-shadow:0 0 28px rgba(0,230,118,0.45)} }
+  @keyframes glowBlue  { 0%,100%{box-shadow:0 0 16px rgba(0,170,255,0.2)} 50%{box-shadow:0 0 28px rgba(0,170,255,0.45)} }
+  @keyframes glowRed   { 0%,100%{box-shadow:0 0 16px rgba(255,61,61,0.2)}  50%{box-shadow:0 0 28px rgba(255,61,61,0.45)} }
+  @keyframes glowPurp  { 0%,100%{box-shadow:0 0 16px rgba(204,68,255,0.2)} 50%{box-shadow:0 0 28px rgba(204,68,255,0.45)} }
+  @keyframes pulse     { 0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(0,230,118,0.5)} 50%{opacity:.8;box-shadow:0 0 0 5px rgba(0,230,118,0)} }
+  @keyframes blink     { 0%,100%{opacity:1} 50%{opacity:0.3} }
+  @keyframes fadeUp    { from{opacity:0;transform:translateY(5px)} to{opacity:1;transform:none} }
+  @keyframes spin      { to{transform:rotate(360deg)} }
+
+  /* ── HOME WEATHER ── */
+  .wx-top { display:flex; align-items:center; gap:14px; margin-bottom:14px; }
+  .wx-stats { flex:1; display:flex; flex-direction:column; gap:7px; }
+  .wx-stat-row { display:flex; justify-content:space-between; align-items:baseline; }
+  .wx-key { font-family:var(--head); font-size:9px; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; color:var(--dim); }
+  .wx-val { font-family:var(--mono); font-size:14px; color:var(--bright); }
+  .wx-bar { height:3px; background:var(--border); border-radius:2px; margin-top:3px; overflow:hidden; }
+  .wx-fill { height:100%; border-radius:2px; transition:width 1s ease; }
+  .wx-fill.wind  { background:linear-gradient(90deg,var(--green),var(--amber)); }
+  .wx-fill.vis   { background:linear-gradient(90deg,var(--accent),var(--green)); }
+  .wx-fill.cloud { background:linear-gradient(90deg,var(--accent),rgba(0,170,255,0.3)); }
+
+  .raw-box { background:var(--panel2); border:1px solid var(--border); border-radius:5px; padding:10px 12px; margin-top:8px; }
+  .raw-label { font-family:var(--mono); font-size:8px; color:var(--accent); letter-spacing:0.2em; margin-bottom:5px; }
+  .raw-text  { font-family:var(--mono); font-size:10px; color:var(--text); line-height:1.65; word-break:break-all; }
+  .raw-text .h  { color:var(--accent); }
+  .raw-text .hg { color:var(--green); }
+  .raw-text .ha { color:var(--amber); }
+  .taf-text { font-family:var(--mono); font-size:9px; color:var(--dim); line-height:1.7; word-break:break-all; white-space:pre-wrap; }
+
+  /* ── NEARBY AIRFIELDS ── */
+  .airfields-grid { display:flex; flex-direction:column; gap:6px; }
+  .af-card { background:var(--panel2); border:1px solid var(--border); border-radius:6px; overflow:hidden; }
+  .af-row { display:flex; align-items:baseline; gap:10px; padding:8px 12px 4px; }
+  .af-icao { font-family:var(--head); font-weight:900; font-size:16px; letter-spacing:0.1em; color:var(--bright); flex-shrink:0; }
+  .af-name { font-family:var(--head); font-size:10px; color:var(--dim); letter-spacing:0.06em; flex-shrink:0; }
+  .af-spacer { flex:1; }
+  .af-cat { font-family:var(--head); font-weight:900; font-size:11px; letter-spacing:0.1em; padding:2px 8px; border-radius:3px; border:1px solid; flex-shrink:0; }
+  .af-cat.VFR  { color:var(--vfr);  border-color:var(--vfr);  background:rgba(0,230,118,0.1); }
+  .af-cat.MVFR { color:var(--mvfr); border-color:var(--mvfr); background:rgba(0,170,255,0.1); }
+  .af-cat.IFR  { color:var(--ifr);  border-color:var(--ifr);  background:rgba(255,61,61,0.1); }
+  .af-cat.LIFR { color:var(--lifr); border-color:var(--lifr); background:rgba(204,68,255,0.1); }
+  .af-metar { font-family:var(--mono); font-size:9px; color:var(--dim); line-height:1.5; word-break:break-all; padding:0 12px 6px; }
+  .af-metar .h  { color:var(--accent); }
+  .af-metar .hg { color:var(--green); }
+  .af-metar .ha { color:var(--amber); }
+  .af-taf-toggle { font-family:var(--mono); font-size:8px; color:var(--dim); letter-spacing:0.1em; padding:4px 12px; border-top:1px solid var(--border); cursor:pointer; display:flex; justify-content:space-between; user-select:none; }
+  .af-taf-toggle:hover { color:var(--text); }
+  .af-taf-body { font-family:var(--mono); font-size:9px; color:var(--dim); line-height:1.7; word-break:break-all; white-space:pre-wrap; padding:6px 12px 8px; border-top:1px solid var(--border); display:none; }
+  .af-taf-body.open { display:block; }
+
+  /* ── NOTAMs ── */
+  .notam-item { display:flex; gap:10px; padding:9px 0; border-bottom:1px solid var(--border); animation:fadeUp 0.4s ease both; }
+  .notam-item:last-child { border-bottom:none; padding-bottom:0; }
+  .notam-item:first-child { padding-top:0; }
+  .notam-qcode { font-family:var(--mono); font-size:8px; letter-spacing:0.08em; text-transform:uppercase; padding:2px 6px; border-radius:2px; height:fit-content; flex-shrink:0; margin-top:2px; }
+  .notam-qcode.rwy  { background:rgba(255,171,0,0.1); color:var(--amber); border:1px solid rgba(255,171,0,0.25); }
+  .notam-qcode.nav  { background:rgba(0,170,255,0.1); color:var(--accent); border:1px solid rgba(0,170,255,0.25); }
+  .notam-qcode.obst { background:rgba(255,61,61,0.1); color:var(--red);   border:1px solid rgba(255,61,61,0.25); }
+  .notam-title { font-family:var(--head); font-size:13px; font-weight:700; color:var(--bright); letter-spacing:0.04em; }
+  .notam-text  { font-size:11px; color:var(--text); line-height:1.4; margin-top:2px; }
+  .notam-valid { font-family:var(--mono); font-size:9px; color:var(--dim); margin-top:3px; }
+
+  /* ── FLYING NOW ── */
+  .flight-card { background:var(--panel2); border:1px solid var(--border); border-radius:6px; padding:12px 13px; display:flex; flex-direction:column; gap:7px; position:relative; margin-bottom:8px; animation:fadeUp 0.4s ease both; }
+  .flight-card:last-child { margin-bottom:0; }
+  .flight-card::before { content:''; position:absolute; left:0;top:0;bottom:0; width:3px; background:var(--green); border-radius:6px 0 0 6px; animation:glowGreen 3s ease-in-out infinite; }
+  .fc-top { display:flex; align-items:center; justify-content:space-between; }
+  .fc-reg { font-family:var(--head); font-weight:900; font-size:24px; letter-spacing:0.07em; color:var(--accent); line-height:1; }
+  .fc-airborne { display:flex; align-items:center; gap:5px; font-family:var(--mono); font-size:9px; color:var(--green); letter-spacing:0.1em; }
+  .fc-dot { width:6px; height:6px; border-radius:50%; background:var(--green); animation:pulse 2s infinite; }
+  .fc-people { display:flex; gap:20px; flex-wrap:wrap; }
+  .fc-role { font-family:var(--head); font-size:9px; font-weight:700; letter-spacing:0.15em; text-transform:uppercase; color:var(--dim); }
+  .fc-name { font-size:14px; font-weight:500; color:var(--bright); margin-top:1px; }
+  .fc-bottom { display:flex; align-items:center; justify-content:space-between; padding-top:7px; border-top:1px solid var(--border); }
+  .fc-dep { font-family:var(--mono); font-size:10px; color:var(--dim); }
+  .fc-dep span { color:var(--text); }
+  .fc-exercise { font-size:10px; color:var(--dim); font-style:italic; text-align:center; }
+  .fc-elapsed  { font-family:var(--mono); font-size:12px; color:var(--amber); font-weight:bold; }
+  .no-flights { text-align:center; padding:20px 0; font-family:var(--mono); font-size:10px; color:var(--dim); letter-spacing:0.15em; }
+
+  /* ── CIRCUIT SLOTS ── */
+  .slots-status-bar { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; padding-bottom:10px; border-bottom:1px solid var(--border); }
+  .fetch-dot { width:7px; height:7px; border-radius:50%; background:var(--green); animation:pulse 2s infinite; }
+  .fetch-dot.loading { background:var(--amber); animation:blink 0.8s step-end infinite; }
+  .fetch-dot.error   { background:var(--red); animation:none; }
+  .fetch-label { font-family:var(--mono); font-size:9px; color:var(--dim); letter-spacing:0.1em; margin-left:7px; }
+  .last-fetch  { font-family:var(--mono); font-size:9px; color:var(--dim); letter-spacing:0.08em; }
+
+  .ac-slot-row { display:flex; flex-direction:column; margin-bottom:8px; border:1px solid var(--border); border-radius:6px; overflow:hidden; animation:fadeUp 0.4s ease both; }
+  .ac-slot-row:last-child { margin-bottom:0; }
+  .ac-header { display:flex; align-items:center; justify-content:space-between; padding:9px 12px; background:var(--panel2); border-bottom:1px solid var(--border); }
+  .ac-reg { font-family:var(--head); font-weight:900; font-size:20px; letter-spacing:0.07em; color:var(--accent); line-height:1; }
+  .ac-type { font-family:var(--head); font-size:10px; color:var(--dim); letter-spacing:0.08em; margin-top:1px; }
+  .ac-next-badge { text-align:right; }
+  .ac-countdown { font-family:var(--mono); font-size:18px; color:var(--amber); line-height:1; letter-spacing:0.05em; }
+  .ac-countdown.soon { color:var(--red); animation:blink 1s step-end infinite; }
+  .ac-countdown.now  { color:var(--green); }
+  .ac-countdown.none { font-size:11px; color:var(--dim); }
+  .ac-countdown-label { font-family:var(--mono); font-size:8px; color:var(--dim); letter-spacing:0.1em; text-align:right; margin-top:2px; }
+
+  .slot-list { padding:8px 12px; display:flex; flex-direction:column; gap:6px; }
+  .slot-item { display:flex; align-items:center; gap:10px; }
+  .slot-time { font-family:var(--mono); font-size:13px; color:var(--bright); width:46px; flex-shrink:0; }
+  .slot-col { font-family:var(--head); font-size:9px; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; width:38px; flex-shrink:0; padding:2px 5px; border-radius:2px; text-align:center; }
+  .slot-col.cct1 { background:rgba(0,170,255,0.1); color:var(--accent); border:1px solid rgba(0,170,255,0.2); }
+  .slot-col.cct2 { background:rgba(0,230,118,0.1); color:var(--green);  border:1px solid rgba(0,230,118,0.2); }
+  .slot-col.dep  { background:rgba(255,171,0,0.1);  color:var(--amber); border:1px solid rgba(255,171,0,0.2); }
+  .slot-col.arr  { background:rgba(204,68,255,0.1); color:var(--purple);border:1px solid rgba(204,68,255,0.2); }
+  .slot-bar-wrap { flex:1; height:4px; background:var(--border); border-radius:2px; overflow:hidden; }
+  .slot-bar { height:100%; border-radius:2px; background:linear-gradient(90deg,var(--accent),var(--green)); transition:width 10s linear; }
+  .slot-bar.active { background:linear-gradient(90deg,var(--green),var(--amber)); }
+  .slot-status { font-family:var(--mono); font-size:9px; color:var(--dim); width:50px; text-align:right; flex-shrink:0; }
+  .slot-status.active-label { color:var(--green); }
+  .slot-status.soon-label   { color:var(--amber); }
+  .no-slots { text-align:center; padding:16px 0; font-family:var(--mono); font-size:10px; color:var(--dim); letter-spacing:0.12em; }
+
+  .fetch-error { background:rgba(255,61,61,0.08); border:1px solid rgba(255,61,61,0.2); border-radius:5px; padding:12px; font-family:var(--mono); font-size:10px; color:var(--red); letter-spacing:0.08em; line-height:1.6; margin-bottom:10px; }
+  .demo-note   { background:rgba(255,171,0,0.07); border:1px solid rgba(255,171,0,0.2); border-radius:5px; padding:10px 12px; margin-bottom:10px; font-family:var(--mono); font-size:9px; color:var(--amber); letter-spacing:0.08em; line-height:1.6; }
+  .loading-state { display:flex; align-items:center; justify-content:center; gap:10px; padding:24px 0; font-family:var(--mono); font-size:10px; color:var(--dim); letter-spacing:0.15em; }
+  .spinner { width:20px; height:20px; border:2px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin 1s linear infinite; }
+
+  /* ── NOTICES ── */
+  .notice-item { display:flex; gap:10px; padding:9px 0; border-bottom:1px solid var(--border); animation:fadeUp 0.4s ease both; }
+  .notice-item:last-child { border-bottom:none; padding-bottom:0; }
+  .notice-item:first-child { padding-top:0; }
+  .ntag { font-family:var(--mono); font-size:8px; letter-spacing:0.1em; text-transform:uppercase; padding:2px 6px; border-radius:2px; height:fit-content; flex-shrink:0; margin-top:2px; }
+  .ntag.info { background:rgba(0,170,255,0.12); color:var(--accent); border:1px solid rgba(0,170,255,0.25); }
+  .ntag.warn { background:rgba(255,171,0,0.12); color:var(--amber); border:1px solid rgba(255,171,0,0.25); }
+  .ntag.ops  { background:rgba(0,230,118,0.12); color:var(--green); border:1px solid rgba(0,230,118,0.25); }
+  .ntext { font-size:12px; color:var(--text); line-height:1.45; }
+  .ndate { font-family:var(--mono); font-size:9px; color:var(--dim); margin-top:3px; }
+
+  /* ── FOOTER ── */
+  .collapse-hint { font-family:var(--mono); font-size:8px; color:var(--dim); text-align:center; letter-spacing:0.1em; opacity:0.5; padding:2px 0 0; }
+  .footer { text-align:center; font-family:var(--mono); font-size:9px; color:var(--dim); letter-spacing:0.1em; padding-top:4px; }
+  .rbar  { height:2px; background:var(--border); border-radius:1px; margin-bottom:8px; overflow:hidden; }
+  .rfill { height:100%; background:var(--accent); width:0%; animation:refill 30s linear infinite; }
+  @keyframes refill { from{width:0} to{width:100%} }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- ═══ HEADER ═══ -->
+  <div class="header">
+    <div>
+      <div class="logo">LS <span>Airmotive</span></div>
+      <div class="logo-sub">OPS DASHBOARD</div>
+      <div class="live-row">
+        <div class="live-dot"></div>
+        <span class="live-txt">LIVE</span>
+      </div>
+    </div>
+    <div>
+      <div class="clock-time" id="clkTime">--:--:--</div>
+      <div class="clock-date" id="clkDate"></div>
+      <div class="clock-utc"  id="clkUtc">UTC ----Z</div>
+    </div>
+  </div>
+
+  <!-- ═══ HOME WEATHER ═══ -->
+  <div class="section" data-id="weather">
+    <div class="slabel" onclick="toggleSection(this)">
+      <span class="drag-handle">⠿</span>
+      <span>⛅</span> Weather · EGTK
+      <span class="chevron">▼</span>
+    </div>
+    <div class="section-body">
+      <div class="panel accent-top">
+        <div class="wx-top">
+          <div class="flt-cat VFR" id="homeCat">VFR</div>
+          <div class="wx-stats">
+            <div>
+              <div class="wx-stat-row"><span class="wx-key">Wind</span><span class="wx-val" id="wxWind">--</span></div>
+              <div class="wx-bar"><div class="wx-fill wind" id="wxWindBar" style="width:0%"></div></div>
+            </div>
+            <div>
+              <div class="wx-stat-row"><span class="wx-key">Visibility</span><span class="wx-val" id="wxVis">--</span></div>
+              <div class="wx-bar"><div class="wx-fill vis" id="wxVisBar" style="width:0%"></div></div>
+            </div>
+            <div>
+              <div class="wx-stat-row"><span class="wx-key">Cloud base</span><span class="wx-val" id="wxCloud">--</span></div>
+              <div class="wx-bar"><div class="wx-fill cloud" id="wxCloudBar" style="width:0%"></div></div>
+            </div>
+          </div>
+        </div>
+        <div class="raw-box">
+          <div class="raw-label">METAR</div>
+          <div class="raw-text" id="metarText"></div>
+        </div>
+        <div class="raw-box" style="margin-top:8px;">
+          <div class="raw-label">TAF</div>
+          <div class="taf-text" id="tafText"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ NEARBY AIRFIELDS ═══ -->
+  <div class="section" data-id="airfields">
+    <div class="slabel" onclick="toggleSection(this)">
+      <span class="drag-handle">⠿</span>
+      <span>🗺</span> Nearby Airfields
+      <span class="chevron">▼</span>
+    </div>
+    <div class="section-body">
+      <div class="airfields-grid" id="airfieldsGrid"></div>
+    </div>
+  </div>
+
+  <!-- ═══ NOTAMs ═══ -->
+  <div class="section" data-id="notams">
+    <div class="slabel" onclick="toggleSection(this)">
+      <span class="drag-handle">⠿</span>
+      <span>⚠️</span> NOTAMs · Local Area
+      <span class="chevron">▼</span>
+    </div>
+    <div class="section-body">
+      <div class="panel red-top">
+        <div id="notamsWrap"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ FLYING NOW ═══ -->
+  <div class="section" data-id="flying">
+    <div class="slabel" onclick="toggleSection(this)">
+      <span class="drag-handle">⠿</span>
+      <span>✈</span> Flying Now
+      <span class="chevron">▼</span>
+    </div>
+    <div class="section-body">
+      <div id="flightsWrap"></div>
+    </div>
+  </div>
+
+  <!-- ═══ CIRCUIT SLOTS ═══ -->
+  <div class="section" data-id="slots">
+    <div class="slabel" onclick="toggleSection(this)">
+      <span class="drag-handle">⠿</span>
+      <span>🔄</span> Circuit &amp; Approach Slots · EGTK
+      <span class="chevron">▼</span>
+    </div>
+    <div class="section-body">
+      <div class="panel green-top">
+        <div class="slots-status-bar">
+          <div style="display:flex;align-items:center;">
+            <div class="fetch-dot" id="fetchDot"></div>
+            <span class="fetch-label" id="fetchLabel">LIVE · AUTO-UPDATE 2 MIN</span>
+          </div>
+          <div class="last-fetch" id="lastFetch">--:--</div>
+        </div>
+        <div id="slotsContent">
+          <div class="loading-state"><div class="spinner"></div>FETCHING SHEET...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ SCHOOL NOTICES ═══ -->
+  <div class="section" data-id="notices">
+    <div class="slabel" onclick="toggleSection(this)">
+      <span class="drag-handle">⠿</span>
+      <span>📋</span> School Notices
+      <span class="chevron">▼</span>
+    </div>
+    <div class="section-body">
+      <div class="panel amber-top">
+        <div id="noticesWrap"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="collapse-hint">DRAG ⠿ TO REORDER &nbsp;·&nbsp; TAP HEADER TO COLLAPSE</div>
+
+  <div class="footer">
+    <div class="rbar"><div class="rfill"></div></div>
+    AUTO-REFRESH 30s &nbsp;·&nbsp; <span id="lastUp">UPDATED --:--</span>
+  </div>
+
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════
+//  DEMO DATA
+// ══════════════════════════════════════════════════════
+
+// ── AIRFIELD CONFIG ──
+const HOME_ICAO    = 'EGTK';
+const NEARBY_ICAOS = [
+  { icao:'EGBB', name:'Birmingham' },
+  { icao:'EGVN', name:'Brize Norton' },
+  { icao:'EGBJ', name:'Gloucester' },
+  { icao:'EGVP', name:'Middle Wallop' },
+];
+const ALL_ICAOS = [HOME_ICAO, ...NEARBY_ICAOS.map(a=>a.icao)];
+
+// ════════════════════════════════════════════════════════════════
+//  ✏️  MANUAL NOTAMs — edit these while AutoRouter API is pending
+//  type options: 'rwy' (yellow) | 'nav' (blue) | 'obst' (red)
+//  Remove items by deleting the { } block. Add new ones at the top.
+// ════════════════════════════════════════════════════════════════
+const MANUAL_NOTAMS = [
+  {
+    type: 'rwy',
+    label: 'RWY',
+    text: 'Add your NOTAM text here — e.g. RWY 01/19 closed for maintenance.',
+    valid: 'Until further notice'
+  },
+  // {
+  //   type: 'nav',
+  //   label: 'NAV',
+  //   text: 'Example: Oxford VOR unserviceable.',
+  //   valid: '08–21 MAR 2026'
+  // },
+  // {
+  //   type: 'obst',
+  //   label: 'OBST',
+  //   text: 'Example: Crane 2NM north, 350ft AGL.',
+  //   valid: 'Until further notice'
+  // },
+];
+
+// ── FLIGHT CATEGORY CALCULATION ──
+function flightCat(metarText) {
+  if (!metarText) return 'VFR';
+  let visSm = 999;
+  const visM = metarText.match(/\b(9999|[0-9]{4})\b/);
+  if (visM) { const m=parseInt(visM[1]); visSm = m>=9999?999:m/1609.34; }
+  let ceilFt = 99999;
+  const layers=[...metarText.matchAll(/(?:BKN|OVC)(\d{3})/g)];
+  for(const l of layers){ const ft=parseInt(l[1])*100; if(ft<ceilFt) ceilFt=ft; }
+  if(ceilFt<500  || visSm<1) return 'LIFR';
+  if(ceilFt<1000 || visSm<3) return 'IFR';
+  if(ceilFt<3000 || visSm<5) return 'MVFR';
+  return 'VFR';
+}
+
+// ── HIGHLIGHT METAR ──
+function highlightMetar(raw) {
+  if(!raw) return '';
+  let h = raw.replace(/^([A-Z]{4})\s/,'<span class="h">$1</span> ');
+  h = h.replace(/(\b(?:\d{3}|VRB)\d{2,3}(?:G\d{2,3})?(?:KT|MPS)\b)/g, m=>{
+    const kts=parseInt(m.match(/\d{2,3}/g)?.[1]||'0');
+    return `<span class="${(kts>=20||m.includes('G'))?'ha':'hg'}">${m}</span>`;
+  });
+  h = h.replace(/\b9999\b/g,'<span class="hg">9999</span>');
+  h = h.replace(/\b(\d{3,4})\b(?!\d)(?!Z)/g,(m,v)=>{
+    const metres=parseInt(v);
+    if(metres<=9000&&metres>0) return metres<5000?`<span class="ha">${v}</span>`:`<span class="hg">${v}</span>`;
+    return m;
+  });
+  h = h.replace(/\b(FEW|SCT|BKN|OVC)(\d{3})\b/g,(m,cov,ht)=>{
+    const ft=parseInt(ht)*100;
+    const cls=(cov==='BKN'||cov==='OVC')&&ft<3000?'ha':'ha';
+    return `<span class="${cls}">${m}</span>`;
+  });
+  return h;
+}
+
+// ── PARSE WIND FOR DISPLAY ──
+function parseWind(metar) {
+  if(!metar) return {txt:'--', pct:0};
+  const m=metar.match(/(\d{3}|VRB)(\d{2,3})(G\d{2,3})?KT/);
+  if(!m) return {txt:'--',pct:0};
+  const kts=parseInt(m[2]);
+  const gust=m[3]?parseInt(m[3].replace('G','')):'';
+  const txt=`${m[1]}/${m[2]}${gust?'G'+gust:''}KT`;
+  const pct=Math.min(100,Math.round((kts/40)*100));
+  return {txt,pct};
+}
+
+// ── PARSE VIS FOR DISPLAY ──
+function parseVis(metar) {
+  if(!metar) return {txt:'--',pct:0};
+  if(metar.includes('9999')) return {txt:'9999M',pct:100};
+  const m=metar.match(/\b([0-9]{4})\b/);
+  if(!m) return {txt:'--',pct:0};
+  const metres=parseInt(m[1]);
+  return {txt:metres+'M', pct:Math.min(100,Math.round((metres/9999)*100))};
+}
+
+// ── PARSE CLOUD BASE ──
+function parseCloud(metar) {
+  if(!metar) return '--';
+  const layers=[...metar.matchAll(/\b(FEW|SCT|BKN|OVC)(\d{3})\b/g)];
+  if(!layers.length) return 'CAVOK';
+  const lowest=layers.reduce((a,b)=>parseInt(a[2])<parseInt(b[2])?a:b);
+  return `${lowest[1]}${lowest[2]}`;
+}
+
+// ── LIVE WEATHER STATE ──
+let wxData = {};
+
+// NOTAM config
+const AUTOROUTER_USER = 'tnewell2@gmail.com';
+const AUTOROUTER_PASS = 'TN12345!';
+const NOTAM_ICAOS     = ['EGTK', 'EGTT']; // home + London FIR for local area
+
+// Q-codes we care about for a flying school
+// MR=runway, MN=nav aid, OB=obstacle, FA=aerodrome, WU/WZ=UAS/airspace
+const RELEVANT_QCODES = ['MR','MN','OB','FA','LR','LT','XX'];
+
+let notamToken     = null;
+let notamTokenExp  = 0;
+
+async function getNotamToken() {
+  if (notamToken && Date.now() < notamTokenExp) return notamToken;
+  try {
+    const res = await fetch('https://api.autorouter.aero/v1.0/oauth2/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: `grant_type=client_credentials&client_id=${encodeURIComponent(AUTOROUTER_USER)}&client_secret=${encodeURIComponent(AUTOROUTER_PASS)}`
+    });
+    const data = await res.json();
+    if (data.access_token) {
+      notamToken    = data.access_token;
+      notamTokenExp = Date.now() + (data.expires_in - 60) * 1000;
+      return notamToken;
+    }
+  } catch(e) {
+    console.warn('AutoRouter auth failed:', e.message);
+  }
+  return null;
+}
+
+async function fetchNotams() {
+  const token = await getNotamToken();
+  if (!token) { renderNotams([]); return; }
+
+  try {
+    const itemas = JSON.stringify(NOTAM_ICAOS);
+    const res = await fetch(
+      `https://api.autorouter.aero/v1.0/notam?itemas=${encodeURIComponent(itemas)}&limit=50`,
+      { headers: { 'Authorization': `Bearer ${token}` } }
+    );
+    const data = await res.json();
+    // AutoRouter returns { total: N, rows: [...] }
+    const notams = data.rows || [];
+    renderNotams(notams);
+  } catch(e) {
+    console.warn('NOTAM fetch failed:', e.message);
+    renderNotams([]);
+  }
+}
+
+const FLIGHTS = [
+  { reg:'G-BCGJ', type:'PA-28-140', instructor:'J. Harrison', student:'Tom Wells',  depTime:'10:45', exercise:'Ex 13 — Stalling',  airborne:true },
+  { reg:'G-HRYZ', type:'PA-28-161', instructor:'Solo',        student:'Sarah King', depTime:'11:10', exercise:'Nav — Local Area',   airborne:true },
+  { reg:'G-MKAS', type:'PA-28-181', instructor:'R. Davies',   student:'Ben Okafor', depTime:'11:30', exercise:'Ex 17 — Circuits',   airborne:true },
+];
+
+const NOTICES = [
+  { tag:'ops',  text:'RWY 15/33 closed this afternoon — all ops on 06/24.', date:'Today' },
+  { tag:'warn', text:'G-BTGO compass swing due. Check with Ops before booking.', date:'Today' },
+  { tag:'info', text:'Ground school exam Thursday 19:00 in briefing room.', date:'Today' },
+  { tag:'info', text:'New PPL theory books at reception. £32 each.', date:'Yesterday' },
+  { tag:'ops',  text:'Club AGM — 15th March 18:30. All members welcome.', date:'14 Mar' },
+];
+
+const FLEET = [
+  { reg:'G-BCGJ', type:'PA-28-140' },
+  { reg:'G-BTGO', type:'PA-28-140' },
+  { reg:'G-FIAT', type:'PA-28-161' },
+  { reg:'G-HRYZ', type:'PA-28-161' },
+  { reg:'G-MKAS', type:'PA-28-181' },
+  { reg:'G-PETR', type:'PA-28-181' },
+  { reg:'N150PK', type:'PA-28-180' },
+];
+
+const SHEET_ID  = '1fnMYghrTIi8EdHDN6JxFrAdqqFMuRbnB4Oj8041Y5ZY';
+const SHEET_GID = '681941426';
+
+// ══════════════════════════════════════════════════════
+//  COLLAPSIBLE
+// ══════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════
+//  COLLAPSE
+// ══════════════════════════════════════════════════════
+function toggleSection(label) {
+  // Don't toggle if we just finished a drag
+  if (label.closest('.section').dataset.dragged === 'true') {
+    label.closest('.section').dataset.dragged = 'false';
+    return;
+  }
+  label.classList.toggle('collapsed');
+  label.nextElementSibling.classList.toggle('collapsed');
+}
+
+// ══════════════════════════════════════════════════════
+//  DRAG AND DROP REORDER
+// ══════════════════════════════════════════════════════
+let dragSrc = null;
+
+function initDrag() {
+  const wrap = document.querySelector('.wrap');
+
+  document.querySelectorAll('.section').forEach(section => {
+    section.setAttribute('draggable', 'true');
+
+    section.addEventListener('dragstart', e => {
+      dragSrc = section;
+      section.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', section.dataset.id);
+    });
+
+    section.addEventListener('dragend', e => {
+      section.classList.remove('dragging');
+      document.querySelectorAll('.section').forEach(s => s.classList.remove('drag-over'));
+      saveOrder();
+    });
+
+    section.addEventListener('dragover', e => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      if (section !== dragSrc) {
+        document.querySelectorAll('.section').forEach(s => s.classList.remove('drag-over'));
+        section.classList.add('drag-over');
+      }
+    });
+
+    section.addEventListener('dragleave', e => {
+      section.classList.remove('drag-over');
+    });
+
+    section.addEventListener('drop', e => {
+      e.preventDefault();
+      section.classList.remove('drag-over');
+      if (dragSrc && dragSrc !== section) {
+        // Mark as dragged so the click after drop doesn't toggle collapse
+        dragSrc.dataset.dragged = 'true';
+
+        // Insert dragSrc before or after target based on position
+        const wrap = document.querySelector('.wrap');
+        const sections = [...wrap.querySelectorAll('.section')];
+        const srcIdx = sections.indexOf(dragSrc);
+        const tgtIdx = sections.indexOf(section);
+
+        if (srcIdx < tgtIdx) {
+          section.after(dragSrc);
+        } else {
+          section.before(dragSrc);
+        }
+      }
+    });
+
+    // Only start drag from the handle
+    const handle = section.querySelector('.drag-handle');
+    if (handle) {
+      handle.addEventListener('mousedown', () => section.setAttribute('draggable', 'true'));
+      // Make entire header draggable but only via handle visually
+    }
+  });
+}
+
+function saveOrder() {
+  const order = [...document.querySelectorAll('.section')].map(s => s.dataset.id);
+  try { localStorage.setItem('dashboardOrder', JSON.stringify(order)); } catch(e) {}
+}
+
+function loadOrder() {
+  try {
+    const saved = JSON.parse(localStorage.getItem('dashboardOrder') || 'null');
+    if (!saved || !Array.isArray(saved)) return;
+    const wrap = document.querySelector('.wrap');
+    // Find the last-section's next sibling as insertion anchor
+    const hint = document.querySelector('.collapse-hint');
+    saved.forEach(id => {
+      const section = wrap.querySelector(`.section[data-id="${id}"]`);
+      if (section) wrap.insertBefore(section, hint);
+    });
+  } catch(e) {}
+}
+
+// ══════════════════════════════════════════════════════
+//  CLOCK
+// ══════════════════════════════════════════════════════
+function tick() {
+  const n = new Date();
+  document.getElementById('clkTime').textContent = n.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  document.getElementById('clkDate').textContent = n.toLocaleDateString('en-GB',{weekday:'short',day:'2-digit',month:'short',year:'numeric'});
+  document.getElementById('clkUtc').textContent  = 'UTC ' + (n.toUTCString().match(/(\d\d:\d\d)/)?.[1]??'--:--') + 'Z';
+}
+setInterval(tick,1000); tick();
+
+// ══════════════════════════════════════════════════════
+//  ELAPSED
+// ══════════════════════════════════════════════════════
+function elapsed(dep) {
+  const [h,m] = dep.split(':').map(Number);
+  const now = new Date(), d = new Date();
+  d.setHours(h,m,0,0);
+  const diff = Math.floor((now-d)/60000);
+  if (diff<0) return 'PRE-DEP';
+  const hrs=Math.floor(diff/60), mins=diff%60;
+  return hrs>0?`${hrs}h ${mins}m`:`${mins}m`;
+}
+
+// ══════════════════════════════════════════════════════
+//  FETCH LIVE WEATHER — CheckWX API
+// ══════════════════════════════════════════════════════
+const CHECKWX_KEY = '9bfe517e1a534efc93c7d9b205e62260';
+
+async function fetchWeather() {
+  const icaoList = ALL_ICAOS.join(',');
+
+  try {
+    const metarRes = await fetch(
+      `https://api.checkwx.com/metar/${icaoList}/decoded`,
+      { headers: { 'X-API-Key': CHECKWX_KEY } }
+    );
+    const metarJson = await metarRes.json();
+
+    if (metarJson.data) {
+      for (const m of metarJson.data) {
+        const icao = m.icao;
+        if (!icao) continue;
+        wxData[icao] = {
+          metar:  m.raw_text || '',
+          cat:    m.flight_category || flightCat(m.raw_text || ''),
+          wind:   { txt: formatWind(m), pct: windPct(m) },
+          vis:    { txt: formatVis(m),  pct: visPct(m)  },
+          cloud:  formatCloud(m),
+        };
+      }
+    }
+
+    const tafRes = await fetch(
+      `https://api.checkwx.com/taf/${ALL_ICAOS.join(',')}/decoded`,
+      { headers: { 'X-API-Key': CHECKWX_KEY } }
+    );
+    const tafJson = await tafRes.json();
+    if (tafJson.data) {
+      for (const t of tafJson.data) {
+        if (!t.icao) continue;
+        if (!wxData[t.icao]) wxData[t.icao] = {};
+        wxData[t.icao].taf = t.raw_text || '';
+      }
+    }
+
+    renderHomeWx();
+    renderNearby();
+
+  } catch(e) {
+    console.warn('CheckWX fetch failed:', e.message);
+    renderHomeWx();
+    renderNearby();
+  }
+}
+
+// ── FORMAT HELPERS using CheckWX decoded data ──
+function formatWind(m) {
+  if (!m.wind) return '--';
+  const dir = m.wind.degrees === 0 ? 'VRB' : String(m.wind.degrees).padStart(3,'0');
+  const spd = m.wind.speed_kts;
+  const gust = m.wind.gust_kts ? `G${m.wind.gust_kts}` : '';
+  return `${dir}/${spd}${gust}KT`;
+}
+function windPct(m) {
+  if (!m.wind) return 0;
+  return Math.min(100, Math.round((m.wind.speed_kts / 40) * 100));
+}
+function formatVis(m) {
+  if (!m.visibility) return '--';
+  const metres = m.visibility.meters;
+  if (!metres) return m.visibility.miles ? m.visibility.miles+'SM' : '--';
+  return metres >= 9999 ? '9999M' : metres + 'M';
+}
+function visPct(m) {
+  if (!m.visibility) return 0;
+  const metres = m.visibility.meters || 0;
+  return Math.min(100, Math.round((metres / 9999) * 100));
+}
+function formatCloud(m) {
+  if (!m.clouds || !m.clouds.length) return 'CAVOK';
+  const lowest = m.clouds.reduce((a,b) => (a.base_feet_agl||99999) < (b.base_feet_agl||99999) ? a : b);
+  if (lowest.code === 'CAVOK' || lowest.code === 'CLR' || lowest.code === 'SKC') return lowest.code;
+  const hundreds = Math.round((lowest.base_feet_agl||0) / 100);
+  return `${lowest.code}${String(hundreds).padStart(3,'0')}`;
+}
+
+// ══════════════════════════════════════════════════════
+//  RENDER HOME WEATHER
+// ══════════════════════════════════════════════════════
+function renderHomeWx() {
+  const d = wxData[HOME_ICAO] || {};
+  const cat   = d.cat   || 'VFR';
+  const wind  = d.wind  || { txt:'--', pct:0 };
+  const vis   = d.vis   || { txt:'--', pct:0 };
+  const cloud = d.cloud || '--';
+  const metar = d.metar || '';
+  const taf   = d.taf   || '';
+
+  const catEl = document.getElementById('homeCat');
+  catEl.textContent = cat;
+  catEl.className   = 'flt-cat ' + cat;
+
+  document.getElementById('wxWind').textContent    = wind.txt;
+  document.getElementById('wxVis').textContent     = vis.txt;
+  document.getElementById('wxCloud').textContent   = cloud;
+  document.getElementById('wxWindBar').style.width  = wind.pct + '%';
+  document.getElementById('wxVisBar').style.width   = vis.pct  + '%';
+
+  // Cloud bar — % of max useful ceiling (3000ft)
+  const cloudMatch = cloud.match(/\d+/);
+  const cloudPct = cloudMatch ? Math.min(100, Math.round((parseInt(cloudMatch[0])*100)/3000*100)) : 80;
+  document.getElementById('wxCloudBar').style.width = cloudPct + '%';
+
+  document.getElementById('metarText').innerHTML = metar
+    ? highlightMetar(metar)
+    : '<span style="color:var(--dim)">Fetching METAR...</span>';
+  document.getElementById('tafText').textContent = taf || 'Fetching TAF...';
+}
+
+// ══════════════════════════════════════════════════════
+//  RENDER NEARBY
+// ══════════════════════════════════════════════════════
+function renderNearby() {
+  document.getElementById('airfieldsGrid').innerHTML = NEARBY_ICAOS.map(a => {
+    const d   = wxData[a.icao] || {};
+    const cat = d.cat   || '---';
+    const raw = d.metar || '';
+    const taf = d.taf   || '';
+    const catClass = ['VFR','MVFR','IFR','LIFR'].includes(cat) ? cat : '';
+    const id = 'taf-' + a.icao;
+    return `
+      <div class="af-card">
+        <div class="af-row">
+          <div class="af-icao">${a.icao}</div>
+          <div class="af-name">${a.name}</div>
+          <div class="af-spacer"></div>
+          <div class="af-cat ${catClass}" style="${!catClass?'color:var(--dim);border-color:var(--border)':''}">${cat}</div>
+        </div>
+        <div class="af-metar">${raw ? highlightMetar(raw) : '<span style="color:var(--dim)">Fetching...</span>'}</div>
+        ${taf ? `
+        <div class="af-taf-toggle" onclick="this.nextElementSibling.classList.toggle('open');this.querySelector('.taf-chev').textContent=this.nextElementSibling.classList.contains('open')?'▲':'▼'">
+          <span>TAF</span><span class="taf-chev">▼</span>
+        </div>
+        <div class="af-taf-body" id="${id}">${taf}</div>` : ''}
+      </div>`;
+  }).join('');
+}
+
+// ══════════════════════════════════════════════════════
+//  RENDER NOTAMs
+// ══════════════════════════════════════════════════════
+function parseQcode(n) {
+  // AutoRouter uses code23 + code45 fields directly
+  return (n.code23 || 'XX').trim();
+}
+
+function qcodeLabel(qc) {
+  const map = {
+    MR:'RWY', MN:'NAV', OB:'OBST', FA:'AD', LR:'AIRSPACE',
+    LT:'AIRSPACE', WU:'UAS', WZ:'UAS', XX:'INFO'
+  };
+  return map[qc] || qc;
+}
+
+function qcodeType(qc) {
+  if (qc==='MR') return 'rwy';
+  if (qc==='MN') return 'nav';
+  if (['OB','FA'].includes(qc)) return 'obst';
+  return 'nav';
+}
+
+function notamTitle(n) {
+  // AutoRouter uses iteme for the plain text description
+  const text = (n.iteme || '').replace(/\n/g,' ').trim();
+  return text.length > 100 ? text.substring(0, 100) + '…' : text || 'NOTAM';
+}
+
+function notamValid(n) {
+  const fmt = t => {
+    if (!t) return '?';
+    // AutoRouter validity is Unix epoch seconds
+    return new Date(t * 1000).toUTCString().replace(' GMT','Z').substring(0,22);
+  };
+  return `${fmt(n.startvalidity)} → ${fmt(n.endvalidity)}`;
+}
+
+function renderNotams(liveNotams) {
+  const wrap = document.getElementById('notamsWrap');
+
+  // If live data available, use it
+  if (liveNotams && liveNotams.length) {
+    const filtered = liveNotams.filter(n => RELEVANT_QCODES.includes(parseQcode(n)));
+    const display  = filtered.length ? filtered : liveNotams.slice(0, 8);
+    wrap.innerHTML = display.slice(0, 8).map((n, i) => {
+      const qc    = parseQcode(n);
+      const label = qcodeLabel(qc);
+      const type  = qcodeType(qc);
+      const text  = notamTitle(n);
+      const valid = notamValid(n);
+      return `
+        <div class="notam-item" style="animation-delay:${i*0.07}s">
+          <div class="notam-qcode ${type}">${label}</div>
+          <div><div class="notam-text">${text}</div><div class="notam-valid">${valid}</div></div>
+        </div>`;
+    }).join('');
+    return;
+  }
+
+  // Fall back to manual NOTAMs
+  if (MANUAL_NOTAMS.length) {
+    wrap.innerHTML = MANUAL_NOTAMS.map((n, i) => `
+      <div class="notam-item" style="animation-delay:${i*0.07}s">
+        <div class="notam-qcode ${n.type}">${n.label}</div>
+        <div><div class="notam-text">${n.text}</div><div class="notam-valid">${n.valid}</div></div>
+      </div>`).join('');
+    return;
+  }
+
+  // Nothing at all
+  wrap.innerHTML = '<div style="font-family:var(--mono);font-size:10px;color:var(--dim);padding:8px 0;letter-spacing:.1em;">NO ACTIVE NOTAMs</div>';
+}
+
+// ══════════════════════════════════════════════════════
+//  RENDER FLIGHTS
+// ══════════════════════════════════════════════════════
+function renderFlights() {
+  const wrap = document.getElementById('flightsWrap');
+  const active = FLIGHTS.filter(f=>f.airborne);
+  if (!active.length) { wrap.innerHTML='<div class="no-flights">NO AIRCRAFT AIRBORNE</div>'; return; }
+  wrap.innerHTML = active.map(f=>`
+    <div class="flight-card">
+      <div class="fc-top">
+        <div class="fc-reg">${f.reg}</div>
+        <div class="fc-airborne"><div class="fc-dot"></div>AIRBORNE</div>
+      </div>
+      <div class="fc-people">
+        <div><div class="fc-role">${f.instructor==='Solo'?'P1 Solo':'Instructor'}</div><div class="fc-name">${f.instructor==='Solo'?f.student:f.instructor}</div></div>
+        ${f.instructor!=='Solo'?`<div><div class="fc-role">Student</div><div class="fc-name">${f.student}</div></div>`:''}
+        <div><div class="fc-role">Type</div><div class="fc-name" style="font-size:11px;color:var(--dim)">${f.type}</div></div>
+      </div>
+      <div class="fc-bottom">
+        <div class="fc-dep">DEP <span>${f.depTime}</span></div>
+        <div class="fc-exercise">${f.exercise}</div>
+        <div class="fc-elapsed" id="el-${f.reg.replace(/-/g,'')}">${elapsed(f.depTime)}</div>
+      </div>
+    </div>`).join('');
+}
+
+// ══════════════════════════════════════════════════════
+//  CIRCUIT SLOTS
+// ══════════════════════════════════════════════════════
+function nowMins()    { const n=new Date(); return n.getHours()*60+n.getMinutes(); }
+function timeMins(t)  { const [h,m]=t.split(':').map(Number); return h*60+m; }
+function minsToDisplay(m) { if(m<=0) return 'NOW'; const h=Math.floor(m/60),mn=m%60; return h>0?`${h}h ${mn}m`:`${mn}m`; }
+function snapTo15(m)  { return Math.ceil(m/15)*15; }
+function minsToTime(m){ const h=Math.floor((m%1440)/60),mn=m%60; return `${h.toString().padStart(2,'0')}:${mn.toString().padStart(2,'0')}`; }
+
+async function fetchSheet() {
+  setFetchState('loading');
+  const url=`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&gid=${SHEET_GID}`;
+  try {
+    const res=await fetch(url);
+    const text=await res.text();
+    return JSON.parse(text.replace(/^[^(]+\(/,'').replace(/\);?\s*$/,''));
+  } catch(e) {
+    setFetchState('error');
+    showSlotsError(`Could not fetch sheet.\n${e.message}`);
+    return null;
+  }
+}
+
+function parseSheet(json) {
+  if (!json||!json.table) return [];
+  const rows=json.table.rows;
+  if (!rows||!rows.length) return [];
+  const slots=[];
+  const grid=rows.map(row=>(row.c||[]).map(cell=>{
+    if(!cell) return '';
+    if(cell.f) return cell.f.toString().trim();
+    if(cell.v!=null) return cell.v.toString().trim();
+    return '';
+  }));
+  const timeRegex=/^\d{2}:\d{2}$/;
+  for(let r=0;r<grid.length;r++){
+    const row=grid[r];
+    for(let c=0;c<row.length;c++){
+      if(!timeRegex.test(row[c])) continue;
+      const time=row[c];
+      const colMap=[{offset:1,label:'DEP'},{offset:2,label:'ARR'},{offset:3,label:'CCT1'},{offset:4,label:'CCT2'}];
+      for(const {offset,label} of colMap){
+        const val=(row[c+offset]||'').trim().toUpperCase();
+        if(!val) continue;
+        for(const ac of FLEET){
+          const norm=val.replace(/[\s-]/g,'');
+          const acn=ac.reg.replace(/[\s-]/g,'');
+          if(norm===acn||val===ac.reg) slots.push({time,col:label,reg:ac.reg});
+        }
+      }
+    }
+  }
+  return slots;
+}
+
+function renderSlots(slots) {
+  const content=document.getElementById('slotsContent');
+  const now=nowMins();
+  const upcoming=slots.filter(s=>timeMins(s.time)>=now-5);
+  const byReg={};
+  for(const ac of FLEET){
+    const acSlots=upcoming.filter(s=>s.reg===ac.reg);
+    if(acSlots.length>0) byReg[ac.reg]={type:ac.type,slots:acSlots};
+  }
+  const hasAny=Object.keys(byReg).length>0;
+  if(!hasAny){ content.innerHTML='<div class="no-slots">NO SLOTS BOOKED FOR FLEET TODAY</div>'; return; }
+  content.innerHTML=Object.entries(byReg).map(([reg,data],i)=>{
+    const {type,slots}=data;
+    const next=slots[0];
+    const diff=timeMins(next.time)-now;
+    const isActive=diff<=0&&diff>=-5;
+    const isSoon=diff>0&&diff<=10;
+    let cc='',ct='',cl='';
+    if(isActive){cc='now';ct='IN SLOT';cl=`STARTED ${next.time}`;}
+    else if(isSoon){cc='soon';ct=minsToDisplay(diff);cl=`NEXT SLOT ${next.time}`;}
+    else{cc='';ct=minsToDisplay(diff);cl=`NEXT SLOT ${next.time}`;}
+    const slotItems=slots.map(s=>{
+      const sd=timeMins(s.time)-now;
+      const sa=sd<=0&&sd>=-5, ss=sd>0&&sd<=10;
+      const colCls=s.col.toLowerCase();
+      const stxt=sa?'ACTIVE':ss?`${sd}m`:s.time;
+      const scls=sa?'active-label':ss?'soon-label':'';
+      const bp=sa?'100':ss?Math.round((1-sd/10)*100):'0';
+      return `<div class="slot-item">
+        <div class="slot-time">${s.time}</div>
+        <div class="slot-col ${colCls}">${s.col}</div>
+        <div class="slot-bar-wrap"><div class="slot-bar ${sa?'active':''}" style="width:${bp}%"></div></div>
+        <div class="slot-status ${scls}">${stxt}</div>
+      </div>`;
+    }).join('');
+    return `<div class="ac-slot-row" style="animation-delay:${i*0.06}s">
+      <div class="ac-header">
+        <div><div class="ac-reg">${reg}</div><div class="ac-type">${type}</div></div>
+        <div class="ac-next-badge">
+          <div class="ac-countdown ${cc}">${ct}</div>
+          <div class="ac-countdown-label">${cl}</div>
+        </div>
+      </div>
+      <div class="slot-list">${slotItems}</div>
+    </div>`;
+  }).join('');
+}
+
+function setFetchState(state) {
+  const dot=document.getElementById('fetchDot');
+  const lbl=document.getElementById('fetchLabel');
+  dot.className='fetch-dot';
+  if(state==='loading'){dot.classList.add('loading');lbl.textContent='FETCHING...';}
+  else if(state==='error'){dot.classList.add('error');lbl.textContent='FETCH ERROR';}
+  else{lbl.textContent='LIVE · AUTO-UPDATE 2 MIN';}
+}
+
+function showSlotsError(msg) {
+  // Fall back to demo data
+  const base=nowMins();
+  const demoSlots=[
+    {time:minsToTime(snapTo15(base+8)),  col:'CCT1',reg:'G-BCGJ'},
+    {time:minsToTime(snapTo15(base+8)),  col:'CCT2',reg:'G-HRYZ'},
+    {time:minsToTime(snapTo15(base+23)), col:'DEP', reg:'G-BCGJ'},
+    {time:minsToTime(snapTo15(base+45)), col:'CCT1',reg:'G-MKAS'},
+    {time:minsToTime(snapTo15(base+60)), col:'ARR', reg:'G-HRYZ'},
+    {time:minsToTime(snapTo15(base+75)), col:'CCT2',reg:'G-BCGJ'},
+  ];
+  renderSlots(demoSlots);
+  const rendered=document.getElementById('slotsContent').innerHTML;
+  document.getElementById('slotsContent').innerHTML=
+    `<div class="fetch-error">${msg.replace(/\n/g,'<br>')}</div>`+
+    `<div class="demo-note">⚠ DEMO DATA SHOWN — live sheet unavailable</div>`+rendered;
+}
+
+// ══════════════════════════════════════════════════════
+//  RENDER NOTICES
+// ══════════════════════════════════════════════════════
+function renderNotices() {
+  document.getElementById('noticesWrap').innerHTML=NOTICES.map((n,i)=>`
+    <div class="notice-item" style="animation-delay:${i*0.07}s">
+      <div class="ntag ${n.tag}">${n.tag.toUpperCase()}</div>
+      <div><div class="ntext">${n.text}</div><div class="ndate">${n.date}</div></div>
+    </div>`).join('');
+}
+
+// ══════════════════════════════════════════════════════
+//  ELAPSED UPDATER
+// ══════════════════════════════════════════════════════
+function updateElapsed() {
+  FLIGHTS.filter(f=>f.airborne).forEach(f=>{
+    const el=document.getElementById('el-'+f.reg.replace(/-/g,''));
+    if(el) el.textContent=elapsed(f.depTime);
+  });
+}
+
+// ══════════════════════════════════════════════════════
+//  LAST UPDATED
+// ══════════════════════════════════════════════════════
+function updateStamp() {
+  document.getElementById('lastUp').textContent=
+    'UPDATED '+new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+}
+
+// ══════════════════════════════════════════════════════
+//  SLOTS REFRESH
+// ══════════════════════════════════════════════════════
+let cachedSlots=null;
+
+async function refreshSlots() {
+  const json=await fetchSheet();
+  if(json){
+    cachedSlots=parseSheet(json);
+    setFetchState('ok');
+    document.getElementById('lastFetch').textContent=
+      new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+  }
+  if(cachedSlots) renderSlots(cachedSlots);
+}
+
+// ══════════════════════════════════════════════════════
+//  INIT
+// ══════════════════════════════════════════════════════
+function init() {
+  renderHomeWx();
+  renderNearby();
+  renderFlights();
+  renderNotices();
+  updateStamp();
+}
+
+init();
+loadOrder();
+initDrag();
+fetchWeather();
+fetchNotams();
+refreshSlots();
+setInterval(updateElapsed, 30000);
+setInterval(init, 30000);
+setInterval(()=>{ if(cachedSlots) renderSlots(cachedSlots); }, 30000);
+setInterval(fetchWeather, 600000);   // weather every 10 mins
+setInterval(fetchNotams,  1800000);  // NOTAMs every 30 mins
+setInterval(refreshSlots, 120000);   // slots every 2 mins
+</script>
+</body>
+</html>
