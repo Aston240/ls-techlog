@@ -875,8 +875,8 @@ function renderHomeWx() {
 
   document.getElementById('metarText').innerHTML = metar
     ? highlightMetar(metar)
-    : '<span style="color:var(--dim)">Fetching METAR...</span>';
-  document.getElementById('tafText').textContent = taf || 'Fetching TAF...';
+    : '<span style="color:var(--dim)">NO DATA</span>';
+  document.getElementById('tafText').textContent = taf || 'NO DATA';
 }
 
 // ══════════════════════════════════════════════════════
@@ -898,7 +898,7 @@ function renderNearby() {
           <div class="af-spacer"></div>
           <div class="af-cat ${catClass}" style="${!catClass?'color:var(--dim);border-color:var(--border)':''}">${cat}</div>
         </div>
-        <div class="af-metar">${raw ? highlightMetar(raw) : '<span style="color:var(--dim)">Fetching...</span>'}</div>
+        <div class="af-metar">${raw ? highlightMetar(raw) : '<span style="color:var(--dim)">NO DATA</span>'}</div>
         ${taf ? `
         <div class="af-taf-toggle" onclick="this.nextElementSibling.classList.toggle('open');this.querySelector('.taf-chev').textContent=this.nextElementSibling.classList.contains('open')?'▲':'▼'">
           <span>TAF</span><span class="taf-chev">▼</span>
@@ -979,7 +979,7 @@ function renderNotams(liveNotams) {
   }
 
   // Nothing at all
-  wrap.innerHTML = '<div style="font-family:var(--mono);font-size:10px;color:var(--dim);padding:8px 0;letter-spacing:.1em;">NO ACTIVE NOTAMs</div>';
+  wrap.innerHTML = '<div style="font-family:var(--mono);font-size:10px;color:var(--dim);padding:8px 0;letter-spacing:.1em;">NO DATA</div>';
 }
 
 // ══════════════════════════════════════════════════════
@@ -1144,7 +1144,7 @@ function showSlotsError(msg) {
 function renderNotices(notices) {
   const wrap = document.getElementById('noticesWrap');
   if (!notices || !notices.length) {
-    wrap.innerHTML = '<div style="font-family:var(--mono);font-size:10px;color:var(--dim);padding:8px 0;letter-spacing:.1em;text-align:center;">NO ACTIVE NOTICES</div>';
+    wrap.innerHTML = '<div style="font-family:var(--mono);font-size:10px;color:var(--dim);padding:8px 0;letter-spacing:.1em;text-align:center;">NO DATA</div>';
     return;
   }
   wrap.innerHTML = notices.slice().reverse().map((n,i) => `
