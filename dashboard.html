@@ -613,18 +613,13 @@ async function fetchFlights() {
       console.log('Airbly top-level keys:', Object.keys(data));
     }
     const assets = (data.assetList && data.assetList.assets) ? data.assetList.assets : [];
-    console.log('First asset:', JSON.stringify(assets[0]));
-    liveFlights = assets.map(a => {
-      console.log('Asset fields:', Object.keys(a));
-      const airborne = a.airborne || a.flying || a.is_airborne || a.inFlight ||
-                       a.status === 'airborne' || a.status === 'flying' ||
-                       a.flightStatus === 'airborne' || false;
-      return {
-        reg:      a.registration || a.reg || a.callsign || a.tail || a.name || '?',
-        airborne: airborne,
-        depTime:  a.departure_time || a.dep_time || a.takeoff_time || a.departureTime || null,
-      };
-    });
+    liveFlights = assets
+      .filter(a => a.asset_type === 'aircraft')
+      .map(a => ({
+        reg:      a.ident || '?',
+        airborne: a.operational_status === 'airborne',
+        depTime:  null,
+      }));
     renderFlights();
   } catch(e) {
     console.warn('Airbly fetch failed:', e.message);
