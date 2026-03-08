@@ -51,7 +51,23 @@
     position:relative; z-index:1;
     max-width:900px; margin:0 auto;
     padding:16px 14px 28px;
-    display:flex; flex-direction:column; gap:14px;
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:14px;
+    align-items:start;
+  }
+
+  /* Full-width sections */
+  .wrap > .header,
+  .wrap > .section[data-id="weather"],
+  .wrap > .section[data-id="airfields"],
+  .wrap > .section[data-id="notams"] {
+    grid-column: 1 / -1;
+  }
+
+  @media(max-width:640px) {
+    .wrap { grid-template-columns:1fr; }
+    .wrap > * { grid-column:1; }
   }
 
   /* ── HEADER ── */
