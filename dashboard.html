@@ -862,17 +862,6 @@ function renderHomeWx() {
   catEl.textContent = cat;
   catEl.className   = 'flt-cat ' + cat;
 
-  document.getElementById('wxWind').textContent    = wind.txt;
-  document.getElementById('wxVis').textContent     = vis.txt;
-  document.getElementById('wxCloud').textContent   = cloud;
-  document.getElementById('wxWindBar').style.width  = wind.pct + '%';
-  document.getElementById('wxVisBar').style.width   = vis.pct  + '%';
-
-  // Cloud bar — % of max useful ceiling (3000ft)
-  const cloudMatch = cloud.match(/\d+/);
-  const cloudPct = cloudMatch ? Math.min(100, Math.round((parseInt(cloudMatch[0])*100)/3000*100)) : 80;
-  document.getElementById('wxCloudBar').style.width = cloudPct + '%';
-
   document.getElementById('metarText').innerHTML = metar
     ? highlightMetar(metar)
     : '<span style="color:var(--dim)">NO DATA</span>';
