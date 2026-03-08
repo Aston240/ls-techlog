@@ -57,17 +57,24 @@
     align-items:start;
   }
 
-  /* Full-width sections */
-  .wrap > .header,
-  .wrap > .section[data-id="weather"],
-  .wrap > .section[data-id="airfields"],
-  .wrap > .section[data-id="notams"] {
-    grid-column: 1 / -1;
+  /* Width classes */
+  .wrap > .header { grid-column: 1 / -1; }
+  .section.full-width { grid-column: 1 / -1; }
+  .section.half-width { grid-column: span 1; }
+
+  /* Width toggle button */
+  .width-btn {
+    font-family:var(--mono); font-size:9px; color:var(--dim);
+    background:none; border:1px solid var(--border); border-radius:2px;
+    padding:2px 6px; cursor:pointer; letter-spacing:0.08em;
+    transition:all 0.2s; flex-shrink:0; margin-left:4px;
   }
+  .width-btn:hover { color:var(--accent); border-color:var(--accent); }
 
   @media(max-width:640px) {
     .wrap { grid-template-columns:1fr; }
-    .wrap > * { grid-column:1; }
+    .wrap > * { grid-column:1 !important; }
+    .width-btn { display:none; }
   }
 
   /* ── HEADER ── */
@@ -287,30 +294,17 @@
   </div>
 
   <!-- ═══ HOME WEATHER ═══ -->
-  <div class="section" data-id="weather">
+  <div class="section full-width" data-id="weather">
     <div class="slabel" onclick="toggleSection(this)">
       <span class="drag-handle">⠿</span>
       <span>⛅</span> Weather · EGTK
+      <button class="width-btn" onclick="toggleWidth(event,this)">▣ FULL</button>
       <span class="chevron">▼</span>
     </div>
     <div class="section-body">
       <div class="panel accent-top">
-        <div class="wx-top">
+        <div class="wx-top" style="margin-bottom:10px;">
           <div class="flt-cat VFR" id="homeCat">VFR</div>
-          <div class="wx-stats">
-            <div>
-              <div class="wx-stat-row"><span class="wx-key">Wind</span><span class="wx-val" id="wxWind">--</span></div>
-              <div class="wx-bar"><div class="wx-fill wind" id="wxWindBar" style="width:0%"></div></div>
-            </div>
-            <div>
-              <div class="wx-stat-row"><span class="wx-key">Visibility</span><span class="wx-val" id="wxVis">--</span></div>
-              <div class="wx-bar"><div class="wx-fill vis" id="wxVisBar" style="width:0%"></div></div>
-            </div>
-            <div>
-              <div class="wx-stat-row"><span class="wx-key">Cloud base</span><span class="wx-val" id="wxCloud">--</span></div>
-              <div class="wx-bar"><div class="wx-fill cloud" id="wxCloudBar" style="width:0%"></div></div>
-            </div>
-          </div>
         </div>
         <div class="raw-box">
           <div class="raw-label">METAR</div>
@@ -325,10 +319,11 @@
   </div>
 
   <!-- ═══ NEARBY AIRFIELDS ═══ -->
-  <div class="section" data-id="airfields">
+  <div class="section half-width" data-id="airfields">
     <div class="slabel" onclick="toggleSection(this)">
       <span class="drag-handle">⠿</span>
       <span>🗺</span> Nearby Airfields
+      <button class="width-btn" onclick="toggleWidth(event,this)">⬜ HALF</button>
       <span class="chevron">▼</span>
     </div>
     <div class="section-body">
@@ -337,10 +332,11 @@
   </div>
 
   <!-- ═══ NOTAMs ═══ -->
-  <div class="section" data-id="notams">
+  <div class="section half-width" data-id="notams">
     <div class="slabel" onclick="toggleSection(this)">
       <span class="drag-handle">⠿</span>
       <span>⚠️</span> NOTAMs · Local Area
+      <button class="width-btn" onclick="toggleWidth(event,this)">⬜ HALF</button>
       <span class="chevron">▼</span>
     </div>
     <div class="section-body">
@@ -351,10 +347,11 @@
   </div>
 
   <!-- ═══ FLYING NOW ═══ -->
-  <div class="section" data-id="flying">
+  <div class="section half-width" data-id="flying">
     <div class="slabel" onclick="toggleSection(this)">
       <span class="drag-handle">⠿</span>
       <span>✈</span> Flying Now
+      <button class="width-btn" onclick="toggleWidth(event,this)">⬜ HALF</button>
       <span class="chevron">▼</span>
     </div>
     <div class="section-body">
@@ -363,10 +360,11 @@
   </div>
 
   <!-- ═══ CIRCUIT SLOTS ═══ -->
-  <div class="section" data-id="slots">
+  <div class="section half-width" data-id="slots">
     <div class="slabel" onclick="toggleSection(this)">
       <span class="drag-handle">⠿</span>
       <span>🔄</span> Circuit &amp; Approach Slots · EGTK
+      <button class="width-btn" onclick="toggleWidth(event,this)">⬜ HALF</button>
       <span class="chevron">▼</span>
     </div>
     <div class="section-body">
@@ -386,10 +384,11 @@
   </div>
 
   <!-- ═══ SCHOOL NOTICES ═══ -->
-  <div class="section" data-id="notices">
+  <div class="section half-width" data-id="notices">
     <div class="slabel" onclick="toggleSection(this)">
       <span class="drag-handle">⠿</span>
       <span>📋</span> School Notices
+      <button class="width-btn" onclick="toggleWidth(event,this)">⬜ HALF</button>
       <span class="chevron">▼</span>
     </div>
     <div class="section-body">
@@ -399,7 +398,7 @@
     </div>
   </div>
 
-  <div class="collapse-hint">DRAG ⠿ TO REORDER &nbsp;·&nbsp; TAP HEADER TO COLLAPSE</div>
+  <div class="collapse-hint">DRAG ⠿ TO REORDER &nbsp;·&nbsp; TAP HEADER TO COLLAPSE &nbsp;·&nbsp; ⬜ HALF / ▣ FULL TO RESIZE</div>
 
   <div class="footer">
     <div class="rbar"><div class="rfill"></div></div>
@@ -695,22 +694,49 @@ function initDrag() {
 }
 
 function saveOrder() {
-  const order = [...document.querySelectorAll('.section')].map(s => s.dataset.id);
-  try { localStorage.setItem('dashboardOrder', JSON.stringify(order)); } catch(e) {}
+  const sections = [...document.querySelectorAll('.section')];
+  const order = sections.map(s => s.dataset.id);
+  const widths = {};
+  sections.forEach(s => { widths[s.dataset.id] = s.classList.contains('full-width') ? 'full' : 'half'; });
+  try {
+    localStorage.setItem('dashboardOrder', JSON.stringify(order));
+    localStorage.setItem('dashboardWidths', JSON.stringify(widths));
+  } catch(e) {}
 }
 
 function loadOrder() {
   try {
     const saved = JSON.parse(localStorage.getItem('dashboardOrder') || 'null');
-    if (!saved || !Array.isArray(saved)) return;
+    const widths = JSON.parse(localStorage.getItem('dashboardWidths') || 'null');
     const wrap = document.querySelector('.wrap');
-    // Find the last-section's next sibling as insertion anchor
     const hint = document.querySelector('.collapse-hint');
-    saved.forEach(id => {
-      const section = wrap.querySelector(`.section[data-id="${id}"]`);
-      if (section) wrap.insertBefore(section, hint);
-    });
+    if (widths) {
+      Object.entries(widths).forEach(([id, w]) => {
+        const section = wrap.querySelector(`.section[data-id="${id}"]`);
+        if (!section) return;
+        section.classList.toggle('full-width', w === 'full');
+        section.classList.toggle('half-width', w === 'half');
+        const btn = section.querySelector('.width-btn');
+        if (btn) btn.textContent = w === 'full' ? '▣ FULL' : '⬜ HALF';
+      });
+    }
+    if (saved && Array.isArray(saved)) {
+      saved.forEach(id => {
+        const section = wrap.querySelector(`.section[data-id="${id}"]`);
+        if (section) wrap.insertBefore(section, hint);
+      });
+    }
   } catch(e) {}
+}
+
+function toggleWidth(e, btn) {
+  e.stopPropagation();
+  const section = btn.closest('.section');
+  const isFull = section.classList.contains('full-width');
+  section.classList.toggle('full-width', !isFull);
+  section.classList.toggle('half-width', isFull);
+  btn.textContent = isFull ? '⬜ HALF' : '▣ FULL';
+  saveOrder();
 }
 
 // ══════════════════════════════════════════════════════
