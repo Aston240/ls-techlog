@@ -49,10 +49,10 @@
 
   .wrap {
     position:relative; z-index:1;
-    max-width:900px; margin:0 auto;
-    padding:16px 14px 28px;
+    width:100%;
+    padding:16px 20px 28px;
     display:grid;
-    grid-template-columns:1fr 1fr;
+    grid-template-columns:repeat(auto-fill, minmax(420px, 1fr));
     gap:14px;
     align-items:start;
   }
@@ -71,8 +71,8 @@
   }
   .width-btn:hover { color:var(--accent); border-color:var(--accent); }
 
-  @media(max-width:640px) {
-    .wrap { grid-template-columns:1fr; }
+  @media(max-width:500px) {
+    .wrap { grid-template-columns:1fr; padding:10px; }
     .wrap > * { grid-column:1 !important; }
     .width-btn { display:none; }
   }
@@ -121,6 +121,11 @@
   .panel.red-top::before    { content:''; position:absolute; top:0;left:0;right:0; height:2px; background:linear-gradient(90deg,#660000,var(--red),transparent); }
   .panel.green-top::before  { content:''; position:absolute; top:0;left:0;right:0; height:2px; background:linear-gradient(90deg,#006633,var(--green),transparent); }
   .panel.purple-top::before { content:''; position:absolute; top:0;left:0;right:0; height:2px; background:linear-gradient(90deg,#660088,var(--purple),transparent); }
+
+  /* ── WEATHER INLINE LAYOUT ── */
+  .wx-inline { display:flex; align-items:flex-start; gap:16px; }
+  .wx-inline .flt-cat { flex-shrink:0; }
+  .wx-inline-text { flex:1; min-width:0; }
 
   /* ── FLIGHT CATEGORY BADGE ── */
   .flt-cat {
@@ -303,16 +308,18 @@
     </div>
     <div class="section-body">
       <div class="panel accent-top">
-        <div class="wx-top" style="margin-bottom:10px;">
+        <div class="wx-inline">
           <div class="flt-cat VFR" id="homeCat">VFR</div>
-        </div>
-        <div class="raw-box">
-          <div class="raw-label">METAR</div>
-          <div class="raw-text" id="metarText"></div>
-        </div>
-        <div class="raw-box" style="margin-top:8px;">
-          <div class="raw-label">TAF</div>
-          <div class="taf-text" id="tafText"></div>
+          <div class="wx-inline-text">
+            <div class="raw-box">
+              <div class="raw-label">METAR</div>
+              <div class="raw-text" id="metarText"></div>
+            </div>
+            <div class="raw-box" style="margin-top:6px;">
+              <div class="raw-label">TAF</div>
+              <div class="taf-text" id="tafText"></div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -415,10 +422,10 @@
 // ── AIRFIELD CONFIG ──
 const HOME_ICAO    = 'EGTK';
 const NEARBY_ICAOS = [
-  { icao:'EGBB', name:'Birmingham' },
   { icao:'EGVN', name:'Brize Norton' },
   { icao:'EGBJ', name:'Gloucester' },
   { icao:'EGVP', name:'Middle Wallop' },
+  { icao:'EGBB', name:'Birmingham' },
 ];
 const ALL_ICAOS = [HOME_ICAO, ...NEARBY_ICAOS.map(a=>a.icao)];
 
