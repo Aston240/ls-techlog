@@ -490,7 +490,7 @@ function highlightMetar(raw) {
   h = h.replace(/(?<!\/)\b(\d{3,4})\b(?!\d)(?!Z)(?!\/)/g, (m, v) => {
     const metres = parseInt(v);
     if (metres > 0 && metres <= 9000) {
-      const cls = metres < 1500 ? 'hr' : metres < 5000 ? 'ha' : 'hg';
+      const cls = metres < 5000 ? 'hr' : metres <= 9999 && metres >= 5000 ? 'ha' : 'hg';
       return `<span class="${cls}">${v}</span>`;
     }
     return m;
