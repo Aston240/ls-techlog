@@ -167,6 +167,10 @@
   .raw-text .ha { color:var(--amber); }
   .raw-text .hr { color:var(--red); }
   .taf-text { font-family:var(--mono); font-size:9px; color:var(--dim); line-height:1.7; word-break:break-all; white-space:pre-wrap; }
+  .taf-text .h  { color:var(--accent); }
+  .taf-text .hg { color:var(--green); }
+  .taf-text .ha { color:var(--amber); }
+  .taf-text .hr { color:var(--red); }
 
   /* ── NEARBY AIRFIELDS ── */
   .airfields-grid { display:flex; flex-direction:column; gap:6px; }
@@ -188,6 +192,10 @@
   .af-taf-toggle { font-family:var(--mono); font-size:8px; color:var(--dim); letter-spacing:0.1em; padding:4px 12px; border-top:1px solid var(--border); cursor:pointer; display:flex; justify-content:space-between; user-select:none; }
   .af-taf-toggle:hover { color:var(--text); }
   .af-taf-body { font-family:var(--mono); font-size:9px; color:var(--dim); line-height:1.7; word-break:break-all; white-space:pre-wrap; padding:6px 12px 8px; border-top:1px solid var(--border); display:none; }
+  .af-taf-body .h  { color:var(--accent); }
+  .af-taf-body .hg { color:var(--green); }
+  .af-taf-body .ha { color:var(--amber); }
+  .af-taf-body .hr { color:var(--red); }
   .af-taf-body.open { display:block; }
 
   /* ── NOTAMs ── */
@@ -446,15 +454,18 @@ const MANUAL_NOTAMS = []; // now sourced from JSONBin via fetchNotices
 // ── FLIGHT CATEGORY CALCULATION ──
 function flightCat(metarText) {
   if (!metarText) return 'VFR';
-  let visSm = 999;
-  const visM = metarText.match(/\b(9999|[0-9]{4})\b/);
-  if (visM) { const m=parseInt(visM[1]); visSm = m>=9999?999:m/1609.34; }
+  // Visibility — metres (4-digit) or 9999
+  let visM = 99999;
+  const visMatch = metarText.match(/\b(9999|[0-9]{4})\b/);
+  if (visMatch) visM = parseInt(visMatch[1]) >= 9999 ? 99999 : parseInt(visMatch[1]);
+  // Ceiling — lowest BKN or OVC layer
   let ceilFt = 99999;
-  const layers=[...metarText.matchAll(/(?:BKN|OVC)(\d{3})/g)];
-  for(const l of layers){ const ft=parseInt(l[1])*100; if(ft<ceilFt) ceilFt=ft; }
-  if(ceilFt<500  || visSm<1) return 'LIFR';
-  if(ceilFt<1000 || visSm<3) return 'IFR';
-  if(ceilFt<3000 || visSm<5) return 'MVFR';
+  const layers = [...metarText.matchAll(/(?:BKN|OVC)(\d{3})/g)];
+  for (const l of layers) { const ft = parseInt(l[1])*100; if (ft < ceilFt) ceilFt = ft; }
+  // Club thresholds
+  if (ceilFt < 500  || visM < 1500)  return 'LIFR';
+  if (ceilFt <= 1000 || visM < 5000)  return 'IFR';
+  if (ceilFt < 2000 || visM < 10000) return 'MVFR';
   return 'VFR';
 }
 
@@ -817,7 +828,7 @@ async function fetchWeather() {
         if (!icao) continue;
         wxData[icao] = {
           metar:  m.raw_text || '',
-          cat:    m.flight_category || flightCat(m.raw_text || ''),
+          cat:    flightCat(m.raw_text || ''),
           wind:   { txt: formatWind(m), pct: windPct(m) },
           vis:    { txt: formatVis(m),  pct: visPct(m)  },
           cloud:  formatCloud(m),
@@ -898,7 +909,7 @@ function renderHomeWx() {
   document.getElementById('metarText').innerHTML = metar
     ? highlightMetar(metar)
     : '<span style="color:var(--dim)">NO DATA</span>';
-  document.getElementById('tafText').textContent = taf || 'NO DATA';
+  document.getElementById('tafText').innerHTML = taf ? highlightMetar(taf) : 'NO DATA';
 }
 
 // ══════════════════════════════════════════════════════
@@ -925,7 +936,7 @@ function renderNearby() {
         <div class="af-taf-toggle" onclick="this.nextElementSibling.classList.toggle('open');this.querySelector('.taf-chev').textContent=this.nextElementSibling.classList.contains('open')?'▲':'▼'">
           <span>TAF</span><span class="taf-chev">▼</span>
         </div>
-        <div class="af-taf-body" id="${id}">${taf}</div>` : ''}
+        <div class="af-taf-body" id="${id}">${highlightMetar(taf)}</div>` : ''}
       </div>`;
   }).join('');
 }
