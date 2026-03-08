@@ -612,8 +612,8 @@ async function fetchFlights() {
     } else {
       console.log('Airbly top-level keys:', Object.keys(data));
     }
-    console.log('assetList type:', typeof data.assetList, Array.isArray(data.assetList), JSON.stringify(data.assetList).slice(0,300));
-    const assets = Array.isArray(data.assetList) ? data.assetList : Object.values(data.assetList || {});
+    const assets = (data.assetList && data.assetList.assets) ? data.assetList.assets : [];
+    console.log('First asset:', JSON.stringify(assets[0]));
     liveFlights = assets.map(a => {
       console.log('Asset fields:', Object.keys(a));
       const airborne = a.airborne || a.flying || a.is_airborne || a.inFlight ||
