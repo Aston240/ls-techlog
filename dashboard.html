@@ -487,7 +487,7 @@ function highlightMetar(raw) {
 
   // Visibility — green 5000m+, amber 1500-4999m, red <1500m
   h = h.replace(/\b9999\b/g, '<span class="hg">9999</span>');
-  h = h.replace(/\b(\d{3,4})\b(?!\d)(?!Z)/g, (m, v) => {
+  h = h.replace(/\b(\d{3,4})\b(?!\d)(?!Z)(?!\/)/g, (m, v) => {
     const metres = parseInt(v);
     if (metres > 0 && metres <= 9000) {
       const cls = metres < 1500 ? 'hr' : metres < 5000 ? 'ha' : 'hg';
@@ -934,9 +934,9 @@ function renderNearby() {
         <div class="af-metar">${raw ? highlightMetar(raw) : '<span style="color:var(--dim)">NO DATA</span>'}</div>
         ${taf ? `
         <div class="af-taf-toggle" onclick="this.nextElementSibling.classList.toggle('open');this.querySelector('.taf-chev').textContent=this.nextElementSibling.classList.contains('open')?'▲':'▼'">
-          <span>TAF</span><span class="taf-chev">▼</span>
+          <span>TAF</span><span class="taf-chev">▲</span>
         </div>
-        <div class="af-taf-body" id="${id}">${highlightMetar(taf)}</div>` : ''}
+        <div class="af-taf-body open" id="${id}">${highlightMetar(taf)}</div>` : ''}
       </div>`;
   }).join('');
 }
