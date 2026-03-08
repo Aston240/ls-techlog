@@ -562,13 +562,25 @@ const FLIGHTS = [
   { reg:'G-MKAS', type:'PA-28-181', instructor:'R. Davies',   student:'Ben Okafor', depTime:'11:30', exercise:'Ex 17 — Circuits',   airborne:true },
 ];
 
-const NOTICES = [
-  { tag:'ops',  text:'RWY 15/33 closed this afternoon — all ops on 06/24.', date:'Today' },
-  { tag:'warn', text:'G-BTGO compass swing due. Check with Ops before booking.', date:'Today' },
-  { tag:'info', text:'Ground school exam Thursday 19:00 in briefing room.', date:'Today' },
-  { tag:'info', text:'New PPL theory books at reception. £32 each.', date:'Yesterday' },
-  { tag:'ops',  text:'Club AGM — 15th March 18:30. All members welcome.', date:'14 Mar' },
-];
+const JSONBIN_KEY = '$2a$10$wjZldGseV25iurze/grlbOQ1ZxUVCugh.kmmRH3LOo3zEiUF4RKPS';
+const BIN_URL     = `https://api.jsonbin.io/v3/b/69ac06bf43b1c97be9bd5667`;
+
+async function fetchNotices() {
+  try {
+    const res  = await fetch(BIN_URL + '/latest', {
+      headers: { 'X-Master-Key': JSONBIN_KEY }
+    });
+    const data = await res.json();
+    const notices = (data.record?.notices || []).filter(n => {
+      if (!n.expiry) return true;
+      return new Date(n.expiry) >= new Date();
+    });
+    renderNotices(notices);
+  } catch(e) {
+    console.warn('Notices fetch failed:', e.message);
+    renderNotices([]);
+  }
+}
 
 const FLEET = [
   { reg:'G-BCGJ', type:'PA-28-140' },
@@ -1087,11 +1099,16 @@ function showSlotsError(msg) {
 // ══════════════════════════════════════════════════════
 //  RENDER NOTICES
 // ══════════════════════════════════════════════════════
-function renderNotices() {
-  document.getElementById('noticesWrap').innerHTML=NOTICES.map((n,i)=>`
+function renderNotices(notices) {
+  const wrap = document.getElementById('noticesWrap');
+  if (!notices || !notices.length) {
+    wrap.innerHTML = '<div style="font-family:var(--mono);font-size:10px;color:var(--dim);padding:8px 0;letter-spacing:.1em;text-align:center;">NO ACTIVE NOTICES</div>';
+    return;
+  }
+  wrap.innerHTML = notices.slice().reverse().map((n,i) => `
     <div class="notice-item" style="animation-delay:${i*0.07}s">
       <div class="ntag ${n.tag}">${n.tag.toUpperCase()}</div>
-      <div><div class="ntext">${n.text}</div><div class="ndate">${n.date}</div></div>
+      <div><div class="ntext">${n.text}</div><div class="ndate">${n.date||''}</div></div>
     </div>`).join('');
 }
 
@@ -1136,7 +1153,6 @@ function init() {
   renderHomeWx();
   renderNearby();
   renderFlights();
-  renderNotices();
   updateStamp();
 }
 
@@ -1145,13 +1161,15 @@ loadOrder();
 initDrag();
 fetchWeather();
 fetchNotams();
+fetchNotices();
 refreshSlots();
 setInterval(updateElapsed, 30000);
 setInterval(init, 30000);
 setInterval(()=>{ if(cachedSlots) renderSlots(cachedSlots); }, 30000);
-setInterval(fetchWeather, 600000);   // weather every 10 mins
-setInterval(fetchNotams,  1800000);  // NOTAMs every 30 mins
-setInterval(refreshSlots, 120000);   // slots every 2 mins
+setInterval(fetchWeather,  600000);   // weather every 10 mins
+setInterval(fetchNotams,  1800000);   // NOTAMs every 30 mins
+setInterval(fetchNotices,  300000);   // notices every 5 mins
+setInterval(refreshSlots,  120000);   // slots every 2 mins
 </script>
 </body>
 </html>
