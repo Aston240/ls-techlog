@@ -578,11 +578,27 @@ async function fetchNotams() {
   }
 }
 
-const FLIGHTS = [
-  { reg:'G-BCGJ', type:'PA-28-140', instructor:'J. Harrison', student:'Tom Wells',  depTime:'10:45', exercise:'Ex 13 — Stalling',  airborne:true },
-  { reg:'G-HRYZ', type:'PA-28-161', instructor:'Solo',        student:'Sarah King', depTime:'11:10', exercise:'Nav — Local Area',   airborne:true },
-  { reg:'G-MKAS', type:'PA-28-181', instructor:'R. Davies',   student:'Ben Okafor', depTime:'11:30', exercise:'Ex 17 — Circuits',   airborne:true },
-];
+const AIRBLY_KEY = 'AamCntOnk72udRQvYYiX4oUlcpHcgg';
+let liveFlights = [];
+
+async function fetchFlights() {
+  try {
+    const res = await fetch('https://app.airbly.com/api/fleet/status', {
+      headers: { 'Authorization': 'Bearer ' + AIRBLY_KEY }
+    });
+    const data = await res.json();
+    const aircraft = Array.isArray(data) ? data : (data.aircraft || data.fleet || data.data || []);
+    liveFlights = aircraft.map(a => ({
+      reg:      a.registration || a.reg || a.callsign || '?',
+      airborne: a.airborne || a.flying || a.status === 'airborne' || a.status === 'flying' || false,
+      depTime:  a.departure_time || a.dep_time || a.takeoff_time || null,
+    }));
+    renderFlights();
+  } catch(e) {
+    console.warn('Airbly fetch failed:', e.message);
+    renderFlights();
+  }
+}
 
 const JSONBIN_KEY = '$2a$10$wjZldGseV25iurze/grlbOQ1ZxUVCugh.kmmRH3LOo3zEiUF4RKPS';
 const BIN_URL     = `https://api.jsonbin.io/v3/b/69ac06bf43b1c97be9bd5667`;
@@ -983,25 +999,27 @@ function renderNotams(liveNotams) {
 // ══════════════════════════════════════════════════════
 function renderFlights() {
   const wrap = document.getElementById('flightsWrap');
-  const active = FLIGHTS.filter(f=>f.airborne);
-  if (!active.length) { wrap.innerHTML='<div class="no-flights">NO AIRCRAFT AIRBORNE</div>'; return; }
-  wrap.innerHTML = active.map(f=>`
-    <div class="flight-card">
-      <div class="fc-top">
-        <div class="fc-reg">${f.reg}</div>
-        <div class="fc-airborne"><div class="fc-dot"></div>AIRBORNE</div>
-      </div>
-      <div class="fc-people">
-        <div><div class="fc-role">${f.instructor==='Solo'?'P1 Solo':'Instructor'}</div><div class="fc-name">${f.instructor==='Solo'?f.student:f.instructor}</div></div>
-        ${f.instructor!=='Solo'?`<div><div class="fc-role">Student</div><div class="fc-name">${f.student}</div></div>`:''}
-        <div><div class="fc-role">Type</div><div class="fc-name" style="font-size:11px;color:var(--dim)">${f.type}</div></div>
-      </div>
-      <div class="fc-bottom">
-        <div class="fc-dep">DEP <span>${f.depTime}</span></div>
-        <div class="fc-exercise">${f.exercise}</div>
-        <div class="fc-elapsed" id="el-${f.reg.replace(/-/g,'')}">${elapsed(f.depTime)}</div>
-      </div>
-    </div>`).join('');
+  if (!liveFlights.length) {
+    wrap.innerHTML = '<div class="no-flights">NO DATA</div>';
+    return;
+  }
+  const airborne = liveFlights.filter(f => f.airborne);
+  const grounded = liveFlights.filter(f => !f.airborne);
+  if (!airborne.length) {
+    wrap.innerHTML = '<div class="no-flights">NO AIRCRAFT AIRBORNE</div>';
+  } else {
+    wrap.innerHTML = airborne.map(f => `
+      <div class="flight-card">
+        <div class="fc-top">
+          <div class="fc-reg">${f.reg}</div>
+          <div class="fc-airborne"><div class="fc-dot"></div>AIRBORNE</div>
+        </div>
+        <div class="fc-bottom">
+          ${f.depTime ? `<div class="fc-dep">DEP <span>${f.depTime}</span></div>` : ''}
+          <div class="fc-elapsed" id="el-${f.reg.replace(/-/g,'')}">${f.depTime ? elapsed(f.depTime) : ''}</div>
+        </div>
+      </div>`).join('');
+  }
 }
 
 // ══════════════════════════════════════════════════════
@@ -1190,7 +1208,6 @@ async function refreshSlots() {
 function init() {
   renderHomeWx();
   renderNearby();
-  renderFlights();
   updateStamp();
 }
 
@@ -1200,6 +1217,7 @@ initDrag();
 fetchWeather();
 fetchNotams();
 fetchNotices();
+fetchFlights();
 refreshSlots();
 setInterval(updateElapsed, 30000);
 setInterval(init, 30000);
@@ -1207,6 +1225,7 @@ setInterval(()=>{ if(cachedSlots) renderSlots(cachedSlots); }, 30000);
 setInterval(fetchWeather,  600000);   // weather every 10 mins
 setInterval(fetchNotams,  1800000);   // NOTAMs every 30 mins
 setInterval(fetchNotices,  300000);   // notices every 5 mins
+setInterval(fetchFlights,   30000);   // flights every 30 secs
 setInterval(refreshSlots,  120000);   // slots every 2 mins
 </script>
 </body>
