@@ -612,9 +612,8 @@ async function fetchFlights() {
     } else {
       console.log('Airbly top-level keys:', Object.keys(data));
     }
-    const assets = Array.isArray(data) ? data : (data.assets || data.data || data.items || []);
+    const assets = data.assetList || [];
     liveFlights = assets.map(a => {
-      // Log first asset structure to console so we can see field names
       console.log('Asset fields:', Object.keys(a));
       const airborne = a.airborne || a.flying || a.is_airborne || a.inFlight ||
                        a.status === 'airborne' || a.status === 'flying' ||
