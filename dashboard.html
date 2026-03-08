@@ -161,12 +161,12 @@
 
   .raw-box { background:var(--panel2); border:1px solid var(--border); border-radius:5px; padding:10px 12px; margin-top:8px; }
   .raw-label { font-family:var(--mono); font-size:8px; color:var(--accent); letter-spacing:0.2em; margin-bottom:5px; }
-  .raw-text  { font-family:var(--mono); font-size:10px; color:var(--text); line-height:1.65; word-break:break-all; }
+  .raw-text  { font-family:var(--mono); font-size:10px; color:var(--bright); line-height:1.65; word-break:break-all; }
   .raw-text .h  { color:var(--accent); }
   .raw-text .hg { color:var(--green); }
   .raw-text .ha { color:var(--amber); }
   .raw-text .hr { color:var(--red); }
-  .taf-text { font-family:var(--mono); font-size:9px; color:var(--dim); line-height:1.7; word-break:break-all; white-space:pre-wrap; }
+  .taf-text { font-family:var(--mono); font-size:9px; color:var(--bright); line-height:1.7; word-break:break-all; white-space:pre-wrap; }
   .taf-text .h  { color:var(--accent); }
   .taf-text .hg { color:var(--green); }
   .taf-text .ha { color:var(--amber); }
@@ -184,14 +184,14 @@
   .af-cat.MVFR { color:var(--mvfr); border-color:var(--mvfr); background:rgba(0,170,255,0.1); }
   .af-cat.IFR  { color:var(--ifr);  border-color:var(--ifr);  background:rgba(255,61,61,0.1); }
   .af-cat.LIFR { color:var(--lifr); border-color:var(--lifr); background:rgba(204,68,255,0.1); }
-  .af-metar { font-family:var(--mono); font-size:9px; color:var(--dim); line-height:1.5; word-break:break-all; padding:0 12px 6px; }
+  .af-metar { font-family:var(--mono); font-size:9px; color:var(--bright); line-height:1.5; word-break:break-all; padding:0 12px 6px; }
   .af-metar .h  { color:var(--accent); }
   .af-metar .hg { color:var(--green); }
   .af-metar .ha { color:var(--amber); }
   .af-metar .hr { color:var(--red); }
   .af-taf-toggle { font-family:var(--mono); font-size:8px; color:var(--dim); letter-spacing:0.1em; padding:4px 12px; border-top:1px solid var(--border); cursor:pointer; display:flex; justify-content:space-between; user-select:none; }
   .af-taf-toggle:hover { color:var(--text); }
-  .af-taf-body { font-family:var(--mono); font-size:9px; color:var(--dim); line-height:1.7; word-break:break-all; white-space:pre-wrap; padding:6px 12px 8px; border-top:1px solid var(--border); display:none; }
+  .af-taf-body { font-family:var(--mono); font-size:9px; color:var(--bright); line-height:1.7; word-break:break-all; white-space:pre-wrap; padding:6px 12px 8px; border-top:1px solid var(--border); display:none; }
   .af-taf-body .h  { color:var(--accent); }
   .af-taf-body .hg { color:var(--green); }
   .af-taf-body .ha { color:var(--amber); }
@@ -487,7 +487,7 @@ function highlightMetar(raw) {
 
   // Visibility — green 5000m+, amber 1500-4999m, red <1500m
   h = h.replace(/\b9999\b/g, '<span class="hg">9999</span>');
-  h = h.replace(/\b(\d{3,4})\b(?!\d)(?!Z)(?!\/)/g, (m, v) => {
+  h = h.replace(/(?<!\/)\b(\d{3,4})\b(?!\d)(?!Z)(?!\/)/g, (m, v) => {
     const metres = parseInt(v);
     if (metres > 0 && metres <= 9000) {
       const cls = metres < 1500 ? 'hr' : metres < 5000 ? 'ha' : 'hg';
