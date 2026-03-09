@@ -132,9 +132,10 @@
     <div id="statusBar" class="status-bar"></div>
 
     <div class="backup-bar">
-      <button class="btn-export" onclick="exportBackup()">⬇ EXPORT BACKUP</button>
-      <button class="btn-import" onclick="document.getElementById('importFile').click()">⬆ IMPORT BACKUP</button>
+      <button class="btn-export" onclick="exportBackup()">⬇ EXPORT</button>
+      <button class="btn-import" onclick="document.getElementById('importFile').click()">⬆ IMPORT</button>
       <input type="file" id="importFile" accept=".json" style="display:none" onchange="importBackup(event)">
+      <button class="btn-export" onclick="restoreFromBackup()">↩ RESTORE FROM CLOUD BACKUP</button>
     </div>
 
     <div class="columns">
@@ -210,6 +211,74 @@ const JSONBIN_ID  = '69ac06bf43b1c97be9bd5667';
 const JSONBIN_KEY = '$2a$10$wjZldGseV25iurze/grlbOQ1ZxUVCugh.kmmRH3LOo3zEiUF4RKPS';
 const BIN_URL     = `https://api.jsonbin.io/v3/b/${JSONBIN_ID}`;
 
+// ── BACKUP BIN ──
+// Backup bin ID is created automatically on first use and stored in localStorage
+async function getBackupBinId() {
+  let id = localStorage.getItem('ls_backup_bin_id');
+  if (id) return id;
+  // Create a new bin
+  try {
+    const res = await fetch('https://api.jsonbin.io/v3/b', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Master-Key': JSONBIN_KEY,
+        'X-Bin-Name': 'ls-notices-backup',
+        'X-Private': 'true'
+      },
+      body: JSON.stringify({ notices: [], notams: [] })
+    });
+    const data = await res.json();
+    id = data.metadata && data.metadata.id;
+    if (id) {
+      localStorage.setItem('ls_backup_bin_id', id);
+      console.log('Backup bin created:', id);
+    }
+  } catch(e) {
+    console.warn('Could not create backup bin:', e.message);
+  }
+  return id;
+}
+
+async function writeBackup(record) {
+  try {
+    const id = await getBackupBinId();
+    if (!id) return;
+    await fetch(`https://api.jsonbin.io/v3/b/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', 'X-Master-Key': JSONBIN_KEY },
+      body: JSON.stringify(record)
+    });
+  } catch(e) {
+    console.warn('Backup write failed:', e.message);
+  }
+}
+
+async function restoreFromBackup() {
+  try {
+    const id = localStorage.getItem('ls_backup_bin_id');
+    if (!id) { showStatus('NO BACKUP BIN FOUND', 'err'); return; }
+    const res = await fetch(`https://api.jsonbin.io/v3/b/${id}/latest`, {
+      headers: { 'X-Master-Key': JSONBIN_KEY }
+    });
+    const data = await res.json();
+    const record = data.record || {};
+    if (!record.notices && !record.notams) { showStatus('BACKUP IS EMPTY', 'err'); return; }
+    if (!window.confirm(`Restore ${(record.notices||[]).length} notices and ${(record.notams||[]).length} NOTAMs from backup?`)) return;
+    const ok = await writeBin(record);
+    if (ok) {
+      allData = record;
+      if (!allData.notices) allData.notices = [];
+      if (!allData.notams)  allData.notams  = [];
+      renderNotices();
+      renderNotams();
+      showStatus('RESTORED FROM BACKUP', 'ok');
+    }
+  } catch(e) {
+    showStatus('RESTORE FAILED: ' + e.message, 'err');
+  }
+}
+
 // ── AUTH ──
 function doLogin() {
   const pw = document.getElementById('pwInput').value;
@@ -252,6 +321,7 @@ async function writeBin(record) {
     headers: { 'Content-Type': 'application/json', 'X-Master-Key': JSONBIN_KEY },
     body: JSON.stringify(record)
   });
+  if (res.ok) writeBackup(record); // silent backup on every save
   return res.ok;
 }
 
