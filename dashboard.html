@@ -645,6 +645,7 @@ async function fetchNotices() {
 const FLEET = [
   { reg:'G-BCGJ', type:'PA-28-140' },
   { reg:'G-BTGO', type:'PA-28-140' },
+  { reg:'G-EGTB', type:'PA-28-161' },
   { reg:'G-FIAT', type:'PA-28-161' },
   { reg:'G-HRYZ', type:'PA-28-161' },
   { reg:'G-MKAS', type:'PA-28-181' },
@@ -1086,14 +1087,16 @@ function parseSheet(json) {
   // Sheet repeats every 5 columns: UTC | DEP | ARR | CCT1 | CCT2
   const SECTION_WIDTH = 5;
   const timeRegex = /^\d{2}:\d{2}$/;
-  console.log('Sheet rows:', grid.length, 'First row:', JSON.stringify(grid[0]));
-  console.log('Sample rows:', JSON.stringify(grid.slice(1,4)));
+
 
   // Find how many sections there are by checking row 0
   const maxCols = grid.reduce((m, r) => Math.max(m, r.length), 0);
   const sectionStarts = [];
   for (let c = 0; c < maxCols; c += SECTION_WIDTH) sectionStarts.push(c);
 
+  // Log first row that has a registration in it
+  const nonEmpty = grid.filter(r => r.some(c => c && !/^\d{2}:\d{2}$/.test(c) && c !== '' && !['1','2','3','Comm','IFR Trg','UTC','DEP','ARR','CCT1','CCT2'].includes(c)));
+  console.log('Rows with regs:', JSON.stringify(nonEmpty.slice(0,3)));
   for (const row of grid) {
     for (const start of sectionStarts) {
       const time = (row[start] || '').trim();
