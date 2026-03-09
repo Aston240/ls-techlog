@@ -1107,36 +1107,38 @@ function parseSheet(json) {
     return `${String(h).padStart(2,'0')}:${String(Math.floor(m/15)*15).padStart(2,'0')}`;
   }
 
-  // Find all columns that ever contain a time value — these are UTC columns
-  // Then determine DEP/ARR/CCT1/CCT2 offsets by scanning the header rows
-  // Simpler: find header row with Dep/Arr/CCT labels, map col index to label
-  const colLabels = {}; // col index → label
-  for (const row of grid) {
-    for (let c = 0; c < row.length; c++) {
-      const v = row[c].trim().toUpperCase();
-      if (v === 'DEP')  colLabels[c] = 'DEP';
-      if (v === 'ARR')  colLabels[c] = 'ARR';
-      if (v === 'CCT 1' || v === 'CCT1') colLabels[c] = 'CCT1';
-      if (v === 'CCT 2' || v === 'CCT2') colLabels[c] = 'CCT2';
-    }
-  }
-  console.log('Detected colLabels:', JSON.stringify(colLabels));
+  // Sections are every 6 columns: UTC | DEP | ARR | CCT1 | CCT2 | LOAD
+  // UTC cols: 0, 6, 12, 18, 24, 30
+  const SECTION_WIDTH = 6;
+  const maxCols = grid.reduce((m,r) => Math.max(m, r.length), 0);
+  const utcCols = [];
+  for (let c = 0; c < maxCols; c += SECTION_WIDTH) utcCols.push(c);
 
-  // Now scan every row — for any cell that is a time, check sibling columns
+  // Offsets within each section
+  const offsets = [
+    { offset:1, label:'DEP' },
+    { offset:2, label:'ARR' },
+    { offset:3, label:'CCT1' },
+    { offset:4, label:'CCT2' },
+  ];
+
+  // Collect all raw slots: { time, col, reg }
   for (const row of grid) {
-    for (let c = 0; c < row.length; c++) {
-      const time = (row[c] || '').trim();
+    for (const utcCol of utcCols) {
+      const time = (row[utcCol] || '').trim();
       if (!timeRegex.test(time)) continue;
       const slotTime = roundDown15(time);
-      // Check all labelled columns that are to the right of this time cell
-      // and before the next time cell
-      for (const [colIdx, label] of Object.entries(colLabels)) {
-        const ci = Number(colIdx);
-        if (ci <= c) continue; // must be to the right
-        const val = (row[ci] || '').trim().toUpperCase().replace(/[\s-]/g,'');
+      for (const {offset, label} of offsets) {
+        const val = (row[utcCol + offset] || '').trim().toUpperCase().replace(/[\s-]/g,'');
         if (!val) continue;
         if (fleetNorm[val]) {
-          slots.push({ time: slotTime, col: label, reg: fleetNorm[val] });
+          // Deduplicate: skip if same reg+time+col already added
+          const key = `${fleetNorm[val]}|${slotTime}|${label}`;
+          if (!slots._seen) slots._seen = new Set();
+          if (!slots._seen.has(key)) {
+            slots._seen.add(key);
+            slots.push({ time: slotTime, col: label, reg: fleetNorm[val] });
+          }
         }
       }
     }
@@ -1145,42 +1147,78 @@ function parseSheet(json) {
   return slots;
 }
 
-function renderSlots(slots) {
-  const content=document.getElementById('slotsContent');
-  const now=nowMins();
-  const upcoming=slots.filter(s=>timeMins(s.time)>=now-5);
-  const byReg={};
-  for(const ac of FLEET){
-    const acSlots=upcoming.filter(s=>s.reg===ac.reg);
-    if(acSlots.length>0) byReg[ac.reg]={type:ac.type,slots:acSlots};
+function groupBookings(slots) {
+  // Group consecutive 15-min slots per reg+col into bookings with start/end
+  const sorted = [...slots].sort((a,b) => timeMins(a.time) - timeMins(b.time));
+  const bookings = [];
+  for (const s of sorted) {
+    const last = bookings.find(b =>
+      b.reg === s.reg && b.col === s.col &&
+      timeMins(b.end) === timeMins(s.time) // end of last booking == this slot start
+    );
+    if (last) {
+      last.end = minsToTime(timeMins(s.time) + 15);
+    } else {
+      bookings.push({ reg: s.reg, col: s.col, start: s.time, end: minsToTime(timeMins(s.time) + 15) });
+    }
   }
-  const hasAny=Object.keys(byReg).length>0;
-  if(!hasAny){ content.innerHTML='<div class="no-slots">NO SLOTS BOOKED FOR FLEET TODAY</div>'; return; }
-  content.innerHTML=Object.entries(byReg).map(([reg,data],i)=>{
-    const {type,slots}=data;
-    const next=slots[0];
-    const diff=timeMins(next.time)-now;
-    const isActive=diff<=0&&diff>=-5;
-    const isSoon=diff>0&&diff<=10;
-    let cc='',ct='',cl='';
-    if(isActive){cc='now';ct='IN SLOT';cl=`STARTED ${next.time}`;}
-    else if(isSoon){cc='soon';ct=minsToDisplay(diff);cl=`NEXT SLOT ${next.time}`;}
-    else{cc='';ct=minsToDisplay(diff);cl=`NEXT SLOT ${next.time}`;}
-    const slotItems=slots.map(s=>{
-      const sd=timeMins(s.time)-now;
-      const sa=sd<=0&&sd>=-5, ss=sd>0&&sd<=10;
-      const colCls=s.col.toLowerCase();
-      const stxt=sa?'ACTIVE':ss?`${sd}m`:s.time;
-      const scls=sa?'active-label':ss?'soon-label':'';
-      const bp=sa?'100':ss?Math.round((1-sd/10)*100):'0';
-      return `<div class="slot-item">
-        <div class="slot-time">${s.time}</div>
-        <div class="slot-col ${colCls}">${s.col}</div>
-        <div class="slot-bar-wrap"><div class="slot-bar ${sa?'active':''}" style="width:${bp}%"></div></div>
-        <div class="slot-status ${scls}">${stxt}</div>
+  return bookings;
+}
+
+function renderSlots(slots) {
+  const content = document.getElementById('slotsContent');
+  const now = nowMins();
+
+  // Group into bookings
+  const allBookings = groupBookings(slots);
+
+  // Filter to upcoming/active (end time > now - 1)
+  const upcoming = allBookings.filter(b => timeMins(b.end) > now - 1);
+
+  // Group by reg, only show fleet aircraft
+  const byReg = {};
+  for (const ac of FLEET) {
+    const acBookings = upcoming.filter(b => b.reg === ac.reg);
+    if (acBookings.length > 0) byReg[ac.reg] = { type: ac.type, bookings: acBookings };
+  }
+
+  const hasAny = Object.keys(byReg).length > 0;
+  if (!hasAny) { content.innerHTML = '<div class="no-slots">NO SLOTS BOOKED FOR FLEET TODAY</div>'; return; }
+
+  content.innerHTML = Object.entries(byReg).map(([reg, data], i) => {
+    const { type, bookings } = data;
+    const next = bookings[0];
+    const diffStart = timeMins(next.start) - now;
+    const diffEnd   = timeMins(next.end)   - now;
+    const isActive  = diffStart <= 0 && diffEnd > 0;
+    const isSoon    = diffStart > 0 && diffStart <= 15;
+
+    let cc, ct, cl;
+    if (isActive) {
+      cc = 'now'; ct = 'IN SLOT'; cl = `ENDS ${next.end} · ${diffEnd}m remaining`;
+    } else if (isSoon) {
+      cc = 'soon'; ct = minsToDisplay(diffStart); cl = `STARTS ${next.start}`;
+    } else {
+      cc = ''; ct = minsToDisplay(diffStart); cl = `STARTS ${next.start}`;
+    }
+
+    const bookingItems = bookings.map(b => {
+      const ds = timeMins(b.start) - now;
+      const de = timeMins(b.end)   - now;
+      const active = ds <= 0 && de > 0;
+      const soon   = ds > 0 && ds <= 15;
+      const colCls = b.col.toLowerCase().replace(' ','');
+      const pct = active ? Math.round((1 - de / (timeMins(b.end) - timeMins(b.start))) * 100)
+                         : soon   ? Math.round((1 - ds / 15) * 100) : 0;
+      return `<div class="slot-item ${active ? 'slot-active' : ''}">
+        <div class="slot-col ${colCls}">${b.col}</div>
+        <div class="slot-time-range">${b.start} → ${b.end}</div>
+        <div class="slot-bar-wrap"><div class="slot-bar ${active ? 'active' : ''}" style="width:${pct}%"></div></div>
+        <div class="slot-status ${active ? 'active-label' : soon ? 'soon-label' : ''}">${active ? `${de}m left` : soon ? `in ${ds}m` : ''}</div>
       </div>`;
     }).join('');
-    return `<div class="ac-slot-row" style="animation-delay:${i*0.06}s">
+
+    return `<div class="ac-slot-row" style="animation-delay:${i * 0.06}s">
       <div class="ac-header">
         <div><div class="ac-reg">${reg}</div><div class="ac-type">${type}</div></div>
         <div class="ac-next-badge">
@@ -1188,7 +1226,7 @@ function renderSlots(slots) {
           <div class="ac-countdown-label">${cl}</div>
         </div>
       </div>
-      <div class="slot-list">${slotItems}</div>
+      <div class="slot-list">${bookingItems}</div>
     </div>`;
   }).join('');
 }
