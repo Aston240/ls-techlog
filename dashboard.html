@@ -1095,34 +1095,48 @@ function parseSheet(json) {
   const sectionStarts = [];
   for (let c = 0; c < maxCols; c += SECTION_WIDTH) sectionStarts.push(c);
 
-  // Log all non-empty, non-time cell values to see what's in the sheet
-  const allVals = [];
-  grid.forEach(row => row.forEach(cell => { if(cell && !/^\d{2}:\d{2}$/.test(cell)) allVals.push(cell); }));
-  console.log('All non-time cell values:', JSON.stringify([...new Set(allVals)].slice(0,30)));
+  // Build a set of fleet regs stripped of hyphens/spaces for fast lookup
+  const fleetNorm = {};
+  for (const ac of FLEET) {
+    fleetNorm[ac.reg.replace(/[\s-]/g,'')] = ac.reg;
+  }
+
   // Round a HH:MM time down to nearest 15 mins
   function roundDown15(t) {
     const [h, m] = t.split(':').map(Number);
     return `${String(h).padStart(2,'0')}:${String(Math.floor(m/15)*15).padStart(2,'0')}`;
   }
 
+  // Find all columns that ever contain a time value — these are UTC columns
+  // Then determine DEP/ARR/CCT1/CCT2 offsets by scanning the header rows
+  // Simpler: find header row with Dep/Arr/CCT labels, map col index to label
+  const colLabels = {}; // col index → label
   for (const row of grid) {
-    for (const start of sectionStarts) {
-      const time = (row[start] || '').trim();
+    for (let c = 0; c < row.length; c++) {
+      const v = row[c].trim().toUpperCase();
+      if (v === 'DEP')  colLabels[c] = 'DEP';
+      if (v === 'ARR')  colLabels[c] = 'ARR';
+      if (v === 'CCT 1' || v === 'CCT1') colLabels[c] = 'CCT1';
+      if (v === 'CCT 2' || v === 'CCT2') colLabels[c] = 'CCT2';
+    }
+  }
+  console.log('Detected colLabels:', JSON.stringify(colLabels));
+
+  // Now scan every row — for any cell that is a time, check sibling columns
+  for (const row of grid) {
+    for (let c = 0; c < row.length; c++) {
+      const time = (row[c] || '').trim();
       if (!timeRegex.test(time)) continue;
-      const slotTime = roundDown15(time); // e.g. 10:35 → 10:30
-      const colMap = [
-        { offset:1, label:'DEP' },
-        { offset:2, label:'ARR' },
-        { offset:3, label:'CCT1' },
-        { offset:4, label:'CCT2' },
-      ];
-      for (const {offset, label} of colMap) {
-        const val = (row[start + offset] || '').trim().toUpperCase();
+      const slotTime = roundDown15(time);
+      // Check all labelled columns that are to the right of this time cell
+      // and before the next time cell
+      for (const [colIdx, label] of Object.entries(colLabels)) {
+        const ci = Number(colIdx);
+        if (ci <= c) continue; // must be to the right
+        const val = (row[ci] || '').trim().toUpperCase().replace(/[\s-]/g,'');
         if (!val) continue;
-        for (const ac of FLEET) {
-          const norm = val.replace(/[\s-]/g,'');
-          const acn  = ac.reg.replace(/[\s-]/g,'');
-          if (norm === acn) slots.push({ time: slotTime, col:label, reg:ac.reg });
+        if (fleetNorm[val]) {
+          slots.push({ time: slotTime, col: label, reg: fleetNorm[val] });
         }
       }
     }
