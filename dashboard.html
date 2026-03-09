@@ -1192,7 +1192,7 @@ function renderSlots(slots) {
   const filtered = sorted.map(([reg, data]) => {
     const visibleBookings = showAll
       ? data.bookings
-      : data.bookings.filter(b => (timeMins(b.start) - now) <= 360 || timeMins(b.end) > now - 60);
+      : data.bookings.filter(b => (timeMins(b.start) - now) <= 360 || (timeMins(b.end) <= now && timeMins(b.end) > now - 60));
     return [reg, { ...data, bookings: visibleBookings }];
   }).filter(([,d]) => d.bookings.length > 0);
 
