@@ -1086,6 +1086,8 @@ function parseSheet(json) {
   // Sheet repeats every 6 columns: UTC | DEP | ARR | CCT1 | CCT2 | LOAD%
   const SECTION_WIDTH = 6;
   const timeRegex = /^\d{2}:\d{2}$/;
+  console.log('Sheet rows:', grid.length, 'First row:', JSON.stringify(grid[0]));
+  console.log('Sample rows:', JSON.stringify(grid.slice(1,4)));
 
   // Find how many sections there are by checking row 0
   const maxCols = grid.reduce((m, r) => Math.max(m, r.length), 0);
