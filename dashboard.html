@@ -1082,20 +1082,33 @@ function parseSheet(json) {
     if(cell.v!=null) return cell.v.toString().trim();
     return '';
   }));
-  const timeRegex=/^\d{2}:\d{2}$/;
-  for(let r=0;r<grid.length;r++){
-    const row=grid[r];
-    for(let c=0;c<row.length;c++){
-      if(!timeRegex.test(row[c])) continue;
-      const time=row[c];
-      const colMap=[{offset:1,label:'DEP'},{offset:2,label:'ARR'},{offset:3,label:'CCT1'},{offset:4,label:'CCT2'}];
-      for(const {offset,label} of colMap){
-        const val=(row[c+offset]||'').trim().toUpperCase();
-        if(!val) continue;
-        for(const ac of FLEET){
-          const norm=val.replace(/[\s-]/g,'');
-          const acn=ac.reg.replace(/[\s-]/g,'');
-          if(norm===acn||val===ac.reg) slots.push({time,col:label,reg:ac.reg});
+
+  // Sheet repeats every 6 columns: UTC | DEP | ARR | CCT1 | CCT2 | LOAD%
+  const SECTION_WIDTH = 6;
+  const timeRegex = /^\d{2}:\d{2}$/;
+
+  // Find how many sections there are by checking row 0
+  const maxCols = grid.reduce((m, r) => Math.max(m, r.length), 0);
+  const sectionStarts = [];
+  for (let c = 0; c < maxCols; c += SECTION_WIDTH) sectionStarts.push(c);
+
+  for (const row of grid) {
+    for (const start of sectionStarts) {
+      const time = (row[start] || '').trim();
+      if (!timeRegex.test(time)) continue;
+      const colMap = [
+        { offset:1, label:'DEP' },
+        { offset:2, label:'ARR' },
+        { offset:3, label:'CCT1' },
+        { offset:4, label:'CCT2' },
+      ];
+      for (const {offset, label} of colMap) {
+        const val = (row[start + offset] || '').trim().toUpperCase();
+        if (!val) continue;
+        for (const ac of FLEET) {
+          const norm = val.replace(/[\s-]/g,'');
+          const acn  = ac.reg.replace(/[\s-]/g,'');
+          if (norm === acn) slots.push({ time, col:label, reg:ac.reg });
         }
       }
     }
