@@ -494,6 +494,7 @@ function checkPassword(e){
 function initLogin(){
   // Hardcoded key — pre-saved so user never has to re-enter
   const HARDCODED_KEY = 'AamCntOnk72udRQvYYiX4oUlcpHcgg';
+  const HARDCODED_KEY2 = '6W9TZU5ECtrE3U1UeptzaNsCaXoWcQ'; // second account — G-EGTB only
   if(!localStorage.getItem('tl_key')) localStorage.setItem('tl_key', HARDCODED_KEY);
   const saved = localStorage.getItem('tl_key');
   if(saved){
@@ -521,6 +522,15 @@ function goLogin(){
 }
 
 // ══ CONNECT ══════════════════════════════════════
+async function fetchAirbly(key){
+  const url=`https://airbly.com/api/v3/assetList?groupKey=${encodeURIComponent(key)}&log_types=flight&log_limit_per_asset=500`;
+  const r=await fetch(url);
+  if(!r.ok) throw new Error(`Airbly returned HTTP ${r.status}.`);
+  const raw=await r.json();
+  if(raw.auth_group_success===false) throw new Error('API key rejected by Airbly.');
+  return raw;
+}
+
 async function doConnect(keyOverride){
   const key = keyOverride || $('api-input').value.trim();
   if(!key) return;
@@ -528,18 +538,60 @@ async function doConnect(keyOverride){
   if(btn){ btn.textContent='⏳  Connecting…'; btn.disabled=true; }
   if(err) err.style.display='none';
   try{
-    // log_types=flight fetches actual flight records per asset
-    // log_limit_per_asset=500 ensures we get full history not just 10
-    const url=`https://airbly.com/api/v3/assetList?groupKey=${encodeURIComponent(key)}&log_types=flight&log_limit_per_asset=500`;
-    const r=await fetch(url);
-    if(!r.ok) throw new Error(`Airbly returned HTTP ${r.status}. Check your key.`);
-    const raw=await r.json();
-    if(raw.auth_group_success===false) throw new Error('API key rejected by Airbly. Please check it and try again.');
-    const {aircraft,flights}=parseAirbly(raw);
-    if(!aircraft.length) throw new Error('No aircraft found in this Airbly group.');
-    // Save key permanently — never asked again
+    // Fetch both Airbly accounts in parallel
+    const SECOND_KEY = '6W9TZU5ECtrE3U1UeptzaNsCaXoWcQ';
+    const [raw1, raw2] = await Promise.allSettled([
+      fetchAirbly(key),
+      fetchAirbly(SECOND_KEY)
+    ]);
+    if(raw1.status==='rejected') throw new Error(raw1.reason?.message||'Primary Airbly connection failed.');
+    const primary = parseAirbly(raw1.value);
+    if(!primary.aircraft.length) throw new Error('No aircraft found in this Airbly group.');
+
+    let allAirblyAircraft = [...primary.aircraft];
+    let allFlights = {...primary.flights};
+
+    // Merge second account — filter to G-EGTB only
+    if(raw2.status==='fulfilled'){
+      const secondary = parseAirbly(raw2.value);
+      const egtb = secondary.aircraft.find(a=>a.reg==='G-EGTB');
+      if(egtb){
+        allAirblyAircraft.push(egtb);
+        allFlights[egtb.id] = secondary.flights[egtb.id]||[];
+        // Auto-remove manual aircraft entry for G-EGTB if it exists
+        // IMPORTANT: migrate all settings and daily log to the new Airbly ID first
+        const manIdx = ST.manualAircraft.findIndex(m=>(ST.cfg[m.id]?.reg||m.reg||'').toUpperCase()==='G-EGTB');
+        if(manIdx !== -1){
+          const manId = ST.manualAircraft[manIdx].id;
+          const airblyId = egtb.id;
+          // Migrate cfg settings to Airbly ID — keep ARC due, annual due, maint due, check type etc
+          // but drop manual-only fields (man_hours, man_landings, man_last_flight)
+          if(ST.cfg[manId]){
+            if(!ST.cfg[airblyId]) ST.cfg[airblyId]={};
+            const manCfg = ST.cfg[manId];
+            // Copy all settings except manual tracking fields
+            ['reg','type','base','maint_due','check_type','cofa_exp','annual_due','sheet_start'].forEach(k=>{
+              if(manCfg[k]) ST.cfg[airblyId][k]=manCfg[k];
+            });
+          }
+          // Daily log history not migrated — Airbly has authoritative hours already
+          // Now safe to remove the manual entry and its old ID data
+          ST.manualAircraft.splice(manIdx,1);
+          delete ST.cfg[manId];
+          delete ST.dailyLog[manId];
+          saveManual(); saveCfg(); saveDailyLog();
+          console.log('G-EGTB migrated from manual to Airbly — settings and daily log preserved under new ID');
+        }
+      } else {
+        console.warn('G-EGTB not found on second Airbly account');
+      }
+    } else {
+      console.warn('Second Airbly account unavailable:', raw2.reason?.message);
+    }
+
+    // Save primary key permanently
     if(!keyOverride) localStorage.setItem('tl_key', key);
-    Object.assign(ST,{aircraft,flights,selected:aircraft[0],isDemo:false});
+    Object.assign(ST,{aircraft:allAirblyAircraft, flights:allFlights, selected:allAirblyAircraft[0], isDemo:false});
     showApp();
   } catch(e){
     if(err){ err.textContent='⚠ '+e.message; err.style.display='block'; }
