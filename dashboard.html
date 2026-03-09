@@ -1083,8 +1083,8 @@ function parseSheet(json) {
     return '';
   }));
 
-  // Sheet repeats every 6 columns: UTC | DEP | ARR | CCT1 | CCT2 | LOAD%
-  const SECTION_WIDTH = 6;
+  // Sheet repeats every 5 columns: UTC | DEP | ARR | CCT1 | CCT2
+  const SECTION_WIDTH = 5;
   const timeRegex = /^\d{2}:\d{2}$/;
   console.log('Sheet rows:', grid.length, 'First row:', JSON.stringify(grid[0]));
   console.log('Sample rows:', JSON.stringify(grid.slice(1,4)));
