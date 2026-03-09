@@ -260,8 +260,15 @@
   .slot-bar { height:100%; border-radius:2px; background:linear-gradient(90deg,var(--accent),var(--green)); transition:width 10s linear; }
   .slot-bar.active { background:linear-gradient(90deg,var(--green),var(--amber)); }
   .slot-status { font-family:var(--mono); font-size:12px; color:var(--dim); width:50px; text-align:right; flex-shrink:0; }
-  .slot-status.active-label { color:var(--green); }
-  .slot-status.soon-label   { color:var(--amber); }
+  .slot-status.active-label  { color:var(--green); }
+  .slot-status.soon-label    { color:var(--amber); }
+  .slot-status.overdue-label { color:var(--red); }
+  .slot-bar.overdue  { background:linear-gradient(90deg,var(--red),#ff6b6b); }
+  .ac-countdown.overdue { color:var(--red); }
+  .slot-overdue { opacity:0.7; }
+  .slots-show-all-wrap { padding:10px 0 4px; text-align:center; }
+  .slots-toggle-btn { background:rgba(0,170,255,0.08); border:1px solid rgba(0,170,255,0.25); border-radius:4px; color:var(--accent); font-family:var(--mono); font-size:11px; letter-spacing:0.1em; padding:7px 16px; cursor:pointer; }
+  .slots-toggle-btn:hover { background:rgba(0,170,255,0.15); }
   .no-slots { text-align:center; padding:16px 0; font-family:var(--mono); font-size:13.5px; color:var(--dim); letter-spacing:0.12em; }
 
   .fetch-error { background:rgba(255,61,61,0.08); border:1px solid rgba(255,61,61,0.2); border-radius:5px; padding:12px; font-family:var(--mono); font-size:13.5px; color:var(--red); letter-spacing:0.08em; line-height:1.6; margin-bottom:10px; }
@@ -1165,7 +1172,7 @@ function renderSlots(slots) {
   const allBookings = groupBookings(slots);
 
   // Filter to upcoming/active (end time > now - 1)
-  const upcoming = allBookings.filter(b => timeMins(b.end) > now - 1);
+  const upcoming = allBookings.filter(b => timeMins(b.end) > now - 60);
 
   // Group by reg, only show fleet aircraft
   const byReg = {};
@@ -1177,7 +1184,15 @@ function renderSlots(slots) {
   const hasAny = Object.keys(byReg).length > 0;
   if (!hasAny) { content.innerHTML = '<div class="no-slots">NO SLOTS BOOKED FOR FLEET TODAY</div>'; return; }
 
-  content.innerHTML = Object.entries(byReg).map(([reg, data], i) => {
+  // Sort by next booking start time
+  const sorted = Object.entries(byReg).sort(([,a],[,b]) => timeMins(a.bookings[0].start) - timeMins(b.bookings[0].start));
+
+  // 6-hour filter toggle
+  const showAll = slotsShowAll;
+  const filtered = showAll ? sorted : sorted.filter(([,d]) => timeMins(d.bookings[0].start) - now <= 360 || timeMins(d.bookings[0].end) > now - 60);
+  const hiddenCount = sorted.length - filtered.length;
+
+  content.innerHTML = filtered.map(([reg, data], i) => {
     const { type, bookings } = data;
     const next = bookings[0];
     const diffStart = timeMins(next.start) - now;
@@ -1186,7 +1201,10 @@ function renderSlots(slots) {
     const isSoon    = diffStart > 0 && diffStart <= 15;
 
     let cc, ct, cl;
-    if (isActive) {
+    const isOverdue = diffEnd <= 0;
+    if (isOverdue) {
+      cc = 'overdue'; ct = 'OVERDUE'; cl = `ENDED ${next.end} · ${Math.abs(diffEnd)}m ago`;
+    } else if (isActive) {
       cc = 'now'; ct = 'IN SLOT'; cl = `ENDS ${next.end} · ${diffEnd}m remaining`;
     } else if (isSoon) {
       cc = 'soon'; ct = minsToDisplay(diffStart); cl = `STARTS ${next.start}`;
@@ -1197,16 +1215,19 @@ function renderSlots(slots) {
     const bookingItems = bookings.map(b => {
       const ds = timeMins(b.start) - now;
       const de = timeMins(b.end)   - now;
-      const active = ds <= 0 && de > 0;
-      const soon   = ds > 0 && ds <= 15;
-      const colCls = b.col.toLowerCase().replace(' ','');
+      const overdue = de <= 0;
+      const active  = ds <= 0 && de > 0;
+      const soon    = ds > 0 && ds <= 15;
+      const colCls  = b.col.toLowerCase().replace(' ','');
       const pct = active ? Math.round((1 - de / (timeMins(b.end) - timeMins(b.start))) * 100)
-                         : soon   ? Math.round((1 - ds / 15) * 100) : 0;
-      return `<div class="slot-item ${active ? 'slot-active' : ''}">
+                         : soon ? Math.round((1 - ds / 15) * 100) : overdue ? 100 : 0;
+      const statusTxt = overdue ? `OVERDUE ${Math.abs(de)}m` : active ? `${de}m left` : soon ? `in ${ds}m` : '';
+      const statusCls = overdue ? 'overdue-label' : active ? 'active-label' : soon ? 'soon-label' : '';
+      return `<div class="slot-item ${active ? 'slot-active' : overdue ? 'slot-overdue' : ''}">
         <div class="slot-col ${colCls}">${b.col}</div>
         <div class="slot-time-range">${b.start} → ${b.end}</div>
-        <div class="slot-bar-wrap"><div class="slot-bar ${active ? 'active' : ''}" style="width:${pct}%"></div></div>
-        <div class="slot-status ${active ? 'active-label' : soon ? 'soon-label' : ''}">${active ? `${de}m left` : soon ? `in ${ds}m` : ''}</div>
+        <div class="slot-bar-wrap"><div class="slot-bar ${active ? 'active' : overdue ? 'overdue' : ''}" style="width:${pct}%"></div></div>
+        <div class="slot-status ${statusCls}">${statusTxt}</div>
       </div>`;
     }).join('');
 
@@ -1220,7 +1241,7 @@ function renderSlots(slots) {
       </div>
       <div class="slot-list">${bookingItems}</div>
     </div>`;
-  }).join('');
+  }).join('') + (hiddenCount > 0 || showAll ? `<div class="slots-show-all-wrap"><button class="slots-toggle-btn" onclick="slotsShowAll=!slotsShowAll; if(cachedSlots) renderSlots(cachedSlots);">${showAll ? 'SHOW NEXT 6 HRS ONLY' : 'SHOW ALL DAY · ' + hiddenCount + ' MORE'}</button></div>` : '');
 }
 
 function setFetchState(state) {
@@ -1288,6 +1309,7 @@ function updateStamp() {
 //  SLOTS REFRESH
 // ══════════════════════════════════════════════════════
 let cachedSlots=null;
+let slotsShowAll=false;
 
 async function refreshSlots() {
   const json=await fetchSheet();
