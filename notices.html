@@ -25,6 +25,11 @@
   .logo-sub{font-family:var(--mono);font-size:9px;color:var(--dim);letter-spacing:0.18em;margin-top:3px;}
   .logout-btn{font-family:var(--mono);font-size:9px;color:var(--dim);letter-spacing:0.1em;background:none;border:1px solid var(--border);padding:5px 10px;border-radius:3px;cursor:pointer;transition:all 0.2s;}
   .logout-btn:hover{color:var(--red);border-color:var(--red);}
+  .backup-bar{display:flex;gap:8px;margin-bottom:14px;justify-content:flex-end;}
+  .btn-export{font-family:var(--mono);font-size:9px;letter-spacing:0.1em;padding:5px 12px;border-radius:3px;cursor:pointer;transition:all 0.2s;background:rgba(0,200,100,0.08);border:1px solid rgba(0,200,100,0.3);color:#00c864;}
+  .btn-export:hover{background:rgba(0,200,100,0.18);}
+  .btn-import{font-family:var(--mono);font-size:9px;letter-spacing:0.1em;padding:5px 12px;border-radius:3px;cursor:pointer;transition:all 0.2s;background:rgba(0,150,255,0.08);border:1px solid rgba(0,150,255,0.3);color:#0096ff;}
+  .btn-import:hover{background:rgba(0,150,255,0.18);}
 
   /* ── LOGIN ── */
   .login-screen{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:70vh;gap:16px;}
@@ -125,6 +130,12 @@
     </div>
 
     <div id="statusBar" class="status-bar"></div>
+
+    <div class="backup-bar">
+      <button class="btn-export" onclick="exportBackup()">⬇ EXPORT BACKUP</button>
+      <button class="btn-import" onclick="document.getElementById('importFile').click()">⬆ IMPORT BACKUP</button>
+      <input type="file" id="importFile" accept=".json" style="display:none" onchange="importBackup(event)">
+    </div>
 
     <div class="columns">
 
@@ -433,6 +444,44 @@ window.addEventListener('load', () => {
     loadData();
   }
 });
+
+function exportBackup() {
+  const data = { notices: allData.notices || [], notams: allData.notams || [] };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `ls-notices-backup-${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+  showStatus('Backup exported', 'ok');
+}
+
+function importBackup(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = async e => {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (!Array.isArray(data.notices) || !Array.isArray(data.notams)) throw new Error('Invalid backup file');
+      if (!window.confirm(`Import ${data.notices.length} notices and ${data.notams.length} NOTAMs? This will replace all current data.`)) return;
+      showStatus('Importing...', '');
+      const res = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'X-Master-Key': MASTER_KEY },
+        body: JSON.stringify({ notices: data.notices, notams: data.notams })
+      });
+      if (!res.ok) throw new Error('Save failed');
+      allData = data;
+      renderNotices();
+      renderNotams();
+      showStatus(`Imported ${data.notices.length} notices and ${data.notams.length} NOTAMs`, 'ok');
+    } catch(err) {
+      showStatus('Import failed: ' + err.message, 'error');
+    }
+    event.target.value = '';
+  };
+  reader.readAsText(file);
+}
 </script>
 </body>
 </html>
