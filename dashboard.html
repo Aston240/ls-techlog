@@ -1095,6 +1095,10 @@ function parseSheet(json) {
   const sectionStarts = [];
   for (let c = 0; c < maxCols; c += SECTION_WIDTH) sectionStarts.push(c);
 
+  // Log all non-empty, non-time cell values to see what's in the sheet
+  const allVals = [];
+  grid.forEach(row => row.forEach(cell => { if(cell && !/^\d{2}:\d{2}$/.test(cell)) allVals.push(cell); }));
+  console.log('All non-time cell values:', JSON.stringify([...new Set(allVals)].slice(0,30)));
   // Round a HH:MM time down to nearest 15 mins
   function roundDown15(t) {
     const [h, m] = t.split(':').map(Number);
@@ -1123,6 +1127,7 @@ function parseSheet(json) {
       }
     }
   }
+  console.log('Total slots found:', slots.length, JSON.stringify(slots.slice(0,5)));
   return slots;
 }
 
