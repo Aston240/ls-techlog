@@ -1187,10 +1187,18 @@ function renderSlots(slots) {
   // Sort by next booking start time
   const sorted = Object.entries(byReg).sort(([,a],[,b]) => timeMins(a.bookings[0].start) - timeMins(b.bookings[0].start));
 
-  // 6-hour filter toggle
+  // 6-hour filter toggle — filter individual bookings, not just aircraft
   const showAll = slotsShowAll;
-  const filtered = showAll ? sorted : sorted.filter(([,d]) => timeMins(d.bookings[0].start) - now <= 360 || timeMins(d.bookings[0].end) > now - 60);
-  const hiddenCount = sorted.length - filtered.length;
+  const filtered = sorted.map(([reg, data]) => {
+    const visibleBookings = showAll
+      ? data.bookings
+      : data.bookings.filter(b => (timeMins(b.start) - now) <= 360 || timeMins(b.end) > now - 60);
+    return [reg, { ...data, bookings: visibleBookings }];
+  }).filter(([,d]) => d.bookings.length > 0);
+
+  const totalBookings = sorted.reduce((n,[,d]) => n + d.bookings.length, 0);
+  const visibleBookings = filtered.reduce((n,[,d]) => n + d.bookings.length, 0);
+  const hiddenCount = totalBookings - visibleBookings;
 
   content.innerHTML = filtered.map(([reg, data], i) => {
     const { type, bookings } = data;
