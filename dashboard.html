@@ -1196,6 +1196,10 @@ function renderSlots(slots) {
     return [reg, { ...data, bookings: visibleBookings }];
   }).filter(([,d]) => d.bookings.length > 0);
 
+  console.log('now (UTC mins):', now, 'which is', Math.floor(now/60)+':'+String(now%60).padStart(2,'0'), '6hr cutoff:', now+360, 'ie', Math.floor((now+360)/60)+':'+String((now+360)%60).padStart(2,'0'));
+  console.log('sorted bookings:', JSON.stringify(sorted.map(([r,d])=>({reg:r, bookings:d.bookings}))));
+  console.log('filtered bookings:', JSON.stringify(filtered.map(([r,d])=>({reg:r, bookings:d.bookings}))));
+  console.log('hiddenCount will be:', sorted.reduce((n,[,d])=>n+d.bookings.length,0) - filtered.reduce((n,[,d])=>n+d.bookings.length,0));
   const totalBookings = sorted.reduce((n,[,d]) => n + d.bookings.length, 0);
   const visibleBookings = filtered.reduce((n,[,d]) => n + d.bookings.length, 0);
   const hiddenCount = totalBookings - visibleBookings;
