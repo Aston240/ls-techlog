@@ -1060,7 +1060,7 @@ function renderFlights() {
 // ══════════════════════════════════════════════════════
 //  CIRCUIT SLOTS
 // ══════════════════════════════════════════════════════
-function nowMins()    { const n=new Date(); return n.getHours()*60+n.getMinutes(); }
+function nowMins()    { const n=new Date(); return n.getUTCHours()*60+n.getUTCMinutes(); }
 function timeMins(t)  { const [h,m]=t.split(':').map(Number); return h*60+m; }
 function minsToDisplay(m) { if(m<=0) return 'NOW'; const h=Math.floor(m/60),mn=m%60; return h>0?`${h}h ${mn}m`:`${mn}m`; }
 function snapTo15(m)  { return Math.ceil(m/15)*15; }
