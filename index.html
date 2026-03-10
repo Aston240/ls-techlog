@@ -1379,32 +1379,22 @@ function buildPageHTML(ac, chunk, pi, totalChunks, isPreview){
   const hrsRemWarn    = hrsRem === 'OVERDUE' || (hrsRem !== null && parseFloat(hrsRem) <= 10);
 
   // Flight rows
-  const rows = chunk.map(f=>{
-    const hs = f.hobbs_start!=null ? f.hobbs_start.toFixed(1) : '';
-    const he = f.hobbs_end  !=null ? f.hobbs_end.toFixed(1)   : '';
-    return`<tr>
-      <td class="dc">${f.dep_ms?fmtDate(f.dep_ms):''}</td>
-      <td class="nc"></td>
-      <td class="nc"></td>
-      <td class="purpc"></td>
-      <td class="ftc"><span>${esc(f.from)||''}</span><span>${esc(f.to)||''}</span></td>
-      <td class="sc"></td>
-      <td class="authc"></td>
-      <td class="tc"><span class="top-val"></span><span class="bot-val"></span></td>
-      <td class="tc"><span class="top-val">${f.dep_ms?fmtTime(f.dep_ms):''}</span><span class="bot-val">${f.arr_ms?fmtTime(f.arr_ms):''}</span></td>
-      <td class="stn"><span class="top-val"></span><span class="bot-val"></span></td>
-      <td class="tot"><span class="tot-top"></span><span class="tot-bot"></span></td>
-      <td class="stn"><span class="top-val">${hs}</span><span class="bot-val">${he}</span></td>
-      <td class="tot"><span class="tot-top"></span><span class="tot-bot"></span></td>
-      <td class="fc">${f.fuel!=null?f.fuel+' L':''}</td>
-      <td class="fc"></td>
-      <td class="fc"></td>
-      <td class="hrsc"></td>
-      <td class="sc"></td>
-    </tr>`;
-  }).join('');
+  const blankRow = `<tr>
+    <td class="dc"></td><td class="nc"></td><td class="nc"></td><td class="purpc"></td>
+    <td class="ftc"><span></span><span></span></td>
+    <td class="sc"></td><td class="authc"></td>
+    <td class="tc"><span class="top-val"></span><span class="bot-val"></span></td>
+    <td class="tc"><span class="top-val"></span><span class="bot-val"></span></td>
+    <td class="stn"><span class="top-val"></span><span class="bot-val"></span></td>
+    <td class="tot"><span class="tot-top"></span><span class="tot-bot"></span></td>
+    <td class="stn"><span class="top-val"></span><span class="bot-val"></span></td>
+    <td class="tot"><span class="tot-top"></span><span class="tot-bot"></span></td>
+    <td class="fc"></td><td class="fc"></td><td class="fc"></td>
+    <td class="hrsc"></td><td class="sc"></td>
+  </tr>`;
+  const rows = Array.from({length:6}, ()=>blankRow).join('');
 
-  const blanks = Array.from({length:6-chunk.length},()=>`<tr>
+  const blanks = Array.from({length:0},()=>`<tr>
     <td class="dc"></td><td class="nc"></td><td class="nc"></td><td class="purpc"></td>
     <td class="ftc"><span></span><span></span></td>
     <td class="sc"></td><td class="authc"></td>
@@ -1497,7 +1487,7 @@ function buildPageHTML(ac, chunk, pi, totalChunks, isPreview){
           <th class="th-tn">Total</th>
         </tr>
       </thead>
-      <tbody>${rows}${blanks}</tbody>
+      <tbody>${rows}</tbody>
     </table>
     <div class="notes">
       <div class="note-row"><b>Note 1:</b> By signing, you are certifying that the daily A-Check has been completed as required, and that you accept the aircraft.</div>
