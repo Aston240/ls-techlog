@@ -697,24 +697,21 @@ function parseAirbly(raw){
     console.log(`[${id}] ${airblyReg}: ${logs.length} logs returned`);
     if(logs.length) console.log('[sample log full]', JSON.stringify(logs[0]));
     flights[id] = logs
-      .filter(l => (l.takeoff_timestamp||l.departure_timestamp||l.start_timestamp||l.timestamp) > 0)
+      .filter(l => l.status==='closed' && l.usage && l.usage.air_seconds > 0)
       .map(l => {
-        const dep = l.takeoff_timestamp||l.departure_timestamp||l.start_timestamp||l.timestamp||null;
-        const arr = l.landing_timestamp||l.arrival_timestamp||l.end_timestamp||null;
+        const u = l.usage;
         return {
-          id:          l.uuid || Math.random(),
-          dep_ms:      dep,
-          arr_ms:      arr,
-          from:        l.takeoff_airport_icao||l.takeoff_airport||l.departure_icao||l.dep_icao||'',
-          to:          l.landing_airport_icao||l.landing_airport||l.arrival_icao||l.arr_icao||'',
-          air_sec:     l.air_seconds||l.air_time_seconds||0,
-          hobbs_start: l.hobbs_start??null,
-          hobbs_end:   l.hobbs_end??null,
-          cycles:      l.cycles||1,
-          fuel:        l.fuel_added??l.fuel_uplift??null,
+          id:       l.uuid || Math.random(),
+          dep_ms:   u.engine_start_at || l.happened_at,
+          arr_ms:   u.engine_stop_at  || l.happened_at,
+          from:     l.route?.departure_ident||'',
+          to:       l.route?.arrival_ident||'',
+          air_sec:  u.air_seconds||0,
+          tach_sec: u.tach_seconds||0,
+          cycles:   u.landings||1,
+          fuel:     u.fuel_ml ? Math.round(u.fuel_ml/1000) : null,
         };
       })
-      .filter(l => l.dep_ms)
       .sort((a,b)=>(a.dep_ms||0)-(b.dep_ms||0));
     // Derive last flight date from the most recent entry
     // Fallback: use updated_at from the asset itself (Airbly updates it on each flight)
@@ -818,40 +815,47 @@ function bootstrapSnapshotsFromFlightLogs(){
   const now = Date.now();
   const DAY = 86400*1000;
   const cutoff = new Date(now - 35*DAY).toISOString().slice(0,10);
-  let changed = false;
 
   for(const ac of ST.aircraft){
     if(ac.isManual) continue;
     const logs = ST.flights[ac.id]||[];
     if(!ST.hoursSnapshots[ac.id]) ST.hoursSnapshots[ac.id]={};
 
-    // Always record today's live Hobbs
+    // Always stamp today with live Hobbs
     const todayStr = new Date().toISOString().slice(0,10);
     ST.hoursSnapshots[ac.id][todayStr] = ac.totalHobbs;
 
-    for(const log of logs){
-      const hobbsVal = log.hobbs_end != null ? log.hobbs_end
-                     : (log.hobbs_start != null ? log.hobbs_start + (log.air_sec||0)/3600 : null);
-      if(hobbsVal == null) continue;
-      const ts = log.arr_ms || log.dep_ms;
-      if(!ts) continue;
-      const dayStr = new Date(ts).toISOString().slice(0,10);
-      if(dayStr < cutoff) continue;
-      const existing = ST.hoursSnapshots[ac.id][dayStr]||0;
-      if(hobbsVal > existing){
-        ST.hoursSnapshots[ac.id][dayStr] = hobbsVal;
-        changed = true;
+    if(logs.length >= 2){
+      // Work backwards from current totalHobbs using air_seconds per flight
+      // to reconstruct what the total was at end of each day
+      let runningHrs = ac.totalHobbs;
+      // Sort newest-first for backwards walk
+      const sorted = logs.slice().sort((a,b)=>(b.dep_ms||0)-(a.dep_ms||0));
+      let prevDayStr = todayStr;
+      for(const log of sorted){
+        const ts = log.arr_ms || log.dep_ms;
+        if(!ts) continue;
+        const dayStr = new Date(ts).toISOString().slice(0,10);
+        if(dayStr < cutoff) break;
+        const flightHrs = log.air_sec / 3600;
+        // Record end-of-day total on the day this flight landed
+        // Use highest value seen for that day (last flight of day)
+        if(!ST.hoursSnapshots[ac.id][dayStr] || ST.hoursSnapshots[ac.id][dayStr] < runningHrs){
+          ST.hoursSnapshots[ac.id][dayStr] = parseFloat(runningHrs.toFixed(1));
+        }
+        runningHrs -= flightHrs;
       }
     }
+
     // Trim old entries
     Object.keys(ST.hoursSnapshots[ac.id]).forEach(d=>{
       if(d < cutoff) delete ST.hoursSnapshots[ac.id][d];
     });
     console.log('[Bootstrap]', ac.reg, '— snapshot days:', Object.keys(ST.hoursSnapshots[ac.id]).length,
-      '| flights in ST.flights:', logs.length);
+      '| flights used:', logs.length);
   }
 
-  if(changed) saveSnapshots();
+  saveSnapshots();
   console.log('[Bootstrap] Done.');
   if(ST.dashGraph) drawHoursGraph(ST.dashGraph);
 }
