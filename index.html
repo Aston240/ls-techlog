@@ -812,12 +812,16 @@ async function bootstrapSnapshotsFromFlightLogs(){
   if(ST.isDemo || !ST.aircraft.length) return;
 
   console.log('[Bootstrap] Seeding snapshot history from ST.flights...');
-  // Log what flights look like for each aircraft
-  for(const ac of ST.aircraft){
-    if(ac.isManual) continue;
-    const logs = ST.flights[ac.id]||[];
-    const sample = logs.slice(-3).map(l=>({date:new Date(l.dep_ms).toISOString().slice(0,10), air_sec:l.air_sec}));
-    console.log('[Bootstrap]', ac.reg, 'total flights:', logs.length, '| last 3:', JSON.stringify(sample));
+  // Log FIAT specifically
+  const _fiat = ST.aircraft.find(a=>a.reg==='G-FIAT');
+  if(_fiat){
+    const _logs = ST.flights[_fiat.id]||[];
+    console.log('[FIAT DEBUG] totalHobbs:', _fiat.totalHobbs, '| parsed flights:', _logs.length);
+    console.log('[FIAT DEBUG] last 5 flights:', JSON.stringify(_logs.slice(-5).map(l=>({
+      date: new Date(l.dep_ms).toISOString().slice(0,10),
+      air_sec: l.air_sec,
+      dep_ms: l.dep_ms
+    }))));
   }
   const now = Date.now();
   const DAY = 86400*1000;
@@ -1023,8 +1027,11 @@ function drawHoursGraph(id){
   const nowMs = now.getTime();
   const DAY = 86400*1000;
 
-  // ── Y axis always 0–50 ────────────────────────
-  const Y_MAX = 50;
+  // ── Y axis: dynamic based on actual hours remaining ──
+  const remNowRaw = due ? Math.max(0, due - cur) : 50;
+  // Round up to next clean interval (10, 25, 50, 75, 100...)
+  const Y_STEPS = [10,20,25,30,40,50,60,75,100,125,150,200];
+  const Y_MAX = Y_STEPS.find(s=>s>=remNowRaw*1.15) || Math.ceil(remNowRaw*1.2/10)*10;
 
   // ── Build 30-day daily history ────────────────
   // For each of the past 30 days, calculate hours remaining at end of that day
@@ -1056,12 +1063,12 @@ function drawHoursGraph(id){
     for(const dStr of relevantDates){
       runningHrs += (addedByDate[dStr]||0);
       const ms = new Date(dStr+'T12:00:00').setHours(23,59,59,0);
-      histPoints.push({ms, rem:Math.min(Y_MAX,Math.max(0,due-runningHrs))});
+      histPoints.push({ms, rem:Math.max(0,due-runningHrs)});
     }
     // Always include today
     const todayStr = new Date(nowMs).toISOString().slice(0,10);
     if(!addedByDate[todayStr]){
-      histPoints.push({ms:nowMs, rem:Math.min(Y_MAX,Math.max(0,due-cur))});
+      histPoints.push({ms:nowMs, rem:Math.max(0,due-cur)});
     }
     // Sort histPoints by ms just to be safe
     histPoints.sort((a,b)=>a.ms-b.ms);
@@ -1080,12 +1087,12 @@ function drawHoursGraph(id){
     const recentSnaps = Object.keys(snaps).filter(d=>d>=thirtyAgoStr).sort();
     for(const dStr of recentSnaps){
       const ms = new Date(dStr).setHours(23,59,59,0);
-      histPoints.push({ms, rem:Math.min(Y_MAX,Math.max(0,due-snaps[dStr]))});
+      histPoints.push({ms, rem:Math.max(0,due-snaps[dStr])});
     }
     // Always include today's live value
     const todayStr = new Date(nowMs).toISOString().slice(0,10);
     if(!snaps[todayStr]){
-      histPoints.push({ms:nowMs, rem:Math.min(Y_MAX,Math.max(0,due-cur))});
+      histPoints.push({ms:nowMs, rem:Math.max(0,due-cur)});
       histPoints.sort((a,b)=>a.ms-b.ms);
     }
     // Avg rate from actual snapshot spread
@@ -1105,7 +1112,7 @@ function drawHoursGraph(id){
   }
 
   // ── Build projection from today → check due ───
-  const remNow = Math.min(Y_MAX, Math.max(0,due-cur));
+  const remNow = Math.max(0, due-cur);
   let projPoints = [{ms:nowMs, rem:remNow}];
   let checkDate = null;
   if(avgHrsPerDay > 0 && remNow > 0){
