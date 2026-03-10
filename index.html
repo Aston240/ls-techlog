@@ -806,7 +806,7 @@ function takeHoursSnapshot(){
 // Called once on first load if we have fewer than 7 days of snapshots.
 // Fetches the last 30 days of flight logs from Airbly in two monthly chunks,
 // builds end-of-day Hobbs snapshots from them, then discards the raw log data.
-function bootstrapSnapshotsFromFlightLogs(){
+async function bootstrapSnapshotsFromFlightLogs(){
   // Seeds graph history using ST.flights which is already populated from doConnect.
   // No extra API calls needed — just extract Hobbs values from the logs we already have.
   if(ST.isDemo || !ST.aircraft.length) return;
@@ -878,8 +878,8 @@ async function showApp(){
   await syncPull();
   // Schedule nightly midnight snapshot for Airbly aircraft hours
   scheduleMidnightSnapshot();
-  // Seed graph history from flight logs if we don't have enough snapshots yet
-  bootstrapSnapshotsFromFlightLogs();
+  // Seed graph history from flight logs — await so snapshots are ready before render
+  await bootstrapSnapshotsFromFlightLogs();
   // Re-register manual aircraft flights slots after pull (may have new aircraft)
   ST.manualAircraft.forEach(m=>{ if(!ST.flights[m.id]) ST.flights[m.id]=[]; });
   buildAcList(); render();
