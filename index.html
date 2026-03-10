@@ -990,7 +990,7 @@ function renderHoursGraph(id){
   const cur  = ac.totalHobbs||0;
   const rem  = due ? (due - cur) : null;
   const isManual = ac.isManual;
-  const dailyEntries = (ST.dailyLog[id]||[]).slice().sort((a,b)=>new Date(a.date+'T12:00:00')-new Date(b.date+'T12:00:00'));
+  const dailyEntries = (ST.dailyLog[id]||[]).slice().sort((a,b)=>(parseEntryDate(a.date)||0)-(parseEntryDate(b.date)||0));
   const isEstimate = !isManual || dailyEntries.length < 2;
   return`<div class="hgraph-wrap" id="hgraph-section">
     <div class="hgraph-title">📈 ${esc(ac.reg)} — Hours Remaining to Next Check</div>
@@ -1044,12 +1044,16 @@ function drawHoursGraph(id){
   // ── Build 30-day daily history ────────────────
   // For each of the past 30 days, calculate hours remaining at end of that day
   const isManual = ac.isManual;
-  const dailyEntries = (ST.dailyLog[id]||[]).slice().sort((a,b)=>new Date(a.date+'T12:00:00')-new Date(b.date+'T12:00:00'));
+  const dailyEntries = (ST.dailyLog[id]||[]).slice().sort((a,b)=>(parseEntryDate(a.date)||0)-(parseEntryDate(b.date)||0));
 
   // Build a map of date→hoursAdded for quick lookup
   const addedByDate = {};
   for(const e of dailyEntries){
-    addedByDate[e.date] = (addedByDate[e.date]||0) + (e.added||0);
+    // Normalise key to ISO date so sorting and comparisons work reliably
+    const pd = parseEntryDate(e.date);
+    if(!pd) continue;
+    const isoKey = pd.toISOString().slice(0,10);
+    addedByDate[isoKey] = (addedByDate[isoKey]||0) + (e.added||0);
   }
 
   let histPoints = [];
@@ -1813,6 +1817,16 @@ function rMxPlanner(){
     return Math.round(left/rate);
   }
 
+  function parseEntryDate(str){
+    // Handles "2026-02-14" (ISO) and "14 Feb 2026" (legacy display format)
+    if(!str) return null;
+    str = str.trim();
+    // ISO: 2026-02-14
+    if(/^\d{4}-\d{2}-\d{2}$/.test(str)) return new Date(str+'T12:00:00');
+    // "14 Feb 2026" or "14 February 2026"
+    if(/^\d{1,2} [A-Za-z]+ \d{4}$/.test(str)) return new Date(str);
+    return null;
+  }
   function parseUKDate(str){
     if(!str) return null;
     str = str.trim();
