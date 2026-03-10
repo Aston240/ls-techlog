@@ -621,6 +621,7 @@ async function fetchFlights() {
     const res = await fetch(url);
     const data = await res.json();
     const assets = (data.assetList && data.assetList.assets) ? data.assetList.assets : [];
+    console.log('Airbly raw assets:', JSON.stringify(assets.slice(0,5)));
     assets.filter(a => a.asset_type === 'aircraft').forEach(a => {
       // Match Airbly ident to fleet reg (strip hyphens)
       const normIdent = (a.ident || '').replace(/[-\s]/g, '').toUpperCase();
