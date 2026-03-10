@@ -812,6 +812,13 @@ function bootstrapSnapshotsFromFlightLogs(){
   if(ST.isDemo || !ST.aircraft.length) return;
 
   console.log('[Bootstrap] Seeding snapshot history from ST.flights...');
+  // Log what flights look like for each aircraft
+  for(const ac of ST.aircraft){
+    if(ac.isManual) continue;
+    const logs = ST.flights[ac.id]||[];
+    const sample = logs.slice(-3).map(l=>({date:new Date(l.dep_ms).toISOString().slice(0,10), air_sec:l.air_sec}));
+    console.log('[Bootstrap]', ac.reg, 'total flights:', logs.length, '| last 3:', JSON.stringify(sample));
+  }
   const now = Date.now();
   const DAY = 86400*1000;
   const cutoff = new Date(now - 35*DAY).toISOString().slice(0,10);
@@ -943,8 +950,9 @@ function render(){
   else if(ST.view==='mxplanner') c.innerHTML=rMxPlanner();
   else if(ST.view==='settings') c.innerHTML=rSettings();
   // Redraw graph after every render if one is open (canvas gets wiped on innerHTML replace)
+  // Use rAF + small delay to ensure DOM has painted before reading canvas dimensions
   if(ST.view==='dashboard' && ST.dashGraph){
-    setTimeout(()=>drawHoursGraph(ST.dashGraph), 0);
+    requestAnimationFrame(()=>setTimeout(()=>drawHoursGraph(ST.dashGraph), 50));
   }
 }
 
@@ -954,11 +962,11 @@ function openDashGraph(id){
   ST.dashGraph = ST.dashGraph===id ? null : id; // toggle
   render();
   if(ST.dashGraph){
-    setTimeout(()=>{
+    requestAnimationFrame(()=>setTimeout(()=>{
       const el=document.getElementById('hgraph-section');
       if(el) el.scrollIntoView({behavior:'smooth',block:'start'});
       drawHoursGraph(id);
-    },80);
+    },80));
   }
 }
 
