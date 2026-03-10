@@ -1015,10 +1015,12 @@ function renderHoursGraph(id){
 }
 
 function drawHoursGraph(id){
+  console.log('[graph] drawHoursGraph called for', id);
   const canvas = document.getElementById('hgraph-canvas');
-  if(!canvas) return;
+  if(!canvas){ console.log('[graph] no canvas found'); return; }
   const ac = allAircraft().find(a=>a.id===id);
-  if(!ac) return;
+  if(!ac){ console.log('[graph] no ac found'); return; }
+  console.log('[graph] ac=', ac.reg, 'isManual=', ac.isManual, 'totalHobbs=', ac.totalHobbs);
   const cfg = ST.cfg[id]||{};
   const due = parseFloat(cfg.maint_due||'0');
   const cur  = ac.totalHobbs||0;
