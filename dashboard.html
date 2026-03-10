@@ -161,12 +161,12 @@
 
   .raw-box { background:var(--panel2); border:1px solid var(--border); border-radius:5px; padding:10px 12px; margin-top:8px; }
   .raw-label { font-family:var(--mono); font-size:11px; color:var(--accent); letter-spacing:0.2em; margin-bottom:5px; }
-  .raw-text  { font-family:var(--mono); font-size:19px; color:var(--bright); line-height:1.65; word-break:break-all; }
+  .raw-text  { font-family:var(--mono); font-size:19px; color:var(--bright); line-height:1.65; word-break:normal; overflow-wrap:break-word; }
   .raw-text .h  { color:var(--accent); }
   .raw-text .hg { color:var(--green); }
   .raw-text .ha { color:var(--amber); }
   .raw-text .hr { color:var(--red); }
-  .taf-text { font-family:var(--mono); font-size:16px; color:var(--bright); line-height:1.7; word-break:break-all; white-space:pre-wrap; }
+  .taf-text { font-family:var(--mono); font-size:16px; color:var(--bright); line-height:1.7; word-break:normal; overflow-wrap:break-word; white-space:pre-wrap; }
   .taf-text .h  { color:var(--accent); }
   .taf-text .hg { color:var(--green); }
   .taf-text .ha { color:var(--amber); }
@@ -184,14 +184,14 @@
   .af-cat.MVFR { color:var(--mvfr); border-color:var(--mvfr); background:rgba(0,170,255,0.1); }
   .af-cat.IFR  { color:var(--ifr);  border-color:var(--ifr);  background:rgba(255,61,61,0.1); }
   .af-cat.LIFR { color:var(--lifr); border-color:var(--lifr); background:rgba(204,68,255,0.1); }
-  .af-metar { font-family:var(--mono); font-size:19px; color:var(--bright); line-height:1.5; word-break:break-all; padding:0 12px 6px; }
+  .af-metar { font-family:var(--mono); font-size:19px; color:var(--bright); line-height:1.5; word-break:normal; overflow-wrap:break-word; padding:0 12px 6px; }
   .af-metar .h  { color:var(--accent); }
   .af-metar .hg { color:var(--green); }
   .af-metar .ha { color:var(--amber); }
   .af-metar .hr { color:var(--red); }
   .af-taf-toggle { font-family:var(--mono); font-size:11px; color:var(--dim); letter-spacing:0.1em; padding:4px 12px; border-top:1px solid var(--border); cursor:pointer; display:flex; justify-content:space-between; user-select:none; }
   .af-taf-toggle:hover { color:var(--text); }
-  .af-taf-body { font-family:var(--mono); font-size:16px; color:var(--bright); line-height:1.7; word-break:break-all; white-space:pre-wrap; padding:6px 12px 8px; border-top:1px solid var(--border); display:none; }
+  .af-taf-body { font-family:var(--mono); font-size:16px; color:var(--bright); line-height:1.7; word-break:normal; overflow-wrap:break-word; white-space:pre-wrap; padding:6px 12px 8px; border-top:1px solid var(--border); display:none; }
   .af-taf-body .h  { color:var(--accent); }
   .af-taf-body .hg { color:var(--green); }
   .af-taf-body .ha { color:var(--amber); }
@@ -478,6 +478,7 @@ function flightCat(metarText) {
 
 // ── HIGHLIGHT METAR ──
 function highlightMetar(raw) {
+  raw = raw.trimEnd().replace(/=$/, '') + ' ='; // ensure single = terminator
   if(!raw) return '';
   // ICAO identifier
   let h = raw.replace(/^([A-Z]{4})\s/,'<span class="h">$1</span> ');
@@ -1172,7 +1173,7 @@ function renderSlots(slots) {
   const allBookings = groupBookings(slots);
 
   // Filter to upcoming/active (end time > now - 1)
-  const upcoming = allBookings.filter(b => timeMins(b.end) > now - 60);
+  const upcoming = allBookings.filter(b => timeMins(b.end) > now);
 
   // Group by reg, only show fleet aircraft
   const byReg = {};
@@ -1213,10 +1214,7 @@ function renderSlots(slots) {
     const isSoon    = diffStart > 0 && diffStart <= 15;
 
     let cc, ct, cl;
-    const isOverdue = diffEnd <= 0;
-    if (isOverdue) {
-      cc = 'overdue'; ct = 'OVERDUE'; cl = `ENDED ${next.end} · ${Math.abs(diffEnd)}m ago`;
-    } else if (isActive) {
+    if (isActive) {
       cc = 'now'; ct = 'IN SLOT'; cl = `ENDS ${next.end} · ${diffEnd}m remaining`;
     } else if (isSoon) {
       cc = 'soon'; ct = minsToDisplay(diffStart); cl = `STARTS ${next.start}`;
@@ -1227,18 +1225,17 @@ function renderSlots(slots) {
     const bookingItems = bookings.map(b => {
       const ds = timeMins(b.start) - now;
       const de = timeMins(b.end)   - now;
-      const overdue = de <= 0;
-      const active  = ds <= 0 && de > 0;
-      const soon    = ds > 0 && ds <= 15;
-      const colCls  = b.col.toLowerCase().replace(' ','');
+      const active = ds <= 0 && de > 0;
+      const soon   = ds > 0 && ds <= 15;
+      const colCls = b.col.toLowerCase().replace(' ','');
       const pct = active ? Math.round((1 - de / (timeMins(b.end) - timeMins(b.start))) * 100)
-                         : soon ? Math.round((1 - ds / 15) * 100) : overdue ? 100 : 0;
-      const statusTxt = overdue ? `OVERDUE ${Math.abs(de)}m` : active ? `${de}m left` : soon ? `in ${ds}m` : '';
-      const statusCls = overdue ? 'overdue-label' : active ? 'active-label' : soon ? 'soon-label' : '';
-      return `<div class="slot-item ${active ? 'slot-active' : overdue ? 'slot-overdue' : ''}">
+                         : soon ? Math.round((1 - ds / 15) * 100) : 0;
+      const statusTxt = active ? `${de}m left` : soon ? `in ${ds}m` : '';
+      const statusCls = active ? 'active-label' : soon ? 'soon-label' : '';
+      return `<div class="slot-item ${active ? 'slot-active' : ''}">
         <div class="slot-col ${colCls}">${b.col}</div>
         <div class="slot-time-range">${b.start} → ${b.end}</div>
-        <div class="slot-bar-wrap"><div class="slot-bar ${active ? 'active' : overdue ? 'overdue' : ''}" style="width:${pct}%"></div></div>
+        <div class="slot-bar-wrap"><div class="slot-bar ${active ? 'active' : ''}" style="width:${pct}%"></div></div>
         <div class="slot-status ${statusCls}">${statusTxt}</div>
       </div>`;
     }).join('');
