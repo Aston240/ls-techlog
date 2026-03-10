@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;600;800&display=swap" rel="stylesheet">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Aircraft Tech Log System</title>
 <style>
@@ -146,36 +147,46 @@ tfoot td{padding:11px;background:#112240;font-weight:700;}
 .hdr-dv{font-size:10px;font-weight:600;color:#000;min-height:13px;}
 .hdr-dv[contenteditable]{background:#fff;outline:none;}
 /* ── flight table: black & white ── */
-.pt{width:100%;border-collapse:collapse;flex:1;font-size:8px;table-layout:fixed;}
-.pt th{background:#fff;color:#000;padding:3px 4px;text-align:center;border:1px solid #000;font-size:7px;line-height:1.25;vertical-align:middle;font-weight:700;}
-.pt td{border:1px solid #000;padding:2px 3px;text-align:center;vertical-align:middle;height:19mm;}
+.pt{width:100%;border-collapse:collapse;font-size:7px;}
+.pt th{background:#fff;color:#000;padding:2px 3px;text-align:center;border:1px solid #000;font-size:9.5px;line-height:1.2;vertical-align:middle;font-weight:600;font-family:"Nunito",Arial,sans-serif;}
+.pt td{border:1px solid #000;padding:2px 3px;text-align:center;vertical-align:middle;height:20mm;font-weight:300;font-size:9px;font-family:"Nunito",Arial,sans-serif;}
 .pt tr:nth-child(even) td{background:#fff;}
+.th-grp{background:#fff;}
 /* column widths */
-.th-date{width:14mm;}.th-name{width:20mm;}.th-ap{width:9mm;}
-.th-fuel{width:13mm;}.th-sig{width:14mm;}.th-auth{width:14mm;}
-.th-grp{}.th-t{width:11mm;}
+.th-date{width:13mm;}.th-name{width:20mm;}.th-cap{width:18mm;}.th-stu{width:18mm;}
+.th-purp{width:20mm;}.th-frt{width:11mm;}.th-fuel{width:11mm;}
+.th-sig{width:13mm;}.th-auth{width:13mm;}.th-t{width:10mm;}.th-tn{width:9mm;}
+.th-oil{width:10mm;}.th-ldg{width:10mm;}.th-hrs{width:10mm;}.th-signin{width:13mm;}
 /* data cell classes */
-.pt td.dc{width:14mm;font-size:7.5px;}
-.pt td.nc{width:20mm;}
-.pt td.ac{width:9mm;font-weight:700;font-size:8px;}
-.pt td.fc{width:13mm;}
-.pt td.sc{width:14mm;}
-.pt td.authc{width:14mm;}
-.pt td.tc{width:11mm;}
-/* stacked cells */
-.pt td.stacked{width:11mm;padding:0;}
-.top-val,.bot-val{display:block;padding:2px 3px;font-size:7.5px;}
-.top-val{border-bottom:1px solid #000;}
-.pt td.ftc{width:12mm;padding:0;}
-.th-frt{width:12mm;}
+.pt td.dc{width:13mm;font-size:7.5px;}
+.pt td.nc{width:18mm;}
+.pt td.purpc{width:20mm;}
+.pt td.fc{width:11mm;}
+.pt td.hrsc{width:10mm;}
+.pt td.sc{width:13mm;}
+.pt td.authc{width:13mm;}
+.pt td.tc{width:10mm;padding:0;}
+.pt td.stn{width:9mm;padding:0;border-top:none;border-bottom:none;}
+.pt td.ftc{width:11mm;padding:0;}
+.th-frt{width:11mm;}
 .pt td.ftc span{display:block;padding:2px 3px;font-size:8px;font-weight:700;color:#000;line-height:1.3;}
 .pt td.ftc span:first-child{border-bottom:1px solid #000;}
-.pt td.stn{width:9mm;padding:0;}
-.th-tn{width:9mm;}
+/* stacked cells */
+.top-val,.bot-val{display:block;padding:2px 3px;font-size:9px;}
+.top-val{border-bottom:1px solid #000;}
+/* Total cell — split into two halves, mimics Excel merged carry-forward */
+.pt td.tot{padding:0;vertical-align:top;}
+.tot-top{display:block;height:50%;padding:2px 3px;font-size:9px;box-sizing:border-box;}
+.tot-bot{display:block;height:50%;padding:2px 3px;font-size:9px;box-sizing:border-box;}
 .hdr-org-big{font-size:16px;font-weight:900;color:#000;letter-spacing:1px;text-align:right;}
 .hdr-title-small{font-size:9px;color:#444;text-align:right;margin-top:1px;}
 .pfoot{display:flex;justify-content:space-between;font-size:7px;color:#888;border-top:1px solid #ccc;padding-top:3px;margin-top:auto;}
 .ph-sub{font-size:9px;color:#555;margin-top:2px;}
+/* notes */
+.notes{margin-top:2mm;font-size:8.5px;color:#000;border-top:1px solid #ccc;padding-top:1mm;font-weight:400;font-family:"Nunito",Arial,sans-serif;}
+.notes b{font-weight:700;}
+.note-row{margin-bottom:1px;}
+.note-warn{font-size:8.5px;font-weight:700;color:#c00;margin-top:1mm;border:1px solid #c00;padding:1px 5px;display:inline-block;}
 .page-nav{display:flex;align-items:center;gap:10px;margin-bottom:14px;}
 .page-nav button{background:#07111e;border:1px solid var(--border);border-radius:7px;color:var(--mut);font-size:12px;padding:6px 14px;cursor:pointer;}
 .page-nav button:hover{border-color:var(--acc);color:var(--acc);}
@@ -183,6 +194,17 @@ tfoot td{padding:11px;background:#112240;font-weight:700;}
 .page-info{font-size:12px;color:var(--mut);}
 
 .spin{font-size:28px;display:inline-block;animation:sp 1.1s linear infinite;}
+/* ── HOURS GRAPH ────────────────────────────────── */
+.hgraph-wrap{background:var(--panel);border:1px solid var(--border);border-radius:11px;padding:20px 22px;margin-top:16px;}
+.hgraph-title{font-size:14px;font-weight:800;color:#fff;margin-bottom:4px;}
+.hgraph-sub{font-size:11px;color:var(--mut);margin-bottom:14px;}
+.hgraph-canvas-wrap{position:relative;width:100%;height:220px;}
+.hgraph-canvas-wrap canvas{width:100%!important;height:100%!important;}
+.hgraph-est{font-size:10px;color:var(--amb);margin-top:10px;}
+.hgraph-legend{display:flex;gap:18px;margin-top:10px;flex-wrap:wrap;}
+.hgraph-leg-item{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--mut);}
+.hgraph-leg-dot{width:12px;height:3px;border-radius:2px;}
+
 /* ── MOBILE ─────────────────────────────────────── */
 .sb-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:99;}
 .sb-overlay.open{display:block;}
@@ -340,6 +362,13 @@ async function syncPull(){
       ST.manualAircraft=remote.manual;
       localStorage.setItem('tl_manual',JSON.stringify(ST.manualAircraft));
     }
+    if(remote.hoursSnapshots && typeof remote.hoursSnapshots==='object'){
+      Object.keys(remote.hoursSnapshots).forEach(id=>{
+        if(!ST.hoursSnapshots[id]) ST.hoursSnapshots[id]={};
+        Object.assign(ST.hoursSnapshots[id], remote.hoursSnapshots[id]);
+      });
+      localStorage.setItem('tl_snapshots',JSON.stringify(ST.hoursSnapshots));
+    }
     if(remote.dailyLog && typeof remote.dailyLog==='object'){
       // Merge daily logs — combine entries from both sides, deduplicate by date+tacho+sorties
       Object.keys(remote.dailyLog).forEach(id=>{
@@ -377,6 +406,7 @@ function syncPush(){
         cfg: ST.cfg,
         manual: ST.manualAircraft,
         dailyLog: ST.dailyLog||{},
+        hoursSnapshots: ST.hoursSnapshots||{},
         sheets: Object.fromEntries(
           Object.keys(ST.cfg).map(id=>[id, ST.cfg[id]?.sheet_start||'1'])
         ),
@@ -410,10 +440,11 @@ function syncPush(){
 // ══ STATE ════════════════════════════════════════
 const ST={
   aircraft:[], flights:{}, selected:null,
-  view:'dashboard', isDemo:false, previewPage:0,
+  view:'dashboard', isDemo:false, previewPage:0, dashGraph:null,
   cfg: JSON.parse(localStorage.getItem('tl_cfg')||'{}'),
   manualAircraft: JSON.parse(localStorage.getItem('tl_manual')||'[]'),
-  dailyLog: JSON.parse(localStorage.getItem('tl_dailylog')||'{}'),  // keyed by aircraft id
+  dailyLog: JSON.parse(localStorage.getItem('tl_dailylog')||'{}'),
+  hoursSnapshots: JSON.parse(localStorage.getItem('tl_snapshots')||'{}'),
 };
 
 // Save locally AND push to cloud
@@ -427,6 +458,10 @@ function saveManual(){
 }
 function saveDailyLog(){
   localStorage.setItem('tl_dailylog',JSON.stringify(ST.dailyLog));
+  syncPush();
+}
+function saveSnapshots(){
+  localStorage.setItem('tl_snapshots',JSON.stringify(ST.hoursSnapshots));
   syncPush();
 }
 
@@ -720,6 +755,46 @@ function loadDemo(){
   showApp();
 }
 
+
+// ══ DAILY HOURS SNAPSHOT ══════════════════════════
+// Schedules a single snapshot at midnight each night.
+// Records each Airbly aircraft's hours at end of day — one data point per day.
+// Manual aircraft use their dailyLog entries instead.
+function scheduleMidnightSnapshot(){
+  if(ST.isDemo) return;
+  const now = new Date();
+  const midnight = new Date(now);
+  midnight.setHours(24,0,0,0); // next midnight
+  const msUntilMidnight = midnight.getTime() - now.getTime();
+  setTimeout(()=>{
+    takeHoursSnapshot();
+    // Re-schedule for the following midnight
+    setInterval(takeHoursSnapshot, 24*60*60*1000);
+  }, msUntilMidnight);
+  console.log(`[Snapshot] Next snapshot in ${Math.round(msUntilMidnight/60000)} minutes`);
+}
+
+function takeHoursSnapshot(){
+  if(ST.isDemo || !ST.aircraft.length) return;
+  const today = new Date().toISOString().slice(0,10);
+  let changed = false;
+  for(const ac of ST.aircraft){
+    if(ac.isManual) continue;
+    if(!ST.hoursSnapshots[ac.id]) ST.hoursSnapshots[ac.id]={};
+    ST.hoursSnapshots[ac.id][today] = ac.totalHobbs;
+    changed = true;
+    // Trim entries older than 35 days
+    const cutoff = new Date(Date.now()-35*86400*1000).toISOString().slice(0,10);
+    Object.keys(ST.hoursSnapshots[ac.id]).forEach(d=>{
+      if(d<cutoff){ delete ST.hoursSnapshots[ac.id][d]; }
+    });
+  }
+  if(changed){
+    saveSnapshots();
+    console.log('[Snapshot] Hours snapshot saved for',new Date().toISOString().slice(0,10));
+  }
+}
+
 // ══ SHOW APP ═════════════════════════════════════
 async function showApp(){
   $('s-login').classList.remove('active');
@@ -729,6 +804,8 @@ async function showApp(){
   // Pull latest settings from JSONBin before first render
   syncStatus('syncing','Loading cloud settings…');
   await syncPull();
+  // Schedule nightly midnight snapshot for Airbly aircraft hours
+  scheduleMidnightSnapshot();
   // Re-register manual aircraft flights slots after pull (may have new aircraft)
   ST.manualAircraft.forEach(m=>{ if(!ST.flights[m.id]) ST.flights[m.id]=[]; });
   buildAcList(); render();
@@ -796,6 +873,247 @@ function render(){
   else if(ST.view==='preview') c.innerHTML=rPreview();
   else if(ST.view==='hours') c.innerHTML=rHours();
   else if(ST.view==='settings') c.innerHTML=rSettings();
+}
+
+
+// ── DASHBOARD GRAPH ──────────────────────────────
+function openDashGraph(id){
+  ST.dashGraph = ST.dashGraph===id ? null : id; // toggle
+  render();
+  if(ST.dashGraph){
+    setTimeout(()=>{
+      const el=document.getElementById('hgraph-section');
+      if(el) el.scrollIntoView({behavior:'smooth',block:'start'});
+      drawHoursGraph(id);
+    },80);
+  }
+}
+
+function renderHoursGraph(id){
+  const ac = allAircraft().find(a=>a.id===id);
+  if(!ac) return '';
+  const cfg = ST.cfg[id]||{};
+  const due = parseFloat(cfg.maint_due||'0');
+  const cur  = ac.totalHobbs||0;
+  const rem  = due ? (due - cur) : null;
+  const isManual = ac.isManual;
+  const dailyEntries = (ST.dailyLog[id]||[]).slice().sort((a,b)=>new Date(a.date)-new Date(b.date));
+  const isEstimate = !isManual || dailyEntries.length < 2;
+  return`<div class="hgraph-wrap" id="hgraph-section">
+    <div class="hgraph-title">📈 ${esc(ac.reg)} — Hours Remaining to Next Check</div>
+    <div class="hgraph-sub">${due?'Next check due at '+due.toFixed(0)+' hrs · Currently '+cur.toFixed(1)+' hrs · '+
+      (rem==='OVERDUE'||rem<0?'<span style="color:#ff4444">OVERDUE</span>':
+      '<span style="color:var(--acc)">'+parseFloat(rem).toFixed(1)+' hrs remaining</span>')
+      :'No check interval set in Aircraft Settings'}</div>
+    <div class="hgraph-canvas-wrap"><canvas id="hgraph-canvas"></canvas></div>
+    ${isEstimate?'<div class="hgraph-est">⚠ Projection is an estimate based on average utilisation — actual date may vary</div>':''}
+    <div class="hgraph-legend">
+      <div class="hgraph-leg-item"><div class="hgraph-leg-dot" style="background:#4a9eff"></div>Hours remaining (historical)</div>
+      <div class="hgraph-leg-item"><div class="hgraph-leg-dot" style="background:#f0a020;border-top:1px dashed #f0a020"></div>Projected to check</div>
+      <div class="hgraph-leg-item"><div class="hgraph-leg-dot" style="background:rgba(240,160,32,0.15);height:10px"></div>±2 day window</div>
+    </div>
+    <div style="margin-top:12px;font-size:12px">
+      <button onclick="selAc('${id}')" style="background:var(--blue);border:none;border-radius:7px;padding:8px 16px;color:#fff;font-weight:700;cursor:pointer;font-size:12px">Open Tech Log →</button>
+      <button onclick="ST.dashGraph=null;render()" style="background:none;border:1px solid var(--border);border-radius:7px;padding:8px 16px;color:var(--mut);cursor:pointer;font-size:12px;margin-left:8px">Close ✕</button>
+    </div>
+  </div>`;
+}
+
+function drawHoursGraph(id){
+  const canvas = document.getElementById('hgraph-canvas');
+  if(!canvas) return;
+  const ac = allAircraft().find(a=>a.id===id);
+  if(!ac) return;
+  const cfg = ST.cfg[id]||{};
+  const due = parseFloat(cfg.maint_due||'0');
+  const cur  = ac.totalHobbs||0;
+  if(!due){ canvas.parentElement.innerHTML='<div style="color:var(--mut);padding:40px;text-align:center;font-size:13px">No check interval set — add a Next Check Due value in Aircraft Settings to see the graph</div>'; return; }
+
+  const ctx = canvas.getContext('2d');
+  const W = canvas.offsetWidth||600;
+  const H = canvas.offsetHeight||240;
+  canvas.width=W; canvas.height=H;
+
+  const PAD={top:24,right:18,bottom:48,left:52};
+  const CW=W-PAD.left-PAD.right;
+  const CH=H-PAD.top-PAD.bottom;
+
+  const now = new Date(); now.setHours(23,59,59,0);
+  const nowMs = now.getTime();
+  const DAY = 86400*1000;
+
+  // ── Y axis always 0–50 ────────────────────────
+  const Y_MAX = 50;
+
+  // ── Build 30-day daily history ────────────────
+  // For each of the past 30 days, calculate hours remaining at end of that day
+  const isManual = ac.isManual;
+  const dailyEntries = (ST.dailyLog[id]||[]).slice().sort((a,b)=>new Date(a.date)-new Date(b.date));
+
+  // Build a map of date→hoursAdded for quick lookup
+  const addedByDate = {};
+  for(const e of dailyEntries){
+    addedByDate[e.date] = (addedByDate[e.date]||0) + (e.added||0);
+  }
+
+  let histPoints = [];
+  let avgHrsPerDay = 0;
+
+  if(isManual && dailyEntries.length >= 1){
+    // Walk backwards from today reconstructing end-of-day hours remaining
+    // for each of last 30 days that had activity, plus today
+    let runningHrs = cur;
+    const dayPts = [];
+    // Collect dates with entries within last 30 days
+    const thirtyAgo = nowMs - 30*DAY;
+    const relevantDates = Object.keys(addedByDate)
+      .filter(d=>new Date(d).getTime()>=thirtyAgo)
+      .sort();
+    // Build forward: start from hrs at beginning of earliest relevant date
+    // Work backwards from cur to find starting point
+    let startHrs = cur;
+    const allDates = Object.keys(addedByDate).sort();
+    for(const d of [...allDates].reverse()){
+      const dMs = new Date(d).getTime();
+      if(dMs >= thirtyAgo) startHrs -= (addedByDate[d]||0);
+    }
+    // Now walk forward day by day over last 30 days
+    let rollingHrs = startHrs;
+    for(let i=30;i>=0;i--){
+      const d = new Date(nowMs - i*DAY);
+      d.setHours(23,59,59,0);
+      const dStr = new Date(nowMs-i*DAY).toISOString().slice(0,10);
+      rollingHrs += (addedByDate[dStr]||0);
+      // Plot every day — gaps with no flying show as a plateau
+      dayPts.push({ms:d.getTime(), hrs:Math.max(0,rollingHrs)});
+    }
+    histPoints = dayPts.map(p=>({ms:p.ms, rem:Math.min(Y_MAX,Math.max(0,due-p.hrs))}));
+    // Avg hrs/day over last 30 days with data
+    const totalAdded30 = relevantDates.reduce((a,d)=>a+(addedByDate[d]||0),0);
+    const activeDays = Math.max(1, relevantDates.length);
+    // Use per-active-day average — more realistic than dividing by 30
+    avgHrsPerDay = totalAdded30 / Math.max(1,(nowMs - (relevantDates.length?new Date(relevantDates[0]).getTime():nowMs-30*DAY))*(1/DAY));
+  } else {
+    // Airbly — use stored nightly snapshots, carry forward on non-flying days
+    const snaps = ST.hoursSnapshots[id]||{};
+    const snapDates = Object.keys(snaps).sort();
+    const thirtyAgoStr = new Date(nowMs-30*DAY).toISOString().slice(0,10);
+    // Find last known hours before the 30-day window
+    const priorDates = snapDates.filter(d=>d<thirtyAgoStr);
+    let lastKnownHrs = priorDates.length ? snaps[priorDates[priorDates.length-1]] : (snapDates.length ? snaps[snapDates[0]] : cur);
+    // Plot every day in the last 30 — carry forward on days with no snapshot
+    for(let i=30;i>=0;i--){
+      const dStr = new Date(nowMs-i*DAY).toISOString().slice(0,10);
+      if(snaps[dStr]!==undefined) lastKnownHrs = snaps[dStr];
+      const d = new Date(nowMs-i*DAY); d.setHours(23,59,59,0);
+      histPoints.push({ms:d.getTime(), rem:Math.min(Y_MAX,Math.max(0,due-lastKnownHrs))});
+    }
+    // Avg rate from snapshots in the last 30 days
+    const recentSnaps = snapDates.filter(d=>d>=thirtyAgoStr);
+    if(recentSnaps.length>=2){
+      const oldest = snaps[recentSnaps[0]];
+      const newest = snaps[recentSnaps[recentSnaps.length-1]];
+      const daySpan = Math.max(1,(new Date(recentSnaps[recentSnaps.length-1])-new Date(recentSnaps[0]))/DAY);
+      avgHrsPerDay = Math.max(0,(newest-oldest)/daySpan);
+    } else {
+      avgHrsPerDay = cur/90; // not enough data yet — rough fallback
+    }
+  }
+
+  // ── Build projection from today → check due ───
+  const remNow = Math.min(Y_MAX, Math.max(0,due-cur));
+  let projPoints = [{ms:nowMs, rem:remNow}];
+  let checkDate = null;
+  if(avgHrsPerDay > 0 && remNow > 0){
+    const daysToCheck = remNow/avgHrsPerDay;
+    checkDate = new Date(nowMs + daysToCheck*DAY);
+    const steps = Math.min(60, Math.ceil(daysToCheck));
+    for(let i=1;i<=steps;i++){
+      const ms = nowMs + (daysToCheck/steps)*i*DAY;
+      const rem = Math.max(0, remNow - avgHrsPerDay*(daysToCheck/steps)*i);
+      projPoints.push({ms, rem});
+    }
+    projPoints.push({ms:checkDate.getTime(), rem:0});
+  }
+
+  // ── Axis setup ────────────────────────────────
+  // X: from 30 days ago to projected check date (or +7 days if no projection)
+  const xStart = nowMs - 30*DAY;
+  const xEnd   = checkDate ? Math.max(checkDate.getTime()+3*DAY, nowMs+7*DAY) : nowMs+14*DAY;
+  const xRange = xEnd - xStart;
+
+  const toX = ms => PAD.left + ((ms-xStart)/xRange)*CW;
+  const toY = rem => PAD.top + CH - (rem/Y_MAX)*CH;
+
+  ctx.clearRect(0,0,W,H);
+
+  // ── Grid lines + Y labels (0,10,20,30,40,50) ─
+  ctx.strokeStyle='rgba(26,48,80,0.8)'; ctx.lineWidth=1;
+  for(let v=0;v<=Y_MAX;v+=10){
+    const y=toY(v);
+    ctx.beginPath(); ctx.moveTo(PAD.left,y); ctx.lineTo(PAD.left+CW,y); ctx.stroke();
+    ctx.fillStyle='rgba(86,120,152,0.8)'; ctx.font='10px Segoe UI,Arial';
+    ctx.textAlign='right'; ctx.fillText(v+'h', PAD.left-5, y+4);
+  }
+
+  // ── TODAY vertical line ───────────────────────
+  ctx.strokeStyle='rgba(74,158,255,0.3)'; ctx.lineWidth=1; ctx.setLineDash([4,4]);
+  ctx.beginPath(); ctx.moveTo(toX(nowMs),PAD.top); ctx.lineTo(toX(nowMs),PAD.top+CH); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle='rgba(74,158,255,0.5)'; ctx.font='9px Segoe UI,Arial'; ctx.textAlign='center';
+  ctx.fillText('TODAY', toX(nowMs), PAD.top-6);
+
+  // ── X axis labels ─────────────────────────────
+  // Labels every ~7 days across the full range
+  const totalDays = Math.round(xRange/DAY);
+  const labelEvery = Math.max(1, Math.round(totalDays/6));
+  ctx.fillStyle='rgba(86,120,152,0.8)'; ctx.font='10px Segoe UI,Arial'; ctx.textAlign='center';
+  for(let i=0;i*labelEvery*DAY<=xRange;i++){
+    const ms=xStart+i*labelEvery*DAY;
+    if(ms>xEnd) break;
+    const lbl=new Date(ms).toLocaleDateString('en-GB',{day:'numeric',month:'short'});
+    ctx.fillText(lbl, toX(ms), H-PAD.bottom+14);
+  }
+
+  // ── ±2 day band ───────────────────────────────
+  if(checkDate){
+    const bandMs=2*DAY;
+    const x1=toX(checkDate.getTime()-bandMs);
+    const x2=toX(checkDate.getTime()+bandMs);
+    ctx.fillStyle='rgba(240,160,32,0.12)';
+    ctx.fillRect(x1,PAD.top,x2-x1,CH);
+    ctx.strokeStyle='rgba(240,160,32,0.3)'; ctx.lineWidth=1; ctx.setLineDash([3,3]);
+    ctx.beginPath(); ctx.moveTo(x1,PAD.top); ctx.lineTo(x1,PAD.top+CH); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x2,PAD.top); ctx.lineTo(x2,PAD.top+CH); ctx.stroke();
+    ctx.setLineDash([]);
+    const lbl=checkDate.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
+    ctx.fillStyle='#f0a020'; ctx.font='bold 10px Segoe UI,Arial'; ctx.textAlign='center';
+    const cx=toX(checkDate.getTime());
+    ctx.fillText('Est. check: '+lbl, Math.min(W-90,Math.max(90,cx)), PAD.top+14);
+  }
+
+  // ── Historical line (blue solid) ─────────────
+  if(histPoints.length>=2){
+    ctx.beginPath(); ctx.strokeStyle='#4a9eff'; ctx.lineWidth=2.5; ctx.setLineDash([]);
+    histPoints.forEach((p,i)=>i===0?ctx.moveTo(toX(p.ms),toY(p.rem)):ctx.lineTo(toX(p.ms),toY(p.rem)));
+    ctx.stroke();
+    histPoints.forEach(p=>{ ctx.beginPath(); ctx.fillStyle='#4a9eff'; ctx.arc(toX(p.ms),toY(p.rem),3,0,Math.PI*2); ctx.fill(); });
+  } else if(histPoints.length===1){
+    ctx.beginPath(); ctx.fillStyle='#4a9eff'; ctx.arc(toX(histPoints[0].ms),toY(histPoints[0].rem),4,0,Math.PI*2); ctx.fill();
+  }
+
+  // ── Projection line (dashed amber) ───────────
+  if(projPoints.length>=2){
+    ctx.beginPath(); ctx.strokeStyle='#f0a020'; ctx.lineWidth=2; ctx.setLineDash([6,4]);
+    projPoints.forEach((p,i)=>i===0?ctx.moveTo(toX(p.ms),toY(p.rem)):ctx.lineTo(toX(p.ms),toY(p.rem)));
+    ctx.stroke(); ctx.setLineDash([]);
+  }
+
+  // ── CHECK DUE line at y=0 ─────────────────────
+  ctx.strokeStyle='rgba(224,80,80,0.4)'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(PAD.left,toY(0)); ctx.lineTo(PAD.left+CW,toY(0)); ctx.stroke();
+  ctx.fillStyle='rgba(224,80,80,0.6)'; ctx.font='9px Segoe UI,Arial'; ctx.textAlign='left';
+  ctx.fillText('CHECK DUE', PAD.left+4, toY(0)-4);
 }
 
 // ── DASHBOARD ────────────────────────────────────
@@ -881,15 +1199,22 @@ function rDash(){
           }).join('');
         })()}
       </div>
-      <div style="margin-top:9px;font-size:11px;color:var(--acc)">View tech log →</div>
+      <div style="margin-top:9px;display:flex;justify-content:space-between;align-items:center">
+        <span style="font-size:11px;color:var(--acc)">View tech log →</span>
+        <button onclick="event.stopPropagation();openDashGraph('${ac.id}')" id="gbtn-${ac.id}"
+          style="background:#07111e;border:1px solid var(--border);border-radius:6px;color:${ST.dashGraph===ac.id?'var(--acc)':'var(--mut)'};font-size:10px;padding:4px 10px;cursor:pointer">
+          📈 ${ST.dashGraph===ac.id?'Hide Graph':'Hours Graph'}
+        </button>
+      </div>
     </div>`;
   }).join('');
+  const graphHtml = ST.dashGraph ? renderHoursGraph(ST.dashGraph) : '';
   return`<div class="sgrid3">${stats.map(s=>`<div class="sc" style="${s.bg?'background:'+s.bg+';border-color:'+s.c+';':''}">`+
     `<div class="sv" style="color:${s.c}">${s.v}</div>`+
     `<div class="sl">${s.l}</div>`+
     `${s.sub?`<div style="font-size:10px;color:var(--dim);margin-top:3px">${s.sub}</div>`:''}`+
     `</div>`).join('')}</div>
-  <div class="acgrid">${cards}</div>`;
+  <div class="acgrid" id="acgrid-wrap">${cards}</div>${graphHtml}`;
 }
 
 // ── TECH LOG PREVIEW ─────────────────────────────
@@ -905,58 +1230,58 @@ function hobbsRemaining(ac){
 
 function buildPageHTML(ac, chunk, pi, totalChunks, isPreview){
   const cfg   = ST.cfg[ac.id]||{};
-  const first = chunk[0], last=chunk[chunk.length-1];
-  const dateRange = `${fmtDate(first?.dep_ms)} – ${fmtDate(last?.dep_ms)}`;
   const editAttr  = isPreview ? '' : ' contenteditable="true"';
   const editCls   = isPreview ? '' : ' phv-edit';
 
-  // Sheet number: use saved override start + pi, else just pi+1
   const sheetStart = parseInt(cfg.sheet_start||'1',10);
   const sheetNum   = String(sheetStart + pi).padStart(3,'0');
 
-  // Hours remaining calc
   const hrsRem  = hobbsRemaining(ac);
   const hrsRemDisplay = hrsRem !== null ? hrsRem : '—';
   const hrsRemWarn    = hrsRem === 'OVERDUE' || (hrsRem !== null && parseFloat(hrsRem) <= 10);
 
   // Flight rows
-  const rows=chunk.map(f=>{
+  const rows = chunk.map(f=>{
     const hs = f.hobbs_start!=null ? f.hobbs_start.toFixed(1) : '';
     const he = f.hobbs_end  !=null ? f.hobbs_end.toFixed(1)   : '';
     return`<tr>
       <td class="dc">${f.dep_ms?fmtDate(f.dep_ms):''}</td>
       <td class="nc"></td>
       <td class="nc"></td>
+      <td class="purpc"></td>
       <td class="ftc"><span>${esc(f.from)||''}</span><span>${esc(f.to)||''}</span></td>
-      <td class="fc"></td>
       <td class="sc"></td>
       <td class="authc"></td>
       <td class="tc"><span class="top-val"></span><span class="bot-val"></span></td>
       <td class="tc"><span class="top-val">${f.dep_ms?fmtTime(f.dep_ms):''}</span><span class="bot-val">${f.arr_ms?fmtTime(f.arr_ms):''}</span></td>
       <td class="stn"><span class="top-val"></span><span class="bot-val"></span></td>
-      <td class="stn"></td>
+      <td class="tot"><span class="tot-top"></span><span class="tot-bot"></span></td>
       <td class="stn"><span class="top-val">${hs}</span><span class="bot-val">${he}</span></td>
-      <td class="stn"></td>
+      <td class="tot"><span class="tot-top"></span><span class="tot-bot"></span></td>
       <td class="fc">${f.fuel!=null?f.fuel+' L':''}</td>
       <td class="fc"></td>
       <td class="fc"></td>
+      <td class="hrsc"></td>
       <td class="sc"></td>
     </tr>`;
   }).join('');
 
-  const blanks=Array.from({length:7-chunk.length},()=>`<tr>
-    <td class="dc"></td><td class="nc"></td><td class="nc"></td>
-    <td class="ftc"></td><td class="fc"></td>
+  const blanks = Array.from({length:6-chunk.length},()=>`<tr>
+    <td class="dc"></td><td class="nc"></td><td class="nc"></td><td class="purpc"></td>
+    <td class="ftc"><span></span><span></span></td>
     <td class="sc"></td><td class="authc"></td>
-    <td class="tc"></td><td class="tc"></td>
-    <td class="stn"></td><td class="stn"></td><td class="stn"></td><td class="stn"></td>
-    <td class="fc"></td><td class="fc"></td><td class="fc"></td><td class="sc"></td>
+    <td class="tc"><span class="top-val"></span><span class="bot-val"></span></td>
+    <td class="tc"><span class="top-val"></span><span class="bot-val"></span></td>
+    <td class="stn"><span class="top-val"></span><span class="bot-val"></span></td>
+    <td class="tot"><span class="tot-top"></span><span class="tot-bot"></span></td>
+    <td class="stn"><span class="top-val"></span><span class="bot-val"></span></td>
+    <td class="tot"><span class="tot-top"></span><span class="tot-bot"></span></td>
+    <td class="fc"></td><td class="fc"></td><td class="fc"></td>
+    <td class="hrsc"></td><td class="sc"></td>
   </tr>`).join('');
 
-  // ── NEW HEADER: big REG + Hrs Remaining + Sheet, then detail boxes below
   const header = `
     <div class="pg-hdr-wrap">
-      <!-- TOP ROW: big identifiers -->
       <div class="hdr-top">
         <div class="hdr-reg">${esc(ac.reg)}</div>
         <div class="hdr-divider"></div>
@@ -975,7 +1300,6 @@ function buildPageHTML(ac, chunk, pi, totalChunks, isPreview){
           <div class="hdr-title-small">✈ Aircraft Technical Log</div>
         </div>
       </div>
-      <!-- BOTTOM ROW: detail boxes -->
       <div class="hdr-detail">
         <div class="hdr-dbox">
           <div class="hdr-dk">Aircraft Type</div>
@@ -1008,33 +1332,41 @@ function buildPageHTML(ac, chunk, pi, totalChunks, isPreview){
     ${header}
     <table class="pt">
       <thead>
-        <tr class="hr1">
-          <th rowspan="2" class="th-date">Date</th>
-          <th rowspan="2" class="th-name">Captain</th>
-          <th rowspan="2" class="th-name">Student</th>
-          <th rowspan="2" class="th-frt">From<br><span style="font-weight:400;font-size:6px;opacity:.8">/To</span></th>
-          <th rowspan="2" class="th-fuel">Min Plan<br>Dep Fuel</th>
-          <th rowspan="2" class="th-sig">PIC<br>Sig</th>
-          <th rowspan="2" class="th-auth">Auth</th>
+        <tr>
+          <th rowspan="2" class="th-date">Date<br><span style="font-weight:400;font-size:6px">(dd/mm)</span></th>
+          <th rowspan="2" class="th-cap">Captain</th>
+          <th rowspan="2" class="th-stu">Student /<br>Pax Name</th>
+          <th rowspan="2" class="th-purp">Purpose /<br>Exercise</th>
+          <th rowspan="2" class="th-frt">From<br>/To</th>
+          <th colspan="2" class="th-grp">Signature</th>
           <th colspan="2" class="th-grp">Blocks / Times (UTC)</th>
           <th colspan="2" class="th-grp">Tacho</th>
           <th colspan="2" class="th-grp">Hobbs (hrs)</th>
-          <th rowspan="2" class="th-fuel">Fuel<br>Uplift</th>
-          <th rowspan="2" class="th-fuel">Oil<br>Added</th>
-          <th rowspan="2" class="th-fuel">Ldgs/<br>T&amp;Gs<br><span style="font-size:5.5px;font-weight:400;opacity:.8">at EGTK</span></th>
-          <th rowspan="2" class="th-sig">PIC<br>Sign<br>Back In</th>
+          <th rowspan="2" class="th-fuel">Fuel<br>Uplift<br>(litres)</th>
+          <th rowspan="2" class="th-oil">Oil<br>Added<br>(quarts)</th>
+          <th rowspan="2" class="th-ldg">Ldgs/<br>T&amp;Gs<br>at EGTK</th>
+          <th rowspan="2" class="th-hrs">Hrs<br>Remaining</th>
+          <th rowspan="2" class="th-signin">PIC<br>Sign In</th>
         </tr>
-        <tr class="hr2">
+        <tr>
+          <th class="th-sig">PIC Sig</th>
+          <th class="th-auth">Auth</th>
           <th class="th-t">Off Blks<br>T/O</th>
           <th class="th-t">On Blks<br>Ldg</th>
-          <th class="th-tn">Strt/<br>Fin</th>
+          <th class="th-tn">Value<br>Strt/Fin</th>
           <th class="th-tn">Total</th>
-          <th class="th-tn">Strt/<br>Fin</th>
+          <th class="th-tn">Meter<br>Strt/Fin</th>
           <th class="th-tn">Total</th>
         </tr>
       </thead>
       <tbody>${rows}${blanks}</tbody>
     </table>
+    <div class="notes">
+      <div class="note-row"><b>Note 1:</b> By signing, you are certifying that the daily A-Check has been completed as required, and that you accept the aircraft.</div>
+      <div class="note-row"><b>Note 2:</b> Check Authorisation Matrix for list of Authorisers.</div>
+      <div class="note-row"><b>Note 3:</b> For planning purposes, use 30 litres per hour in Cherokees and 35 litres per hour for Warriors and Archers. &nbsp;&nbsp; Please record all defects in FSP.</div>
+      <div style="margin-top:3px"><span class="note-warn">PLEASE DO NOT WRITE NEW FLIGHTS ON THE BOTTOM OF THIS PAGE</span></div>
+    </div>
     <div class="pfoot">
       <span>I certify the above flights were conducted in accordance with applicable regulations &amp; that the aircraft was serviceable before each departure.</span>
       <span>${esc(ac.reg)} &nbsp;·&nbsp; Sheet ${sheetNum} &nbsp;·&nbsp; Generated ${new Date().toLocaleDateString('en-GB')}</span>
@@ -1606,18 +1938,25 @@ function printCSS(){
     .hdr-dbox:last-child{border-right:none;}
     .hdr-dk{font-size:7px;font-weight:700;color:#333;text-transform:uppercase;letter-spacing:.3px;white-space:nowrap;overflow:hidden;}
     .hdr-dv{font-size:10px;font-weight:600;color:#000;min-height:13px;}
-    .pt{width:100%;border-collapse:collapse;flex:1;font-size:8px;table-layout:fixed;}
-    .pt th{background:#fff;color:#000;padding:3px 4px;text-align:center;border:1px solid #000;font-size:7px;line-height:1.25;vertical-align:middle;font-weight:700;}
-    .pt td{border:1px solid #000;padding:2px 3px;text-align:center;vertical-align:middle;height:19mm;}
-    .th-date{width:14mm;}.th-name{width:20mm;}.th-frt{width:12mm;}.th-fuel{width:13mm;}.th-sig{width:14mm;}.th-auth{width:14mm;}.th-t{width:11mm;}.th-tn{width:9mm;}
-    .pt td.dc{width:14mm;font-size:7.5px;}
-    .pt td.nc{width:20mm;}.pt td.ftc{width:12mm;padding:0;font-weight:700;font-size:8px;}
-    .pt td.fc{width:13mm;}.pt td.sc{width:14mm;}.pt td.authc{width:14mm;}.pt td.tc{width:11mm;}.pt td.stn{width:9mm;padding:0;}
-    .top-val,.bot-val{display:block;padding:2px 3px;font-size:7.5px;}
+    .pt{width:100%;border-collapse:collapse;}
+    .pt th{background:#fff;color:#000;padding:2px 3px;text-align:center;border:1px solid #000;font-size:9.5px;line-height:1.2;vertical-align:middle;font-weight:600;font-family:"Nunito",Arial,sans-serif;}
+    .pt td{border:1px solid #000;padding:2px 3px;text-align:center;vertical-align:middle;height:20mm;font-weight:300;font-size:9px;font-family:"Nunito",Arial,sans-serif;}
+    .th-grp{background:#fff;}
+    .th-date{width:13mm;}.th-cap{width:18mm;}.th-stu{width:18mm;}.th-purp{width:20mm;}.th-frt{width:11mm;}.th-fuel{width:11mm;}.th-sig{width:13mm;}.th-auth{width:13mm;}.th-t{width:10mm;}.th-tn{width:9mm;}.th-oil{width:10mm;}.th-ldg{width:10mm;}.th-hrs{width:10mm;}.th-signin{width:13mm;}
+    .pt td.dc{width:13mm;font-size:7.5px;}
+    .pt td.nc{width:18mm;}.pt td.purpc{width:20mm;}.pt td.ftc{width:11mm;padding:0;}
+    .pt td.fc{width:11mm;}.pt td.hrsc{width:10mm;}.pt td.sc{width:13mm;}.pt td.authc{width:13mm;}.pt td.tc{width:10mm;padding:0;}.pt td.stn{width:9mm;padding:0;border-top:none;border-bottom:none;}
+    .pt td.tot{padding:0;vertical-align:top;}
+    .tot-top{display:block;height:50%;padding:2px 3px;font-size:9px;box-sizing:border-box;}
+    .tot-bot{display:block;height:50%;padding:2px 3px;font-size:9px;box-sizing:border-box;}
+    .top-val,.bot-val{display:block;padding:2px 3px;font-size:9px;}
     .top-val{border-bottom:1px solid #000;}
     .pt td.ftc span{display:block;padding:2px 3px;font-size:8px;font-weight:700;color:#000;line-height:1.3;}
     .pt td.ftc span:first-child{border-bottom:1px solid #000;}
-    .pfoot{display:flex;justify-content:space-between;font-size:7px;color:#666;border-top:1px solid #aaa;padding-top:3px;margin-top:auto;}
+    .notes{margin-top:2mm;font-size:8.5px;color:#000;border-top:1px solid #ccc;padding-top:1mm;font-weight:400;font-family:"Nunito",Arial,sans-serif;}
+    .notes b{font-weight:700;}.note-row{margin-bottom:1px;}
+    .note-warn{font-size:8.5px;font-weight:700;color:#c00;margin-top:1mm;border:1px solid #c00;padding:1px 5px;display:inline-block;}
+    .pfoot{display:flex;justify-content:space-between;font-size:7px;color:#666;border-top:1px solid #aaa;padding-top:3px;margin-top:auto;font-family:"Nunito",Arial,sans-serif;font-weight:300;}
     @media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}}
   </style>`;
 }
