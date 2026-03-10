@@ -942,6 +942,10 @@ function render(){
   else if(ST.view==='hours') c.innerHTML=rHours();
   else if(ST.view==='mxplanner') c.innerHTML=rMxPlanner();
   else if(ST.view==='settings') c.innerHTML=rSettings();
+  // Redraw graph after every render if one is open (canvas gets wiped on innerHTML replace)
+  if(ST.view==='dashboard' && ST.dashGraph){
+    setTimeout(()=>drawHoursGraph(ST.dashGraph), 0);
+  }
 }
 
 
@@ -966,7 +970,7 @@ function renderHoursGraph(id){
   const cur  = ac.totalHobbs||0;
   const rem  = due ? (due - cur) : null;
   const isManual = ac.isManual;
-  const dailyEntries = (ST.dailyLog[id]||[]).slice().sort((a,b)=>new Date(a.date)-new Date(b.date));
+  const dailyEntries = (ST.dailyLog[id]||[]).slice().sort((a,b)=>new Date(a.date+'T12:00:00')-new Date(b.date+'T12:00:00'));
   const isEstimate = !isManual || dailyEntries.length < 2;
   return`<div class="hgraph-wrap" id="hgraph-section">
     <div class="hgraph-title">📈 ${esc(ac.reg)} — Hours Remaining to Next Check</div>
@@ -1017,7 +1021,7 @@ function drawHoursGraph(id){
   // ── Build 30-day daily history ────────────────
   // For each of the past 30 days, calculate hours remaining at end of that day
   const isManual = ac.isManual;
-  const dailyEntries = (ST.dailyLog[id]||[]).slice().sort((a,b)=>new Date(a.date)-new Date(b.date));
+  const dailyEntries = (ST.dailyLog[id]||[]).slice().sort((a,b)=>new Date(a.date+'T12:00:00')-new Date(b.date+'T12:00:00'));
 
   // Build a map of date→hoursAdded for quick lookup
   const addedByDate = {};
@@ -1031,18 +1035,19 @@ function drawHoursGraph(id){
   if(isManual){
     // Manual aircraft — only plot days that have actual log entries
     const thirtyAgo = nowMs - 30*DAY;
+    // Dates are ISO (YYYY-MM-DD) so string sort = date sort
     const allDates = Object.keys(addedByDate).sort();
-    const relevantDates = allDates.filter(d=>new Date(d).getTime()>=thirtyAgo);
+    const relevantDates = allDates.filter(d=>new Date(d+'T12:00:00').getTime()>=thirtyAgo);
     // Work backwards from cur to find total at start of earliest relevant date
     let runningHrs = cur;
     for(const d of [...allDates].reverse()){
-      if(new Date(d).getTime() < thirtyAgo) break;
+      if(new Date(d+'T12:00:00').getTime() < thirtyAgo) break;
       runningHrs -= (addedByDate[d]||0);
     }
     // Walk forward — only emit a point on days with actual entries
     for(const dStr of relevantDates){
       runningHrs += (addedByDate[dStr]||0);
-      const ms = new Date(dStr).setHours(23,59,59,0);
+      const ms = new Date(dStr+'T12:00:00').setHours(23,59,59,0);
       histPoints.push({ms, rem:Math.min(Y_MAX,Math.max(0,due-runningHrs))});
     }
     // Always include today
@@ -1050,10 +1055,12 @@ function drawHoursGraph(id){
     if(!addedByDate[todayStr]){
       histPoints.push({ms:nowMs, rem:Math.min(Y_MAX,Math.max(0,due-cur))});
     }
+    // Sort histPoints by ms just to be safe
+    histPoints.sort((a,b)=>a.ms-b.ms);
     // Avg rate: total hours flown over the date span
     if(relevantDates.length>=2){
       const totalAdded = relevantDates.reduce((a,d)=>a+(addedByDate[d]||0),0);
-      const spanDays = Math.max(1,(new Date(relevantDates[relevantDates.length-1])-new Date(relevantDates[0]))/DAY);
+      const spanDays = Math.max(1,(new Date(relevantDates[relevantDates.length-1]+'T12:00:00')-new Date(relevantDates[0]+'T12:00:00'))/DAY);
       avgHrsPerDay = totalAdded/spanDays;
     } else {
       avgHrsPerDay = cur/90;
@@ -1596,12 +1603,13 @@ function submitDailyLog(id){
 
   const added = Math.max(0, tacho - (sorties * 0.1));
 
-  // Format date nicely for display
+  // Store date as ISO (YYYY-MM-DD) for reliable sorting; display separately in UI
+  const dateISO = dateVal; // already ISO from <input type="date">
   const dateDisplay = new Date(dateVal+'T12:00:00').toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});
 
   // Save log entry
   if(!ST.dailyLog[id]) ST.dailyLog[id] = [];
-  ST.dailyLog[id].push({ date: dateDisplay, tacho, sorties, added });
+  ST.dailyLog[id].push({ date: dateISO, display: dateDisplay, tacho, sorties, added });
   saveDailyLog();
 
   // Update aircraft total hours
@@ -1612,7 +1620,7 @@ function submitDailyLog(id){
     if(!ST.cfg[id]) ST.cfg[id]={};
     ST.cfg[id].man_hours = String(newHrs);
     // Update last flight date
-    ST.cfg[id].man_last_flight = dateDisplay;
+    ST.cfg[id].man_last_flight = dateISO;
     saveCfg();
     m.hours = String(newHrs);
     m.last_flight = dateDisplay;
@@ -1631,7 +1639,7 @@ function deleteDailyEntry(id, index){
   if(!ST.dailyLog[id]) return;
   const entry = ST.dailyLog[id][index];
   if(!entry) return;
-  if(!confirm(`Delete entry: ${entry.date} — +${entry.added.toFixed(2)} hrs?`)) return;
+  if(!confirm(`Delete entry: ${entry.display||entry.date} — +${entry.added.toFixed(2)} hrs?`)) return;
 
   // Reverse the hours addition
   const m = ST.manualAircraft.find(x=>x.id===id);
