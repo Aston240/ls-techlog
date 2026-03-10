@@ -1020,7 +1020,16 @@ function drawHoursGraph(id){
   const cfg = ST.cfg[id]||{};
   const due = parseFloat(cfg.maint_due||'0');
   const cur  = ac.totalHobbs||0;
-  if(!due){ canvas.parentElement.innerHTML='<div style="color:var(--mut);padding:40px;text-align:center;font-size:13px">No check interval set — add a Next Check Due value in Aircraft Settings to see the graph</div>'; return; }
+  // For manual aircraft with no maint_due, plot total hours flown as a rising graph
+  const isManualNoDue = (!due) && ac.isManual;
+  if(!due && !ac.isManual){
+    canvas.style.display='none';
+    const msg = canvas.parentElement.querySelector('.no-due-msg') || document.createElement('div');
+    msg.className='no-due-msg'; msg.style.cssText='color:var(--mut);padding:40px;text-align:center;font-size:13px';
+    msg.textContent='No check interval set — add a Next Check Due value in Aircraft Settings to see the graph';
+    canvas.parentElement.appendChild(msg);
+    return;
+  }
 
   const ctx = canvas.getContext('2d');
   const W = canvas.offsetWidth||600;
@@ -1062,25 +1071,27 @@ function drawHoursGraph(id){
   if(isManual){
     // Manual aircraft — only plot days that have actual log entries
     const thirtyAgo = nowMs - 30*DAY;
-    // Dates are ISO (YYYY-MM-DD) so string sort = date sort
     const allDates = Object.keys(addedByDate).sort();
     const relevantDates = allDates.filter(d=>new Date(d+'T12:00:00').getTime()>=thirtyAgo);
-    // Work backwards from cur to find total at start of earliest relevant date
+    // Work backwards from cur to find total hours at start of earliest relevant date
     let runningHrs = cur;
     for(const d of [...allDates].reverse()){
       if(new Date(d+'T12:00:00').getTime() < thirtyAgo) break;
       runningHrs -= (addedByDate[d]||0);
     }
-    // Walk forward — only emit a point on days with actual entries
+    // Walk forward — emit a point on days with actual entries
     for(const dStr of relevantDates){
       runningHrs += (addedByDate[dStr]||0);
       const ms = new Date(dStr+'T12:00:00').setHours(23,59,59,0);
-      histPoints.push({ms, rem:Math.max(0,due-runningHrs)});
+      // If no maint_due, plot hours flown (use runningHrs directly as rem so graph rises)
+      const rem = isManualNoDue ? runningHrs : Math.max(0, due-runningHrs);
+      histPoints.push({ms, rem});
     }
     // Always include today
     const todayStr = new Date(nowMs).toISOString().slice(0,10);
     if(!addedByDate[todayStr]){
-      histPoints.push({ms:nowMs, rem:Math.max(0,due-cur)});
+      const rem = isManualNoDue ? cur : Math.max(0, due-cur);
+      histPoints.push({ms:nowMs, rem});
     }
     // Sort histPoints by ms just to be safe
     histPoints.sort((a,b)=>a.ms-b.ms);
