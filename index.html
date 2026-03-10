@@ -966,9 +966,9 @@ function render(){
     const _gid = ST.dashGraph;
     let _tries = 0;
     const _poll = setInterval(()=>{
-      const cv = document.getElementById('hgraph-canvas');
-      if(cv && cv.offsetWidth > 0){ clearInterval(_poll); drawHoursGraph(_gid); }
-      else if(++_tries > 20){ clearInterval(_poll); } // give up after 1s
+      const wrap = document.getElementById('hgraph-section');
+      if(wrap && wrap.offsetWidth > 0){ clearInterval(_poll); drawHoursGraph(_gid); }
+      else if(++_tries > 20){ clearInterval(_poll); }
     }, 50);
   }
 }
@@ -979,15 +979,8 @@ function openDashGraph(id){
   ST.dashGraph = ST.dashGraph===id ? null : id; // toggle
   render();
   if(ST.dashGraph){
-    let _ot=0; const _op=setInterval(()=>{
-      const cv=document.getElementById('hgraph-canvas');
-      if(cv&&cv.offsetWidth>0){
-        clearInterval(_op);
-        const el=document.getElementById('hgraph-section');
-        if(el) el.scrollIntoView({behavior:'smooth',block:'start'});
-        drawHoursGraph(id);
-      } else if(++_ot>20) clearInterval(_op);
-    },50);
+    const el=document.getElementById('hgraph-section');
+    if(el) el.scrollIntoView({behavior:'smooth',block:'start'});
   }
 }
 
@@ -1032,11 +1025,10 @@ function drawHoursGraph(id){
   // For manual aircraft with no maint_due, plot total hours flown as a rising graph
   const isManualNoDue = (!due) && ac.isManual;
   if(!due && !ac.isManual){
-    canvas.style.display='none';
-    const msg = canvas.parentElement.querySelector('.no-due-msg') || document.createElement('div');
-    msg.className='no-due-msg'; msg.style.cssText='color:var(--mut);padding:40px;text-align:center;font-size:13px';
-    msg.textContent='No check interval set — add a Next Check Due value in Aircraft Settings to see the graph';
-    canvas.parentElement.appendChild(msg);
+    const ctx2 = canvas.getContext('2d');
+    canvas.width = canvas.offsetWidth||600; canvas.height = canvas.offsetHeight||220;
+    ctx2.fillStyle='var(--mut,#888)'; ctx2.font='13px Segoe UI,Arial'; ctx2.textAlign='center';
+    ctx2.fillText('No check interval set — add Next Check Due in Aircraft Settings', canvas.width/2, canvas.height/2);
     return;
   }
 
