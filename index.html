@@ -557,8 +557,10 @@ function goLogin(){
 }
 
 // ══ CONNECT ══════════════════════════════════════
-async function fetchAirbly(key){
-  const url=`https://airbly.com/api/v3/assetList?groupKey=${encodeURIComponent(key)}&log_types=flight&log_limit_per_asset=500`;
+async function fetchAirbly(key, after=null, before=null){
+  let url=`https://airbly.com/api/v3/assetList?groupKey=${encodeURIComponent(key)}&log_types=flight&log_limit_per_asset=100`;
+  if(after)  url += `&log_completed_after=${after}`;
+  if(before) url += `&log_completed_before=${before}`;
   const r=await fetch(url);
   if(!r.ok) throw new Error(`Airbly returned HTTP ${r.status}.`);
   const raw=await r.json();
@@ -573,6 +575,7 @@ async function doConnect(keyOverride){
   if(btn){ btn.textContent='⏳  Connecting…'; btn.disabled=true; }
   if(err) err.style.display='none';
   try{
+    ST._primaryKey = key; // store for bootstrap use
     // Fetch both Airbly accounts in parallel
     const SECOND_KEY = '6W9TZU5ECtrE3U1UeptzaNsCaXoWcQ';
     const [raw1, raw2] = await Promise.allSettled([
@@ -783,16 +786,89 @@ function takeHoursSnapshot(){
     if(!ST.hoursSnapshots[ac.id]) ST.hoursSnapshots[ac.id]={};
     ST.hoursSnapshots[ac.id][today] = ac.totalHobbs;
     changed = true;
-    // Trim entries older than 35 days
+    // Trim snapshots older than 35 days
     const cutoff = new Date(Date.now()-35*86400*1000).toISOString().slice(0,10);
     Object.keys(ST.hoursSnapshots[ac.id]).forEach(d=>{
-      if(d<cutoff){ delete ST.hoursSnapshots[ac.id][d]; }
+      if(d<cutoff) delete ST.hoursSnapshots[ac.id][d];
     });
   }
   if(changed){
     saveSnapshots();
     console.log('[Snapshot] Hours snapshot saved for',new Date().toISOString().slice(0,10));
   }
+}
+
+// ══ BOOTSTRAP SNAPSHOTS FROM HISTORICAL FLIGHT LOGS ══════════════
+// Called once on first load if we have fewer than 7 days of snapshots.
+// Fetches the last 30 days of flight logs from Airbly in two monthly chunks,
+// builds end-of-day Hobbs snapshots from them, then discards the raw log data.
+async function bootstrapSnapshotsFromFlightLogs(){
+  if(ST.isDemo || !ST.aircraft.length) return;
+  const PRIMARY_KEY = ST._primaryKey;
+  const SECOND_KEY  = '6W9TZU5ECtrE3U1UeptzaNsCaXoWcQ';
+  if(!PRIMARY_KEY) return;
+
+  // Check if we already have enough data (7+ days for any aircraft)
+  const hasEnough = ST.aircraft.some(ac=>{
+    if(ac.isManual) return true;
+    const snaps = ST.hoursSnapshots[ac.id]||{};
+    return Object.keys(snaps).length >= 7;
+  });
+  if(hasEnough){
+    console.log('[Bootstrap] Enough snapshot data already, skipping flight log fetch');
+    return;
+  }
+
+  console.log('[Bootstrap] Fetching historical flight logs to seed graph data...');
+
+  // Build two monthly chunks covering last ~60 days to ensure 30 days of data
+  const now = Date.now();
+  const chunks = [
+    { after: now - 60*86400*1000, before: now - 30*86400*1000 },
+    { after: now - 30*86400*1000, before: now }
+  ];
+
+  // Fetch for both keys
+  const keys = [
+    { key: PRIMARY_KEY, filter: null },
+    { key: SECOND_KEY,  filter: 'G-EGTB' }
+  ];
+
+  for(const chunk of chunks){
+    const results = await Promise.allSettled(
+      keys.map(k => fetchAirbly(k.key, Math.floor(chunk.after), Math.floor(chunk.before)))
+    );
+    for(let i=0; i<results.length; i++){
+      if(results[i].status !== 'fulfilled') continue;
+      const parsed = parseAirbly(results[i].value);
+      const acList = keys[i].filter
+        ? parsed.aircraft.filter(a=>a.reg===keys[i].filter)
+        : parsed.aircraft;
+
+      for(const ac of acList){
+        const logs = parsed.flights[ac.id]||[];
+        if(!ST.hoursSnapshots[ac.id]) ST.hoursSnapshots[ac.id]={};
+        // For each flight log, record end-of-day Hobbs on the day it completed
+        for(const log of logs){
+          if(log.hobbs_end == null) continue;
+          const dayStr = new Date(log.arr_ms||log.dep_ms).toISOString().slice(0,10);
+          // Keep the highest Hobbs value seen on each day (last flight of day)
+          const existing = ST.hoursSnapshots[ac.id][dayStr]||0;
+          if(log.hobbs_end > existing){
+            ST.hoursSnapshots[ac.id][dayStr] = log.hobbs_end;
+          }
+        }
+        // Trim anything older than 35 days
+        const cutoff = new Date(Date.now()-35*86400*1000).toISOString().slice(0,10);
+        Object.keys(ST.hoursSnapshots[ac.id]).forEach(d=>{
+          if(d<cutoff) delete ST.hoursSnapshots[ac.id][d];
+        });
+      }
+    }
+  }
+
+  saveSnapshots();
+  console.log('[Bootstrap] Historical snapshot seeding complete');
 }
 
 // ══ SHOW APP ═════════════════════════════════════
@@ -806,6 +882,8 @@ async function showApp(){
   await syncPull();
   // Schedule nightly midnight snapshot for Airbly aircraft hours
   scheduleMidnightSnapshot();
+  // Seed graph history from flight logs if we don't have enough snapshots yet
+  bootstrapSnapshotsFromFlightLogs();
   // Re-register manual aircraft flights slots after pull (may have new aircraft)
   ST.manualAircraft.forEach(m=>{ if(!ST.flights[m.id]) ST.flights[m.id]=[]; });
   buildAcList(); render();
