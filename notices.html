@@ -316,6 +316,7 @@ async function readBin() {
 }
 
 async function writeBin(record) {
+  if (!dataLoaded) { console.warn('writeBin blocked — data not yet loaded'); return false; }
   const res = await fetch(BIN_URL, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json', 'X-Master-Key': JSONBIN_KEY },
@@ -327,6 +328,7 @@ async function writeBin(record) {
 
 // ── LOAD ──
 let allData = {};
+let dataLoaded = false;
 
 async function loadData() {
   showStatus('LOADING...', 'load');
@@ -334,6 +336,7 @@ async function loadData() {
     allData = await readBin();
     if (!allData.notices) allData.notices = [];
     if (!allData.notams)  allData.notams  = [];
+    dataLoaded = true;
     renderNotices();
     renderNotams();
     document.getElementById('statusBar').classList.remove('show');
@@ -535,9 +538,9 @@ function importBackup(event) {
       if (!Array.isArray(data.notices) || !Array.isArray(data.notams)) throw new Error('Invalid backup file');
       if (!window.confirm(`Import ${data.notices.length} notices and ${data.notams.length} NOTAMs? This will replace all current data.`)) return;
       showStatus('Importing...', '');
-      const res = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`, {
+      const res = await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_ID}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json', 'X-Master-Key': MASTER_KEY },
+        headers: { 'Content-Type': 'application/json', 'X-Master-Key': JSONBIN_KEY },
         body: JSON.stringify({ notices: data.notices, notams: data.notams })
       });
       if (!res.ok) throw new Error('Save failed');

@@ -226,6 +226,10 @@
   .fc-dep span { color:var(--text); }
   .fc-exercise { font-size:13.5px; color:var(--dim); font-style:italic; text-align:center; }
   .fc-elapsed  { font-family:var(--mono); font-size:16px; color:var(--amber); font-weight:bold; }
+  .grounded-section { margin-top:12px; padding-top:10px; border-top:1px solid var(--border); }
+  .grounded-label { font-family:var(--mono); font-size:10px; color:var(--dim); letter-spacing:0.12em; margin-bottom:8px; }
+  .grounded-list { display:flex; flex-wrap:wrap; gap:6px; }
+  .grounded-reg { font-family:var(--head); font-weight:700; font-size:14px; letter-spacing:0.08em; color:var(--dim); background:var(--card); border:1px solid var(--border); border-radius:4px; padding:4px 10px; }
   .no-flights { text-align:center; padding:20px 0; font-family:var(--mono); font-size:13.5px; color:var(--dim); letter-spacing:0.15em; }
 
   /* ── CIRCUIT SLOTS ── */
@@ -608,23 +612,31 @@ const AIRBLY_KEY = 'AamCntOnk72udRQvYYiX4oUlcpHcgg';
 let liveFlights = [];
 
 async function fetchFlights() {
+  // Start with all fleet aircraft as grounded
+  const fleetStatus = {};
+  FLEET.forEach(ac => fleetStatus[ac.reg] = false);
+
   try {
     const url = `https://airbly.com/api/v3/assetList?groupKey=${AIRBLY_KEY}&log_types=flight&log_limit_per_asset=1`;
     const res = await fetch(url);
     const data = await res.json();
     const assets = (data.assetList && data.assetList.assets) ? data.assetList.assets : [];
-    liveFlights = assets
-      .filter(a => a.asset_type === 'aircraft')
-      .map(a => ({
-        reg:      a.ident || '?',
-        airborne: a.operational_status === 'airborne',
-        depTime:  null,
-      }));
-    renderFlights();
+    assets.filter(a => a.asset_type === 'aircraft').forEach(a => {
+      // Match Airbly ident to fleet reg (strip hyphens)
+      const normIdent = (a.ident || '').replace(/[-\s]/g, '').toUpperCase();
+      const match = FLEET.find(ac => ac.reg.replace(/[-\s]/g, '').toUpperCase() === normIdent);
+      if (match) fleetStatus[match.reg] = a.operational_status === 'airborne';
+    });
   } catch(e) {
     console.warn('Airbly fetch failed:', e.message);
-    renderFlights();
   }
+
+  liveFlights = FLEET.map(ac => ({
+    reg:      ac.reg,
+    airborne: fleetStatus[ac.reg] || false,
+    depTime:  null,
+  }));
+  renderFlights();
 }
 
 const JSONBIN_KEY = '$2a$10$wjZldGseV25iurze/grlbOQ1ZxUVCugh.kmmRH3LOo3zEiUF4RKPS';
@@ -1035,27 +1047,22 @@ function renderNotams(liveNotams) {
 // ══════════════════════════════════════════════════════
 function renderFlights() {
   const wrap = document.getElementById('flightsWrap');
-  if (!liveFlights.length) {
-    wrap.innerHTML = '<div class="no-flights">NO DATA</div>';
-    return;
-  }
   const airborne = liveFlights.filter(f => f.airborne);
-  const grounded = liveFlights.filter(f => !f.airborne);
   if (!airborne.length) {
     wrap.innerHTML = '<div class="no-flights">NO AIRCRAFT AIRBORNE</div>';
-  } else {
-    wrap.innerHTML = airborne.map(f => `
-      <div class="flight-card">
-        <div class="fc-top">
-          <div class="fc-reg">${f.reg}</div>
-          <div class="fc-airborne"><div class="fc-dot"></div>AIRBORNE</div>
-        </div>
-        <div class="fc-bottom">
-          ${f.depTime ? `<div class="fc-dep">DEP <span>${f.depTime}</span></div>` : ''}
-          <div class="fc-elapsed" id="el-${f.reg.replace(/-/g,'')}">${f.depTime ? elapsed(f.depTime) : ''}</div>
-        </div>
-      </div>`).join('');
+    return;
   }
+  wrap.innerHTML = airborne.map(f => `
+    <div class="flight-card">
+      <div class="fc-top">
+        <div class="fc-reg">${f.reg}</div>
+        <div class="fc-airborne"><div class="fc-dot"></div>AIRBORNE</div>
+      </div>
+      <div class="fc-bottom">
+        ${f.depTime ? `<div class="fc-dep">DEP <span>${f.depTime}</span></div>` : ''}
+        <div class="fc-elapsed" id="el-${f.reg.replace(/-/g,'')}">${f.depTime ? elapsed(f.depTime) : ''}</div>
+      </div>
+    </div>`).join('');
 }
 
 // ══════════════════════════════════════════════════════
