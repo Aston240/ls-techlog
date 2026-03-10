@@ -815,27 +815,27 @@ async function bootstrapSnapshotsFromFlightLogs(){
   const SECOND_KEY  = '6W9TZU5ECtrE3U1UeptzaNsCaXoWcQ';
   if(!PRIMARY_KEY) return;
 
-  // Check if we already have enough data (7+ days for any aircraft)
-  const hasEnough = ST.aircraft.some(ac=>{
-    if(ac.isManual) return true;
-    const snaps = ST.hoursSnapshots[ac.id]||{};
-    return Object.keys(snaps).length >= 7;
-  });
-  if(hasEnough){
-    console.log('[Bootstrap] Enough snapshot data already, skipping flight log fetch');
+  // Only skip if EVERY Airbly aircraft already has 7+ days of snapshots
+  const allHaveEnough = ST.aircraft
+    .filter(ac=>!ac.isManual)
+    .every(ac=> Object.keys(ST.hoursSnapshots[ac.id]||{}).length >= 7);
+  if(allHaveEnough){
+    console.log('[Bootstrap] All aircraft have enough snapshot data, skipping');
     return;
   }
 
   console.log('[Bootstrap] Fetching historical flight logs to seed graph data...');
 
-  // Build two monthly chunks covering last ~60 days to ensure 30 days of data
   const now = Date.now();
+  const DAY = 86400*1000;
+
+  // Three monthly chunks covering last 90 days for a solid history
   const chunks = [
-    { after: now - 60*86400*1000, before: now - 30*86400*1000 },
-    { after: now - 30*86400*1000, before: now }
+    { after: now - 90*DAY, before: now - 60*DAY },
+    { after: now - 60*DAY, before: now - 30*DAY },
+    { after: now - 30*DAY, before: now }
   ];
 
-  // Fetch for both keys
   const keys = [
     { key: PRIMARY_KEY, filter: null },
     { key: SECOND_KEY,  filter: 'G-EGTB' }
@@ -846,36 +846,58 @@ async function bootstrapSnapshotsFromFlightLogs(){
       keys.map(k => fetchAirbly(k.key, Math.floor(chunk.after), Math.floor(chunk.before)))
     );
     for(let i=0; i<results.length; i++){
-      if(results[i].status !== 'fulfilled') continue;
-      const parsed = parseAirbly(results[i].value);
+      if(results[i].status !== 'fulfilled'){
+        console.log('[Bootstrap] Fetch failed:', results[i].reason);
+        continue;
+      }
+      const raw = results[i].value;
+      const parsed = parseAirbly(raw);
       const acList = keys[i].filter
         ? parsed.aircraft.filter(a=>a.reg===keys[i].filter)
         : parsed.aircraft;
 
+      console.log('[Bootstrap] chunk', new Date(chunk.after).toISOString().slice(0,10),
+        '→', new Date(chunk.before).toISOString().slice(0,10),
+        '| aircraft:', acList.length);
+
       for(const ac of acList){
         const logs = parsed.flights[ac.id]||[];
+        console.log('[Bootstrap]', ac.reg, '— flight logs returned:', logs.length);
         if(!ST.hoursSnapshots[ac.id]) ST.hoursSnapshots[ac.id]={};
-        // For each flight log, record end-of-day Hobbs on the day it completed
+
+        // Also record today's known live Hobbs value
+        const todayStr = new Date().toISOString().slice(0,10);
+        if(ac.totalHobbs) ST.hoursSnapshots[ac.id][todayStr] = ac.totalHobbs;
+
         for(const log of logs){
-          if(log.hobbs_end == null) continue;
-          const dayStr = new Date(log.arr_ms||log.dep_ms).toISOString().slice(0,10);
-          // Keep the highest Hobbs value seen on each day (last flight of day)
+          // Use hobbs_end if available, otherwise accumulate from air_sec
+          const hobbsVal = log.hobbs_end != null ? log.hobbs_end
+                         : (log.hobbs_start != null ? log.hobbs_start + (log.air_sec||0)/3600 : null);
+          if(hobbsVal == null) continue;
+          const ts = log.arr_ms || log.dep_ms;
+          if(!ts) continue;
+          const dayStr = new Date(ts).toISOString().slice(0,10);
           const existing = ST.hoursSnapshots[ac.id][dayStr]||0;
-          if(log.hobbs_end > existing){
-            ST.hoursSnapshots[ac.id][dayStr] = log.hobbs_end;
+          if(hobbsVal > existing){
+            ST.hoursSnapshots[ac.id][dayStr] = hobbsVal;
           }
         }
         // Trim anything older than 35 days
-        const cutoff = new Date(Date.now()-35*86400*1000).toISOString().slice(0,10);
+        const cutoff = new Date(now-35*DAY).toISOString().slice(0,10);
         Object.keys(ST.hoursSnapshots[ac.id]).forEach(d=>{
           if(d<cutoff) delete ST.hoursSnapshots[ac.id][d];
         });
+        console.log('[Bootstrap]', ac.reg, '— snapshot days now:', Object.keys(ST.hoursSnapshots[ac.id]).length);
       }
     }
   }
 
   saveSnapshots();
-  console.log('[Bootstrap] Historical snapshot seeding complete');
+  console.log('[Bootstrap] Complete. Snapshots:', JSON.stringify(
+    Object.fromEntries(ST.aircraft.filter(a=>!a.isManual).map(a=>[a.reg, Object.keys(ST.hoursSnapshots[a.id]||{}).length+' days']))
+  ));
+  // Redraw graph if one is currently open
+  if(ST.dashGraph) drawHoursGraph(ST.dashGraph);
 }
 
 // ══ SHOW APP ═════════════════════════════════════
