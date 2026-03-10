@@ -614,6 +614,7 @@ let liveFlights = [];
 async function fetchFlights() {
   // Start with all fleet aircraft as grounded
   const fleetStatus = {};
+  const fleetDepTimes = {};
   FLEET.forEach(ac => fleetStatus[ac.reg] = false);
 
   try {
@@ -621,12 +622,18 @@ async function fetchFlights() {
     const res = await fetch(url);
     const data = await res.json();
     const assets = (data.assetList && data.assetList.assets) ? data.assetList.assets : [];
-    console.log('Airbly raw assets:', JSON.stringify(assets.slice(0,5)));
     assets.filter(a => a.asset_type === 'aircraft').forEach(a => {
       // Match Airbly ident to fleet reg (strip hyphens)
       const normIdent = (a.ident || '').replace(/[-\s]/g, '').toUpperCase();
       const match = FLEET.find(ac => ac.reg.replace(/[-\s]/g, '').toUpperCase() === normIdent);
-      if (match) fleetStatus[match.reg] = a.operational_status === 'airborne';
+      if (match) {
+        const isAirborne = a.operational_status === 'airborne' || a.operational_status === 'inflight';
+        fleetStatus[match.reg] = isAirborne;
+        if (isAirborne && a.logs && a.logs[0] && a.logs[0].usage && a.logs[0].usage.engine_start_at) {
+          const d = new Date(a.logs[0].usage.engine_start_at);
+          fleetDepTimes[match.reg] = d.getUTCHours().toString().padStart(2,'0') + ':' + d.getUTCMinutes().toString().padStart(2,'0');
+        }
+      }
     });
   } catch(e) {
     console.warn('Airbly fetch failed:', e.message);
@@ -635,7 +642,7 @@ async function fetchFlights() {
   liveFlights = FLEET.map(ac => ({
     reg:      ac.reg,
     airborne: fleetStatus[ac.reg] || false,
-    depTime:  null,
+    depTime:  fleetDepTimes[ac.reg] || null,
   }));
   renderFlights();
 }
