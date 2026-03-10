@@ -1028,64 +1028,64 @@ function drawHoursGraph(id){
   let histPoints = [];
   let avgHrsPerDay = 0;
 
-  if(isManual && dailyEntries.length >= 1){
-    // Walk backwards from today reconstructing end-of-day hours remaining
-    // for each of last 30 days that had activity, plus today
-    let runningHrs = cur;
-    const dayPts = [];
-    // Collect dates with entries within last 30 days
+  if(isManual){
+    // Manual aircraft — only plot days that have actual log entries
     const thirtyAgo = nowMs - 30*DAY;
-    const relevantDates = Object.keys(addedByDate)
-      .filter(d=>new Date(d).getTime()>=thirtyAgo)
-      .sort();
-    // Build forward: start from hrs at beginning of earliest relevant date
-    // Work backwards from cur to find starting point
-    let startHrs = cur;
     const allDates = Object.keys(addedByDate).sort();
+    const relevantDates = allDates.filter(d=>new Date(d).getTime()>=thirtyAgo);
+    // Work backwards from cur to find total at start of earliest relevant date
+    let runningHrs = cur;
     for(const d of [...allDates].reverse()){
-      const dMs = new Date(d).getTime();
-      if(dMs >= thirtyAgo) startHrs -= (addedByDate[d]||0);
+      if(new Date(d).getTime() < thirtyAgo) break;
+      runningHrs -= (addedByDate[d]||0);
     }
-    // Now walk forward day by day over last 30 days
-    let rollingHrs = startHrs;
-    for(let i=30;i>=0;i--){
-      const d = new Date(nowMs - i*DAY);
-      d.setHours(23,59,59,0);
-      const dStr = new Date(nowMs-i*DAY).toISOString().slice(0,10);
-      rollingHrs += (addedByDate[dStr]||0);
-      // Plot every day — gaps with no flying show as a plateau
-      dayPts.push({ms:d.getTime(), hrs:Math.max(0,rollingHrs)});
+    // Walk forward — only emit a point on days with actual entries
+    for(const dStr of relevantDates){
+      runningHrs += (addedByDate[dStr]||0);
+      const ms = new Date(dStr).setHours(23,59,59,0);
+      histPoints.push({ms, rem:Math.min(Y_MAX,Math.max(0,due-runningHrs))});
     }
-    histPoints = dayPts.map(p=>({ms:p.ms, rem:Math.min(Y_MAX,Math.max(0,due-p.hrs))}));
-    // Avg hrs/day over last 30 days with data
-    const totalAdded30 = relevantDates.reduce((a,d)=>a+(addedByDate[d]||0),0);
-    const activeDays = Math.max(1, relevantDates.length);
-    // Use per-active-day average — more realistic than dividing by 30
-    avgHrsPerDay = totalAdded30 / Math.max(1,(nowMs - (relevantDates.length?new Date(relevantDates[0]).getTime():nowMs-30*DAY))*(1/DAY));
+    // Always include today
+    const todayStr = new Date(nowMs).toISOString().slice(0,10);
+    if(!addedByDate[todayStr]){
+      histPoints.push({ms:nowMs, rem:Math.min(Y_MAX,Math.max(0,due-cur))});
+    }
+    // Avg rate: total hours flown over the date span
+    if(relevantDates.length>=2){
+      const totalAdded = relevantDates.reduce((a,d)=>a+(addedByDate[d]||0),0);
+      const spanDays = Math.max(1,(new Date(relevantDates[relevantDates.length-1])-new Date(relevantDates[0]))/DAY);
+      avgHrsPerDay = totalAdded/spanDays;
+    } else {
+      avgHrsPerDay = cur/90;
+    }
   } else {
-    // Airbly — use stored nightly snapshots, carry forward on non-flying days
+    // Airbly — only plot days where we actually have a snapshot
     const snaps = ST.hoursSnapshots[id]||{};
-    const snapDates = Object.keys(snaps).sort();
     const thirtyAgoStr = new Date(nowMs-30*DAY).toISOString().slice(0,10);
-    // Find last known hours before the 30-day window
-    const priorDates = snapDates.filter(d=>d<thirtyAgoStr);
-    let lastKnownHrs = priorDates.length ? snaps[priorDates[priorDates.length-1]] : (snapDates.length ? snaps[snapDates[0]] : cur);
-    // Plot every day in the last 30 — carry forward on days with no snapshot
-    for(let i=30;i>=0;i--){
-      const dStr = new Date(nowMs-i*DAY).toISOString().slice(0,10);
-      if(snaps[dStr]!==undefined) lastKnownHrs = snaps[dStr];
-      const d = new Date(nowMs-i*DAY); d.setHours(23,59,59,0);
-      histPoints.push({ms:d.getTime(), rem:Math.min(Y_MAX,Math.max(0,due-lastKnownHrs))});
+    const recentSnaps = Object.keys(snaps).filter(d=>d>=thirtyAgoStr).sort();
+    for(const dStr of recentSnaps){
+      const ms = new Date(dStr).setHours(23,59,59,0);
+      histPoints.push({ms, rem:Math.min(Y_MAX,Math.max(0,due-snaps[dStr]))});
     }
-    // Avg rate from snapshots in the last 30 days
-    const recentSnaps = snapDates.filter(d=>d>=thirtyAgoStr);
+    // Always include today's live value
+    const todayStr = new Date(nowMs).toISOString().slice(0,10);
+    if(!snaps[todayStr]){
+      histPoints.push({ms:nowMs, rem:Math.min(Y_MAX,Math.max(0,due-cur))});
+      histPoints.sort((a,b)=>a.ms-b.ms);
+    }
+    // Avg rate from actual snapshot spread
     if(recentSnaps.length>=2){
       const oldest = snaps[recentSnaps[0]];
       const newest = snaps[recentSnaps[recentSnaps.length-1]];
       const daySpan = Math.max(1,(new Date(recentSnaps[recentSnaps.length-1])-new Date(recentSnaps[0]))/DAY);
       avgHrsPerDay = Math.max(0,(newest-oldest)/daySpan);
+    } else if(histPoints.length>=2){
+      // Only today + maybe one other point — use that slope
+      const first = histPoints[0], last = histPoints[histPoints.length-1];
+      const spanDays = Math.max(1,(last.ms-first.ms)/DAY);
+      avgHrsPerDay = Math.max(0,(first.rem-last.rem)/spanDays);
     } else {
-      avgHrsPerDay = cur/90; // not enough data yet — rough fallback
+      avgHrsPerDay = 0;
     }
   }
 
@@ -1106,8 +1106,9 @@ function drawHoursGraph(id){
   }
 
   // ── Axis setup ────────────────────────────────
-  // X: from 30 days ago to projected check date (or +7 days if no projection)
-  const xStart = nowMs - 30*DAY;
+  // X: from first real data point (not forced 30 days back) to projected check date
+  const firstPoint = histPoints.length ? histPoints[0].ms : nowMs - 7*DAY;
+  const xStart = Math.min(firstPoint, nowMs - 3*DAY);
   const xEnd   = checkDate ? Math.max(checkDate.getTime()+3*DAY, nowMs+7*DAY) : nowMs+14*DAY;
   const xRange = xEnd - xStart;
 
@@ -1161,15 +1162,16 @@ function drawHoursGraph(id){
     ctx.fillText('Est. check: '+lbl, Math.min(W-90,Math.max(90,cx)), PAD.top+14);
   }
 
-  // ── Historical line (blue solid) ─────────────
+  // ── Historical line — connect all real data points regardless of gaps
   if(histPoints.length>=2){
     ctx.beginPath(); ctx.strokeStyle='#4a9eff'; ctx.lineWidth=2.5; ctx.setLineDash([]);
     histPoints.forEach((p,i)=>i===0?ctx.moveTo(toX(p.ms),toY(p.rem)):ctx.lineTo(toX(p.ms),toY(p.rem)));
     ctx.stroke();
-    histPoints.forEach(p=>{ ctx.beginPath(); ctx.fillStyle='#4a9eff'; ctx.arc(toX(p.ms),toY(p.rem),3,0,Math.PI*2); ctx.fill(); });
-  } else if(histPoints.length===1){
-    ctx.beginPath(); ctx.fillStyle='#4a9eff'; ctx.arc(toX(histPoints[0].ms),toY(histPoints[0].rem),4,0,Math.PI*2); ctx.fill();
   }
+  histPoints.forEach(p=>{
+    ctx.beginPath(); ctx.fillStyle='#4a9eff';
+    ctx.arc(toX(p.ms),toY(p.rem),3,0,Math.PI*2); ctx.fill();
+  });
 
   // ── Projection line (dashed amber) ───────────
   if(projPoints.length>=2){
