@@ -608,7 +608,8 @@ async function fetchNotams() {
   }
 }
 
-const AIRBLY_KEY = 'AamCntOnk72udRQvYYiX4oUlcpHcgg';
+const AIRBLY_KEY  = 'AamCntOnk72udRQvYYiX4oUlcpHcgg';
+const AIRBLY_KEY2 = '6W9TZU5ECtrE3U1UeptzaNsCaXoWcQ';
 let liveFlights = [];
 
 async function fetchFlights() {
@@ -618,10 +619,15 @@ async function fetchFlights() {
   FLEET.forEach(ac => fleetStatus[ac.reg] = false);
 
   try {
-    const url = `https://airbly.com/api/v3/assetList?groupKey=${AIRBLY_KEY}&log_types=flight&log_limit_per_asset=1`;
-    const res = await fetch(url);
-    const data = await res.json();
-    const assets = (data.assetList && data.assetList.assets) ? data.assetList.assets : [];
+    const [res1, res2] = await Promise.all([
+      fetch(`https://airbly.com/api/v3/assetList?groupKey=${AIRBLY_KEY}&log_types=flight&log_limit_per_asset=1`),
+      fetch(`https://airbly.com/api/v3/assetList?groupKey=${AIRBLY_KEY2}&log_types=flight&log_limit_per_asset=1`)
+    ]);
+    const [data1, data2] = await Promise.all([res1.json(), res2.json()]);
+    const assets = [
+      ...((data1.assetList && data1.assetList.assets) ? data1.assetList.assets : []),
+      ...((data2.assetList && data2.assetList.assets) ? data2.assetList.assets : [])
+    ];
     assets.filter(a => a.asset_type === 'aircraft').forEach(a => {
       // Match Airbly ident to fleet reg (strip hyphens)
       const normIdent = (a.ident || '').replace(/[-\s]/g, '').toUpperCase();
