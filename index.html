@@ -295,6 +295,7 @@ tfoot td{padding:11px;background:#112240;font-weight:700;}
     <button class="nb act" id="nb-dashboard" onclick="sv('dashboard')">📊&nbsp; Fleet Dashboard</button>
     <button class="nb"     id="nb-preview"   onclick="sv('preview')">📋&nbsp; Tech Log Preview</button>
     <button class="nb"     id="nb-hours"     onclick="sv('hours')">⏱&nbsp; Hours Tracker</button>
+    <button class="nb"     id="nb-mxplanner" onclick="sv('mxplanner')">🔧&nbsp; Maintenance Planner</button>
     <button class="nb"     id="nb-settings"  onclick="sv('settings')">⚙️&nbsp; Aircraft Settings</button>
     <div class="sb-sec" style="margin-top:6px">AIRCRAFT</div>
     <div id="ac-list"></div>
@@ -362,6 +363,10 @@ async function syncPull(){
       ST.manualAircraft=remote.manual;
       localStorage.setItem('tl_manual',JSON.stringify(ST.manualAircraft));
     }
+    if(remote.downtimeLog && Array.isArray(remote.downtimeLog)){
+      ST.downtimeLog = remote.downtimeLog;
+      localStorage.setItem('tl_downtime',JSON.stringify(ST.downtimeLog));
+    }
     if(remote.hoursSnapshots && typeof remote.hoursSnapshots==='object'){
       Object.keys(remote.hoursSnapshots).forEach(id=>{
         if(!ST.hoursSnapshots[id]) ST.hoursSnapshots[id]={};
@@ -407,6 +412,7 @@ function syncPush(){
         manual: ST.manualAircraft,
         dailyLog: ST.dailyLog||{},
         hoursSnapshots: ST.hoursSnapshots||{},
+        downtimeLog: ST.downtimeLog||[],
         sheets: Object.fromEntries(
           Object.keys(ST.cfg).map(id=>[id, ST.cfg[id]?.sheet_start||'1'])
         ),
@@ -445,6 +451,7 @@ const ST={
   manualAircraft: JSON.parse(localStorage.getItem('tl_manual')||'[]'),
   dailyLog: JSON.parse(localStorage.getItem('tl_dailylog')||'{}'),
   hoursSnapshots: JSON.parse(localStorage.getItem('tl_snapshots')||'{}'),
+  downtimeLog: JSON.parse(localStorage.getItem('tl_downtime')||'[]'),
 };
 
 // Save locally AND push to cloud
@@ -934,13 +941,14 @@ function sv(v){ ST.view=v; closeSidebar(); render(); }
 
 // ══ RENDER ═══════════════════════════════════════
 function render(){
-  ['dashboard','preview','hours','settings'].forEach(v=>{
+  ['dashboard','preview','hours','mxplanner','settings'].forEach(v=>{
     const b=$('nb-'+v); if(b) b.classList.toggle('act',v===ST.view);
   });
   const titles={
     dashboard:'Fleet Dashboard',
     preview:`Tech Log Preview — ${ST.selected?.reg||'select an aircraft'}`,
     hours:'Hours Tracker',
+    mxplanner:'Maintenance Planner',
     settings:'Aircraft Settings',
   };
   $('view-title').textContent=titles[ST.view]||'';
@@ -950,6 +958,7 @@ function render(){
   if(ST.view==='dashboard') c.innerHTML=rDash();
   else if(ST.view==='preview') c.innerHTML=rPreview();
   else if(ST.view==='hours') c.innerHTML=rHours();
+  else if(ST.view==='mxplanner') c.innerHTML=rMxPlanner();
   else if(ST.view==='settings') c.innerHTML=rSettings();
 }
 
@@ -1757,6 +1766,278 @@ function settingsCardFields(id, ac, c, isManual){
       </div>`:''}
     </div>`;
 }
+
+
+// MAINTENANCE PLANNER
+function rMxPlanner(){
+  const _all = allAircraft();
+  const now = Date.now();
+  const DAY = 86400*1000;
+  const dt = ST.downtimeLog||[];
+
+  // Set of grounded regs
+  const grounded = new Set(dt.filter(function(e){return !e.end;}).map(function(e){return e.reg;}));
+
+  function burnRatePday(ac){
+    const snaps = ST.hoursSnapshots[ac.id]||{};
+    const dates = Object.keys(snaps).sort();
+    const cutoff = new Date(now-30*DAY).toISOString().slice(0,10);
+    const recent = dates.filter(function(d){return d>=cutoff;});
+    if(recent.length>=2){
+      const span = Math.max(1,(new Date(recent[recent.length-1])-new Date(recent[0]))/DAY);
+      return Math.max(0,(snaps[recent[recent.length-1]]-snaps[recent[0]])/span);
+    }
+    return ac.totalHobbs/90;
+  }
+
+  function predictDays(ac, targetHrs){
+    const rate = burnRatePday(ac);
+    if(rate<=0) return null;
+    const left = targetHrs - ac.totalHobbs;
+    if(left<=0) return 0;
+    return Math.round(left/rate);
+  }
+
+  function daysUntilDate(str){
+    if(!str) return null;
+    const d = new Date(str);
+    if(isNaN(d)) return null;
+    return Math.round((d-now)/DAY);
+  }
+
+  function fmtDate(str){
+    if(!str) return '---';
+    const d = new Date(str);
+    if(isNaN(d)) return str;
+    return d.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
+  }
+
+  function addDays(ms, days){ return new Date(ms+days*DAY).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}); }
+
+  // Score each aircraft: lower = more urgent = higher priority
+  // Grounded = always last
+  function urgencyScore(ac){
+    if(grounded.has(ac.reg)) return 99999;
+    const cfg = ST.cfg[ac.id]||{};
+    const due = parseFloat(cfg.maint_due)||null;
+    const mxDays = due ? predictDays(ac,due) : null;
+    const arcDays = daysUntilDate(cfg.cofa_exp);
+    const annDays = daysUntilDate(cfg.annual_due);
+    // Worst (smallest days) across all three deadlines
+    const candidates = [mxDays, arcDays, annDays].filter(function(x){return x!==null;});
+    if(!candidates.length) return 9000;
+    return Math.min.apply(null,candidates);
+  }
+
+  const sorted = _all.slice().sort(function(a,b){ return urgencyScore(a)-urgencyScore(b); });
+
+  // Ongoing downtime banners
+  const banners = dt.filter(function(e){return !e.end;}).map(function(e){
+    const days = Math.round((now-new Date(e.start))/DAY);
+    return '<div style="display:flex;align-items:center;gap:10px;background:#2a1010;border:1px solid #6a2020;'
+      +'border-radius:8px;padding:10px 14px;margin-bottom:8px;font-size:12px">'
+      +'<span style="font-weight:800;color:#ff8080;font-size:14px">'+esc(e.reg)+'</span>'
+      +'<span style="color:#ffaaaa;flex:1">Currently unserviceable \u2014 '+esc(e.reason||'No reason given')+'</span>'
+      +'<span style="font-weight:700;color:#ff6060;white-space:nowrap">Day '+days+'</span>'
+      +'</div>';
+  }).join('');
+
+  // Build priority cards
+  var rankNum = 0;
+  const cards = sorted.map(function(ac){
+    const cfg = ST.cfg[ac.id]||{};
+    const isGrounded = grounded.has(ac.reg);
+    const due = parseFloat(cfg.maint_due)||null;
+    const rate = burnRatePday(ac);
+    const rateWk = (rate*7).toFixed(1);
+    const mxDays = due ? predictDays(ac,due) : null;
+    const arcDays = daysUntilDate(cfg.cofa_exp);
+    const annDays = daysUntilDate(cfg.annual_due);
+    const hrsRem = due ? Math.max(0,due-ac.totalHobbs).toFixed(1) : null;
+    const predDate = (mxDays!==null) ? addDays(now,mxDays) : null;
+    const dtEntry = dt.filter(function(e){return e.reg===ac.reg&&!e.end;})[0];
+    const downtimeDays = dtEntry ? Math.round((now-new Date(dtEntry.start))/DAY) : null;
+
+    // Determine urgency tier
+    var tier, label, action, actionSub;
+    if(isGrounded){
+      tier='urgent';
+      label='GROUNDED';
+      action='UNSERVICEABLE';
+      actionSub=esc(dtEntry&&dtEntry.reason||'') + (downtimeDays!==null?'<br>Day '+downtimeDays+' of downtime.':'');
+    } else {
+      rankNum++;
+      // Find the most urgent deadline
+      const minDays = Math.min.apply(null,[mxDays,arcDays,annDays].filter(function(x){return x!==null;}).concat([9999]));
+      const hrsLeft = due ? (due-ac.totalHobbs) : null;
+      if(minDays<=0){
+        tier='urgent'; label='OVERDUE'; action='OVERDUE'; actionSub='Immediate action required.';
+      } else if(minDays<=14){
+        tier='urgent'; label='Fly now'; action='FLY NOW';
+        actionSub='Deadline in '+minDays+' days.<br>Prioritise this aircraft.';
+      } else if(minDays<=45){
+        tier='warn'; label='Plan check'; action='BOOK CHECK';
+        actionSub='Deadline in ~'+minDays+' days.<br>Book engineer slot now.';
+      } else if(hrsLeft!==null && hrsLeft<=10){
+        tier='warn'; label='Ease flying'; action='EASE OFF';
+        actionSub='Only '+hrsLeft+' hrs remaining.<br>Manage carefully.';
+      } else {
+        tier='ok'; label='On track'; action='ON TRACK';
+        actionSub='Next deadline in ~'+minDays+' days.<br>Fly normally.';
+      }
+    }
+
+    const rankBg   = tier==='urgent'?'#3a1010': tier==='warn'?'#2a1e08':'#0a2318';
+    const rankTxt  = isGrounded?'&mdash;':rankNum;
+    const rankIco  = tier==='urgent'?'&#128308;': tier==='warn'?'&#129000;':'&#128994;';
+    const labelBg  = tier==='urgent'?'background:#3a1010;color:#ff8080;border:1px solid #6a2020':
+                     tier==='warn'  ?'background:#2a1e08;color:#f0c040;border:1px solid #5a3a10':
+                                     'background:#0a2318;color:#40d080;border:1px solid #1a5030';
+    const actionCol= tier==='urgent'?'#ff6060': tier==='warn'?'var(--amb)':'var(--grn)';
+    const cardBdr  = isGrounded?'border-color:#3a1010;opacity:.7':'';
+    const regCol   = isGrounded?'#ff8080':'#fff';
+
+    function stat(lbl,val,col){
+      return '<div style="display:flex;flex-direction:column;gap:1px">'
+        +'<div style="font-size:9px;color:var(--mut);letter-spacing:1px;text-transform:uppercase">'+lbl+'</div>'
+        +'<div style="font-size:13px;font-weight:700;color:'+(col||'var(--txt)')+'">'+val+'</div>'
+        +'</div>';
+    }
+
+    const stats = isGrounded
+      ? [stat('Total Hrs',ac.totalHobbs.toFixed(1),'var(--acc)'),
+         due?stat('Check Due At',due+' hrs'):null,
+         hrsRem?stat('Hrs Remaining',hrsRem+' hrs'):null,
+         stat('Downtime','Day '+(downtimeDays||0),'#ff6060'),
+         cfg.cofa_exp?stat('ARC Due',fmtDate(cfg.cofa_exp),(arcDays!==null&&arcDays<30)?'#ff6060':'var(--grn)'):null,
+         cfg.annual_due?stat('Annual Due',fmtDate(cfg.annual_due),(annDays!==null&&annDays<30)?'#ff6060':'var(--grn)'):null]
+      : [stat('Total Hrs',ac.totalHobbs.toFixed(1),'var(--acc)'),
+         due?stat('Check Due At',due+' hrs'):null,
+         hrsRem?stat('Hrs Remaining',hrsRem+' hrs',(parseFloat(hrsRem)<15)?'#ff6060':(parseFloat(hrsRem)<30)?'var(--amb)':'var(--grn)'):null,
+         stat('Burn Rate',rateWk+' hrs/wk'),
+         predDate?stat('Predicted Check',predDate+(mxDays!==null?' ('+mxDays+'d)':''),mxDays!==null&&mxDays<30?'#ff6060':mxDays!==null&&mxDays<60?'var(--amb)':'var(--grn)'):null,
+         cfg.cofa_exp?stat('ARC Due',fmtDate(cfg.cofa_exp)+(arcDays!==null?' ('+arcDays+'d)':''),arcDays!==null&&arcDays<30?'#ff6060':arcDays!==null&&arcDays<60?'var(--amb)':'var(--grn)'):null,
+         cfg.annual_due?stat('Annual Due',fmtDate(cfg.annual_due)+(annDays!==null?' ('+annDays+'d)':''),annDays!==null&&annDays<30?'#ff6060':annDays!==null&&annDays<60?'var(--amb)':'var(--grn)'):null];
+
+    return '<div style="background:var(--panel);border:1px solid var(--border);border-radius:12px;'
+      +'display:grid;grid-template-columns:48px 1fr auto;align-items:center;overflow:hidden;'+cardBdr+'">'
+
+      // rank strip
+      +'<div style="width:48px;display:flex;flex-direction:column;align-items:center;justify-content:center;'
+      +'padding:14px 0;background:'+rankBg+';min-height:80px">'
+      +'<div style="font-size:20px;font-weight:900;color:#fff;line-height:1">'+rankTxt+'</div>'
+      +'<div style="font-size:14px;margin-top:3px">'+rankIco+'</div>'
+      +'</div>'
+
+      // body
+      +'<div style="padding:12px 16px;display:flex;flex-direction:column;gap:8px">'
+      +'<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">'
+      +'<span style="font-size:20px;font-weight:900;color:'+regCol+';letter-spacing:1px">'+esc(ac.reg)+'</span>'
+      +(ac.type?'<span style="font-size:11px;color:var(--mut);padding:2px 8px;background:var(--dim);border-radius:4px">'+esc(ac.type)+'</span>':'')
+      +'<span style="font-size:12px;font-weight:700;padding:3px 10px;border-radius:20px;'+labelBg+'">'+label+'</span>'
+      +'</div>'
+      +'<div style="display:flex;gap:18px;flex-wrap:wrap">'+stats.filter(Boolean).join('')+'</div>'
+      +'</div>'
+
+      // action panel
+      +'<div style="padding:12px 20px;text-align:right;min-width:160px;display:flex;flex-direction:column;'
+      +'align-items:flex-end;justify-content:center;gap:6px;border-left:1px solid var(--border)">'
+      +'<div style="font-size:14px;font-weight:800;letter-spacing:.5px;color:'+actionCol+'">'+action+'</div>'
+      +'<div style="font-size:10px;color:var(--mut);line-height:1.5;text-align:right">'+actionSub+'</div>'
+      +'</div>'
+
+      +'</div>';
+  }).join('<div style="height:8px"></div>');
+
+  // Downtime log rows
+  const dtRows = dt.length ? dt.slice().reverse().map(function(e,i){
+    const idx = dt.length-1-i;
+    const endStr = e.end ? e.end : '<span style="color:var(--amb)">Ongoing</span>';
+    const days = e.end ? Math.round((new Date(e.end)-new Date(e.start))/DAY) : Math.round((now-new Date(e.start))/DAY);
+    return '<tr style="border-bottom:1px solid var(--border)">'
+      +'<td style="padding:9px 12px;font-weight:700;color:#fff">'+esc(e.reg)+'</td>'
+      +'<td style="padding:9px 12px">'+e.start+'</td>'
+      +'<td style="padding:9px 12px">'+endStr+'</td>'
+      +'<td style="padding:9px 12px;color:var(--acc)">'+days+'d</td>'
+      +'<td style="padding:9px 12px;color:var(--mut);font-size:11px">'+esc(e.reason||'')+'</td>'
+      +'<td style="padding:9px 12px"><button onclick="removeDowntime('+idx+')" '
+      +'style="background:none;border:none;color:var(--mut);cursor:pointer;font-size:13px">&#10005;</button></td>'
+      +'</tr>';
+  }).join('') : '<tr><td colspan="6" style="color:var(--mut);text-align:center;padding:14px">No downtime recorded</td></tr>';
+
+  const acOptions = _all.map(function(ac){return '<option value="'+esc(ac.reg)+'">'+esc(ac.reg)+'</option>';}).join('');
+  const today = new Date().toISOString().slice(0,10);
+  const inp = 'width:100%;background:var(--bg);border:1px solid var(--border);border-radius:7px;color:#fff;padding:8px 10px;font-size:12px;outline:none;box-sizing:border-box';
+
+  return '<div style="padding:18px 22px;max-width:980px">'
+
+    // subtitle
+    +'<div style="font-size:11px;color:var(--mut);margin-bottom:16px">Aircraft sorted by priority \u2014 fly from the top down</div>'
+
+    // banners
+    +(banners||'')
+
+    // stack
+    +cards
+
+    // downtime log
+    +'<div style="height:28px"></div>'
+    +'<div style="font-size:11px;font-weight:700;color:var(--mut);letter-spacing:2px;text-transform:uppercase;'
+    +'margin-bottom:12px;padding-bottom:6px;border-bottom:1px solid var(--border)">Downtime Log</div>'
+    +'<div style="background:var(--panel);border:1px solid var(--border);border-radius:11px;overflow:auto;margin-bottom:20px">'
+    +'<table style="width:100%;border-collapse:collapse;font-size:12px">'
+    +'<thead><tr style="border-bottom:1px solid var(--border)">'
+    +'<th style="padding:8px 12px;text-align:left;color:var(--mut);font-size:10px;letter-spacing:.8px;background:var(--sb)">REG</th>'
+    +'<th style="padding:8px 12px;text-align:left;color:var(--mut);font-size:10px;letter-spacing:.8px;background:var(--sb)">START</th>'
+    +'<th style="padding:8px 12px;text-align:left;color:var(--mut);font-size:10px;letter-spacing:.8px;background:var(--sb)">END</th>'
+    +'<th style="padding:8px 12px;text-align:left;color:var(--mut);font-size:10px;letter-spacing:.8px;background:var(--sb)">DURATION</th>'
+    +'<th style="padding:8px 12px;text-align:left;color:var(--mut);font-size:10px;letter-spacing:.8px;background:var(--sb)">REASON</th>'
+    +'<th style="background:var(--sb)"></th>'
+    +'</tr></thead><tbody>'+dtRows+'</tbody></table></div>'
+
+    // add downtime form
+    +'<div style="background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:18px 20px;max-width:700px">'
+    +'<div style="font-size:11px;font-weight:700;color:var(--mut);letter-spacing:2px;text-transform:uppercase;margin-bottom:14px">Record Downtime</div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px">'
+    +'<div><div style="font-size:10px;color:var(--mut);letter-spacing:1px;text-transform:uppercase;margin-bottom:5px">Aircraft</div>'
+    +'<select id="dt-reg" style="'+inp+'">'+acOptions+'</select></div>'
+    +'<div><div style="font-size:10px;color:var(--mut);letter-spacing:1px;text-transform:uppercase;margin-bottom:5px">Start Date</div>'
+    +'<input id="dt-start" type="date" value="'+today+'" style="'+inp+'"></div>'
+    +'<div><div style="font-size:10px;color:var(--mut);letter-spacing:1px;text-transform:uppercase;margin-bottom:5px">End Date <span style="color:var(--dim);font-size:9px">(blank = ongoing)</span></div>'
+    +'<input id="dt-end" type="date" style="'+inp+'"></div>'
+    +'</div>'
+    +'<div style="margin-bottom:14px"><div style="font-size:10px;color:var(--mut);letter-spacing:1px;text-transform:uppercase;margin-bottom:5px">Reason / Defect</div>'
+    +'<input id="dt-reason" type="text" placeholder="e.g. Awaiting engine part, Annual inspection..." style="'+inp+'"></div>'
+    +'<button onclick="addDowntime()" style="background:var(--blue);color:#fff;border:none;border-radius:8px;padding:9px 22px;font-weight:700;font-size:12px;cursor:pointer;letter-spacing:.5px">+ Add Downtime Entry</button>'
+    +'</div>'
+
+    +'</div>';
+}
+
+function addDowntime(){
+  const reg    = document.getElementById('dt-reg')&&document.getElementById('dt-reg').value||'';
+  const start  = document.getElementById('dt-start')&&document.getElementById('dt-start').value||'';
+  const end    = document.getElementById('dt-end')&&document.getElementById('dt-end').value||'';
+  const reason = document.getElementById('dt-reason')&&document.getElementById('dt-reason').value||'';
+  if(!reg||!start) return;
+  if(!ST.downtimeLog) ST.downtimeLog=[];
+  ST.downtimeLog.push({reg:reg,start:start,end:end||null,reason:reason});
+  saveDowntime();
+  render();
+}
+
+function removeDowntime(idx){
+  if(!ST.downtimeLog) return;
+  ST.downtimeLog.splice(idx,1);
+  saveDowntime();
+  render();
+}
+
+function saveDowntime(){
+  localStorage.setItem('tl_downtime',JSON.stringify(ST.downtimeLog||[]));
+  syncPush();
+}
+
 
 function rSettings(){
   const savedKey=localStorage.getItem('tl_key');
