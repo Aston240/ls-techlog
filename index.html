@@ -961,10 +961,15 @@ function render(){
   else if(ST.view==='hours') c.innerHTML=rHours();
   else if(ST.view==='mxplanner') c.innerHTML=rMxPlanner();
   else if(ST.view==='settings') c.innerHTML=rSettings();
-  // Redraw graph after every render if one is open (canvas gets wiped on innerHTML replace)
-  // Use rAF + small delay to ensure DOM has painted before reading canvas dimensions
+  // Redraw graph after every render — poll until canvas has nonzero width then draw
   if(ST.view==='dashboard' && ST.dashGraph){
-    requestAnimationFrame(()=>setTimeout(()=>drawHoursGraph(ST.dashGraph), 50));
+    const _gid = ST.dashGraph;
+    let _tries = 0;
+    const _poll = setInterval(()=>{
+      const cv = document.getElementById('hgraph-canvas');
+      if(cv && cv.offsetWidth > 0){ clearInterval(_poll); drawHoursGraph(_gid); }
+      else if(++_tries > 20){ clearInterval(_poll); } // give up after 1s
+    }, 50);
   }
 }
 
@@ -974,11 +979,15 @@ function openDashGraph(id){
   ST.dashGraph = ST.dashGraph===id ? null : id; // toggle
   render();
   if(ST.dashGraph){
-    requestAnimationFrame(()=>setTimeout(()=>{
-      const el=document.getElementById('hgraph-section');
-      if(el) el.scrollIntoView({behavior:'smooth',block:'start'});
-      drawHoursGraph(id);
-    },80));
+    let _ot=0; const _op=setInterval(()=>{
+      const cv=document.getElementById('hgraph-canvas');
+      if(cv&&cv.offsetWidth>0){
+        clearInterval(_op);
+        const el=document.getElementById('hgraph-section');
+        if(el) el.scrollIntoView({behavior:'smooth',block:'start'});
+        drawHoursGraph(id);
+      } else if(++_ot>20) clearInterval(_op);
+    },50);
   }
 }
 
@@ -1153,7 +1162,7 @@ function drawHoursGraph(id){
   // ── Axis setup ────────────────────────────────
   // X: from first real data point (not forced 30 days back) to projected check date
   const firstPoint = histPoints.length ? histPoints[0].ms : nowMs - 7*DAY;
-  const xStart = Math.min(firstPoint, nowMs - 3*DAY);
+  const xStart = firstPoint - 2*DAY; // small left padding before first point
   const xEnd   = checkDate ? Math.max(checkDate.getTime()+3*DAY, nowMs+7*DAY) : nowMs+14*DAY;
   const xRange = xEnd - xStart;
 
