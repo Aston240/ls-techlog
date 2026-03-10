@@ -695,7 +695,7 @@ function parseAirbly(raw){
     // Flight logs — accept any log entry that has a takeoff timestamp
     const logs = a.logs || [];
     console.log(`[${id}] ${airblyReg}: ${logs.length} logs returned`);
-    if(logs.length) console.log('[sample log fields]', Object.keys(logs[0]));
+    if(logs.length) console.log('[sample log full]', JSON.stringify(logs[0]));
     flights[id] = logs
       .filter(l => (l.takeoff_timestamp||l.departure_timestamp||l.start_timestamp||l.timestamp) > 0)
       .map(l => {
