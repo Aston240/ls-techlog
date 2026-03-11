@@ -1,0 +1,1265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>LS Airmotive — Flight Booking</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow+Condensed:wght@400;600;700;900&family=Barlow:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:     #080c12;
+  --panel:  #0d1420;
+  --panel2: #111825;
+  --border: #1a2840;
+  --accent: #00aaff;
+  --green:  #00e676;
+  --amber:  #ffab00;
+  --red:    #ff3d3d;
+  --text:   #b8d4ee;
+  --dim:    #3a5570;
+  --bright: #e4f2ff;
+  --mono:   'Share Tech Mono', monospace;
+  --head:   'Barlow Condensed', sans-serif;
+  --body:   'Barlow', sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+html,body{background:var(--bg);color:var(--text);font-family:var(--body);min-height:100vh;}
+body::before{
+  content:'';position:fixed;inset:0;
+  background-image:linear-gradient(rgba(0,170,255,0.025) 1px,transparent 1px),linear-gradient(90deg,rgba(0,170,255,0.025) 1px,transparent 1px);
+  background-size:32px 32px;pointer-events:none;z-index:0;
+}
+
+/* ── SCREENS ── */
+.screen{display:none;position:relative;z-index:1;}
+.screen.active{display:flex;}
+
+/* ── PIN SCREEN ── */
+#s-pin{min-height:100vh;align-items:center;justify-content:center;flex-direction:column;}
+.pin-box{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:48px 44px;width:400px;max-width:92vw;text-align:center;box-shadow:0 30px 80px rgba(0,0,0,.6);}
+.pin-eyebrow{font-family:var(--mono);font-size:10px;letter-spacing:4px;color:var(--accent);margin-bottom:10px;}
+.pin-title{font-family:var(--head);font-size:32px;font-weight:900;color:var(--bright);letter-spacing:.06em;margin-bottom:4px;}
+.pin-sub{font-family:var(--mono);font-size:11px;color:var(--dim);letter-spacing:.1em;margin-bottom:32px;}
+.pin-input{width:100%;background:#060a10;border:1px solid var(--border);border-radius:8px;padding:14px;color:var(--bright);font-family:var(--mono);font-size:22px;text-align:center;letter-spacing:8px;outline:none;transition:border-color .2s;}
+.pin-input:focus{border-color:var(--accent);}
+.pin-btn{width:100%;margin-top:14px;background:var(--accent);border:none;border-radius:8px;padding:13px;color:#000;font-family:var(--head);font-weight:700;font-size:16px;letter-spacing:.1em;cursor:pointer;transition:opacity .2s;}
+.pin-btn:hover{opacity:.85;}
+.pin-err{font-family:var(--mono);font-size:11px;color:var(--red);margin-top:10px;min-height:16px;}
+.pin-links{margin-top:24px;display:flex;gap:16px;justify-content:center;}
+.pin-link{font-family:var(--mono);font-size:10px;color:var(--dim);cursor:pointer;letter-spacing:.08em;text-decoration:underline;background:none;border:none;}
+.pin-link:hover{color:var(--text);}
+
+/* ── MAIN APP ── */
+#s-app{flex-direction:column;height:100vh;overflow:hidden;}
+.app-header{display:flex;align-items:flex-start;justify-content:space-between;padding:14px 24px;border-bottom:1px solid var(--border);flex-shrink:0;}
+.logo{font-family:var(--head);font-weight:900;font-size:32px;letter-spacing:.08em;text-transform:uppercase;color:var(--bright);line-height:1;}
+.logo span{color:var(--accent);}
+.logo-sub{font-family:var(--mono);font-size:11px;color:var(--dim);letter-spacing:.18em;margin-top:3px;}
+.header-right{text-align:right;}
+.clock{font-family:var(--mono);font-size:28px;color:var(--accent);letter-spacing:.05em;}
+.clock-date{font-family:var(--mono);font-size:11px;color:var(--dim);margin-top:2px;}
+
+/* ── TABS ── */
+.tabs{display:flex;gap:0;border-bottom:1px solid var(--border);padding:0 24px;flex-shrink:0;}
+.tab-btn{font-family:var(--head);font-size:14px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;padding:12px 20px;background:none;border:none;border-bottom:2px solid transparent;color:var(--dim);cursor:pointer;transition:all .2s;margin-bottom:-1px;}
+.tab-btn:hover{color:var(--text);}
+.tab-btn.active{color:var(--accent);border-bottom-color:var(--accent);}
+
+/* ── SCROLLABLE CONTENT AREA ── */
+.app-body{flex:1;overflow-y:auto;overflow-x:hidden;}
+
+/* ── TAB CONTENT ── */
+.tab-pane{display:none;padding:24px;}
+.tab-pane.active{display:block;}
+
+/* ── BOOKING FORM — card layout ── */
+.form-col{max-width:680px;margin:0 auto;display:flex;flex-direction:column;gap:12px;padding-bottom:32px;}
+
+/* header card */
+.form-header-card{background:var(--panel);border:1px solid var(--border);border-radius:10px;overflow:hidden;}
+.form-header-band{background:#1a2840;padding:14px 20px;}
+.form-header-band-title{font-family:var(--head);font-size:20px;font-weight:900;letter-spacing:.1em;color:var(--bright);text-transform:uppercase;}
+.form-header-body{padding:14px 20px;font-family:var(--mono);font-size:11px;color:var(--dim);letter-spacing:.08em;}
+
+/* field cards */
+.fcard{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:20px 22px;}
+.fcard-label{font-family:var(--head);font-size:17px;font-weight:700;color:var(--bright);margin-bottom:16px;letter-spacing:.04em;}
+.fcard-label .req{color:var(--red);margin-left:4px;}
+
+/* radio rows */
+.radio-list{display:flex;flex-direction:column;gap:2px;}
+.radio-row{display:flex;align-items:center;gap:14px;padding:9px 12px;border-radius:6px;cursor:pointer;transition:background .15s;border:1px solid transparent;}
+.radio-row:hover{background:rgba(0,170,255,.06);border-color:rgba(0,170,255,.15);}
+.radio-row.checked{background:rgba(0,170,255,.1);border-color:rgba(0,170,255,.3);}
+.radio-circle{width:18px;height:18px;border-radius:50%;border:2px solid var(--dim);flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:border-color .15s;}
+.radio-row.checked .radio-circle{border-color:var(--accent);}
+.radio-dot{width:8px;height:8px;border-radius:50%;background:var(--accent);opacity:0;transition:opacity .15s;}
+.radio-row.checked .radio-dot{opacity:1;}
+.radio-label{font-family:var(--body);font-size:15px;color:var(--text);}
+.radio-row.checked .radio-label{color:var(--bright);}
+
+/* "Other" text input within radio */
+.radio-other-input{flex:1;background:transparent;border:none;border-bottom:1px solid var(--dim);color:var(--bright);font-family:var(--body);font-size:14px;padding:2px 4px;outline:none;min-width:0;}
+.radio-other-input:focus{border-bottom-color:var(--accent);}
+.radio-other-input::placeholder{color:var(--dim);}
+
+/* select (POB, Duration) */
+.form-select{background:#060a10;border:1px solid var(--border);border-radius:6px;padding:11px 36px 11px 14px;color:var(--bright);font-family:var(--mono);font-size:14px;outline:none;cursor:pointer;transition:border-color .2s;appearance:none;-webkit-appearance:none;width:220px;}
+.form-select:focus{border-color:var(--accent);}
+.select-wrap{position:relative;display:inline-block;}
+.select-wrap::after{content:'▼';position:absolute;right:13px;top:50%;transform:translateY(-50%);font-size:9px;color:var(--dim);pointer-events:none;}
+
+/* text input / textarea */
+.form-input{width:100%;background:#060a10;border:1px solid var(--border);border-radius:6px;padding:10px 14px;color:var(--bright);font-family:var(--body);font-size:14px;outline:none;transition:border-color .2s;}
+.form-input:focus{border-color:var(--accent);}
+textarea.form-input{resize:vertical;min-height:90px;}
+.field-hint{font-family:var(--mono);font-size:10px;color:var(--dim);margin-top:6px;letter-spacing:.06em;}
+
+/* submit row */
+.submit-row{display:flex;align-items:center;gap:16px;padding-top:4px;}
+.submit-btn{font-family:var(--head);font-size:16px;font-weight:700;letter-spacing:.12em;background:var(--accent);border:none;border-radius:8px;padding:14px 40px;color:#000;cursor:pointer;transition:opacity .2s;text-transform:uppercase;}
+.submit-btn:hover{opacity:.85;}
+.submit-btn:disabled{opacity:.4;cursor:default;}
+.submit-msg{font-family:var(--mono);font-size:12px;}
+.submit-msg.ok{color:var(--green);}
+.submit-msg.err{color:var(--red);}
+
+/* ── CONFIRMATION OVERLAY ── */
+.confirm-overlay{display:none;position:fixed;inset:0;background:rgba(4,8,14,.92);z-index:100;align-items:center;justify-content:center;}
+.confirm-overlay.active{display:flex;}
+.confirm-box{background:var(--panel);border:1px solid var(--green);border-radius:12px;padding:40px 44px;width:480px;max-width:92vw;text-align:center;}
+.confirm-icon{font-size:48px;margin-bottom:12px;}
+.confirm-title{font-family:var(--head);font-size:26px;font-weight:900;color:var(--bright);margin-bottom:6px;}
+.confirm-sub{font-family:var(--mono);font-size:11px;color:var(--dim);letter-spacing:.1em;margin-bottom:24px;}
+.confirm-detail{background:#060a10;border:1px solid var(--border);border-radius:8px;padding:16px;text-align:left;margin-bottom:24px;font-family:var(--mono);font-size:12px;line-height:2;}
+.confirm-detail b{color:var(--accent);}
+.confirm-close{font-family:var(--head);font-size:15px;font-weight:700;letter-spacing:.1em;background:var(--accent);border:none;border-radius:8px;padding:12px 32px;color:#000;cursor:pointer;text-transform:uppercase;}
+
+/* ── CIRCUITS VIEWER ── */
+.slots-header{display:flex;align-items:center;gap:10px;margin-bottom:16px;}
+.slots-title{font-family:var(--head);font-size:18px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:var(--dim);}
+.fetch-dot{width:8px;height:8px;border-radius:50%;background:var(--green);animation:pulse 2s infinite;}
+.fetch-dot.loading{background:var(--amber);animation:spin 1s linear infinite;}
+.fetch-dot.error{background:var(--red);animation:none;}
+.fetch-label{font-family:var(--mono);font-size:11px;color:var(--dim);}
+.refresh-btn{font-family:var(--mono);font-size:11px;color:var(--accent);background:none;border:1px solid var(--border);border-radius:4px;padding:4px 10px;cursor:pointer;letter-spacing:.06em;margin-left:auto;}
+.refresh-btn:hover{border-color:var(--accent);}
+
+.slots-panel{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:18px;margin-bottom:16px;}
+.slots-panel-title{font-family:var(--head);font-size:13px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:var(--dim);margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border);}
+
+.slot-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid rgba(26,40,64,.5);}
+.slot-row:last-child{border-bottom:none;}
+.slot-time{font-family:var(--mono);font-size:13px;color:var(--accent);min-width:50px;}
+.slot-ac{display:inline-block;font-family:var(--mono);font-size:12px;background:rgba(0,170,255,.1);border:1px solid rgba(0,170,255,.25);border-radius:4px;padding:3px 8px;color:var(--bright);}
+.slot-type{font-family:var(--mono);font-size:10px;color:var(--dim);letter-spacing:.08em;}
+.slot-empty{font-family:var(--mono);font-size:12px;color:var(--dim);font-style:italic;}
+
+
+
+.slots-loading{font-family:var(--mono);font-size:12px;color:var(--dim);display:flex;align-items:center;gap:10px;padding:20px 0;}
+.spinner{width:16px;height:16px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;}
+.slots-err{font-family:var(--mono);font-size:12px;color:var(--red);padding:20px 0;}
+
+/* ── SETTINGS SCREEN ── */
+#s-settings{flex-direction:column;min-height:100vh;}
+.settings-header{display:flex;align-items:center;gap:16px;padding:20px 24px;border-bottom:1px solid var(--border);}
+.settings-title{font-family:var(--head);font-size:24px;font-weight:900;letter-spacing:.1em;color:var(--bright);text-transform:uppercase;}
+.back-btn{font-family:var(--mono);font-size:11px;color:var(--dim);background:none;border:1px solid var(--border);border-radius:4px;padding:6px 12px;cursor:pointer;letter-spacing:.06em;}
+.back-btn:hover{border-color:var(--accent);color:var(--accent);}
+.settings-body{padding:24px;max-width:800px;}
+.settings-section{margin-bottom:32px;}
+.settings-section-title{font-family:var(--mono);font-size:10px;letter-spacing:.2em;color:var(--accent);text-transform:uppercase;margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border);}
+.tag-editor{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;}
+.tag{display:flex;align-items:center;gap:6px;background:#060a10;border:1px solid var(--border);border-radius:4px;padding:6px 10px;font-family:var(--mono);font-size:12px;color:var(--text);}
+.tag-del{background:none;border:none;color:var(--dim);cursor:pointer;font-size:14px;padding:0;line-height:1;}
+.tag-del:hover{color:var(--red);}
+.tag-add-row{display:flex;gap:8px;}
+.tag-input{flex:1;background:#060a10;border:1px solid var(--border);border-radius:6px;padding:8px 12px;color:var(--bright);font-family:var(--mono);font-size:12px;outline:none;}
+.tag-input:focus{border-color:var(--accent);}
+.tag-add-btn{font-family:var(--head);font-size:13px;font-weight:700;background:rgba(0,170,255,.15);border:1px solid var(--accent);border-radius:6px;padding:8px 16px;color:var(--accent);cursor:pointer;letter-spacing:.08em;}
+.tag-add-btn:hover{background:rgba(0,170,255,.25);}
+.settings-save{font-family:var(--head);font-size:14px;font-weight:700;letter-spacing:.1em;background:var(--green);border:none;border-radius:8px;padding:12px 28px;color:#000;cursor:pointer;text-transform:uppercase;margin-top:12px;}
+.settings-save:hover{opacity:.85;}
+.settings-flash{font-family:var(--mono);font-size:11px;color:var(--green);margin-left:14px;opacity:0;transition:opacity .3s;}
+
+/* ── SETTINGS PIN SCREEN ── */
+#s-settings-pin{min-height:100vh;align-items:center;justify-content:center;flex-direction:column;}
+
+
+/* ── CIRCUITS TAB ── */
+.ct-statusbar{display:flex;align-items:center;gap:10px;padding:10px 0 12px;flex-wrap:wrap;}
+.ct-lastupdate{font-family:var(--mono);font-size:10px;color:var(--dim);}
+.ct-toggle-btn{font-family:var(--mono);font-size:10px;color:var(--accent);background:rgba(0,170,255,.08);border:1px solid rgba(0,170,255,.25);border-radius:3px;padding:3px 10px;cursor:pointer;letter-spacing:.06em;}
+.ct-toggle-btn:hover{background:rgba(0,170,255,.18);}
+.ct-toggle-btn.active{background:rgba(0,170,255,.2);border-color:var(--accent);}
+
+.ct-load-bar{display:flex;align-items:center;gap:10px;padding:8px 14px;background:var(--panel);border:1px solid var(--border);border-radius:7px;margin-bottom:14px;}
+.ct-load-label{font-family:var(--mono);font-size:10px;color:var(--dim);letter-spacing:.1em;}
+.ct-load-badge{font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.08em;padding:2px 10px;border-radius:3px;}
+.ct-load-hint{font-family:var(--mono);font-size:10px;color:var(--dim);letter-spacing:.06em;}
+.load-calm    {background:rgba(0,230,118,.15);color:#00e676;border:1px solid rgba(0,230,118,.3);}
+.load-light   {background:rgba(170,255,0,.1); color:#aaff00;border:1px solid rgba(170,255,0,.25);}
+.load-moderate{background:rgba(255,171,0,.15);color:#ffab00;border:1px solid rgba(255,171,0,.3);}
+.load-busy    {background:rgba(255,112,32,.15);color:#ff7020;border:1px solid rgba(255,112,32,.3);}
+.load-heavy   {background:rgba(255,61,61,.15); color:#ff3d3d;border:1px solid rgba(255,61,61,.3);}
+
+/* grid table */
+.ct-grid-wrap{margin-bottom:20px;}
+.ct-desktop{}
+.ct-mobile{display:none;}
+.ct-table{width:100%;border-collapse:collapse;font-size:12px;}
+.ct-table th{
+  font-family:var(--mono);font-size:10px;letter-spacing:.12em;
+  padding:9px 12px;text-align:left;
+  background:#07111e;border-bottom:2px solid var(--border);
+  white-space:nowrap;position:sticky;top:0;z-index:2;
+}
+.ct-table th.th-time{color:var(--dim);width:64px;}
+.ct-table th.th-cct1{color:var(--accent);}
+.ct-table th.th-cct2{color:#aaff00;}
+.ct-table th.th-arr {color:#ffab00;}
+.ct-table th.th-load{color:var(--dim);}
+.ct-table td{padding:4px 6px;border-bottom:1px solid rgba(26,40,64,.35);vertical-align:middle;}
+.ct-table tr.row-odd  td{background:#080e1a;}
+.ct-table tr.row-even td{background:#0a1525;}
+.ct-table tr.row-now  td{background:rgba(0,170,255,.06)!important;border-top:2px solid var(--accent)!important;}
+.ct-table tr.row-past td{opacity:.3;}
+
+/* time cell */
+.tc-time{font-family:var(--mono);font-size:12px;color:var(--dim);padding:4px 12px 4px 14px;white-space:nowrap;border-right:1px solid var(--border);}
+.tc-time.is-now{color:var(--accent);}
+.now-pip{display:block;font-family:var(--mono);font-size:8px;color:var(--accent);letter-spacing:.06em;margin-top:1px;}
+
+/* slot cells */
+.slot-cell-lsa{border-radius:5px;padding:6px 10px;font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.06em;line-height:1.4;}
+.slot-cell-lsa .sr{display:block;font-size:12px;}
+.slot-cell-lsa .sd{display:block;font-size:9px;opacity:.65;margin-top:1px;}
+.slot-cct1-lsa{background:rgba(0,170,255,.15);border:1px solid rgba(0,170,255,.4);color:var(--accent);}
+.slot-cct2-lsa{background:rgba(170,255,0,.12);border:1px solid rgba(170,255,0,.35);color:#aaff00;}
+.slot-arr-lsa {background:rgba(255,171,0,.15);border:1px solid rgba(255,171,0,.4); color:#ffab00;}
+
+.slot-cell-ext{border-radius:5px;padding:6px 10px;font-family:var(--mono);font-size:11px;letter-spacing:.06em;line-height:1.4;background:rgba(58,85,112,.15);border:1px solid rgba(58,85,112,.3);color:var(--dim);}
+.slot-cell-ext .sr{display:block;font-size:11px;}
+.slot-cell-ext .sd{display:block;font-size:9px;opacity:.55;margin-top:1px;}
+
+.slot-cont{border-radius:5px;padding:5px 10px;font-family:var(--mono);font-size:10px;color:rgba(58,85,112,.5);letter-spacing:.04em;border:1px solid transparent;}
+.slot-empty-cell{font-family:var(--mono);font-size:10px;color:rgba(58,85,112,.25);padding:5px 10px;}
+
+/* load cell */
+.lc{font-family:var(--mono);font-size:9px;letter-spacing:.06em;padding:3px 8px;border-radius:3px;white-space:nowrap;display:inline-block;}
+
+/* mobile stacked */
+@media(max-width:600px){
+  .ct-desktop{display:none;}
+  .ct-mobile{display:block!important;}
+}
+.mob-lane{margin-bottom:18px;}
+.mob-lane-title{font-family:var(--mono);font-size:10px;letter-spacing:.18em;padding:7px 12px;background:#07111e;border-bottom:2px solid var(--border);border-radius:6px 6px 0 0;}
+.mob-lane-title.tl-cct1{color:var(--accent);}
+.mob-lane-title.tl-cct2{color:#aaff00;}
+.mob-lane-title.tl-arr {color:#ffab00;}
+.mob-table{width:100%;border-collapse:collapse;border-radius:0 0 6px 6px;overflow:hidden;}
+.mob-table td{padding:4px 10px;border-bottom:1px solid rgba(26,40,64,.35);font-size:12px;}
+.mob-table tr.row-now td{background:rgba(0,170,255,.06)!important;border-top:2px solid var(--accent)!important;}
+.mob-table tr.row-past td{opacity:.3;}
+.mob-time{font-family:var(--mono);font-size:11px;color:var(--dim);width:54px;white-space:nowrap;}
+.mob-time.is-now{color:var(--accent);}
+
+/* footer */
+.ct-footer{display:flex;align-items:center;gap:12px;padding-top:16px;border-top:1px solid var(--border);flex-wrap:wrap;}
+
+/* ── ANIMATIONS ── */
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:.4;}}
+@keyframes spin{to{transform:rotate(360deg);}}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
+.tab-pane.active{animation:fadeIn .25s ease;}
+</style>
+</head>
+<body>
+
+<!-- ══ PIN SCREEN ══════════════════════════════════ -->
+<div class="screen active" id="s-pin">
+  <div class="pin-box">
+    <div class="pin-eyebrow">LS AIRMOTIVE · EGTK</div>
+    <div class="pin-title">LS <span style="color:var(--accent)">AIRMOTIVE</span> BOOKINGS</div>
+    <div class="pin-sub">FLIGHT NOTIFICATION SYSTEM</div>
+    <input class="pin-input" id="pinInput" type="password" maxlength="4" placeholder="• • • •" autocomplete="off">
+    <button class="pin-btn" onclick="checkPin()">ENTER</button>
+    <div class="pin-err" id="pinErr"></div>
+    <div class="pin-links">
+      <button class="pin-link" onclick="showSettingsPin()">⚙ SETTINGS</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ SETTINGS PIN SCREEN ═════════════════════════ -->
+<div class="screen" id="s-settings-pin">
+  <div class="pin-box">
+    <div class="pin-eyebrow">LS AIRMOTIVE · RESTRICTED</div>
+    <div class="pin-title">SETTINGS</div>
+    <div class="pin-sub">ADMIN ACCESS REQUIRED</div>
+    <input class="pin-input" id="settingsPinInput" type="password" maxlength="20" placeholder="PASSWORD" style="letter-spacing:4px;">
+    <button class="pin-btn" onclick="checkSettingsPin()">ENTER</button>
+    <div class="pin-err" id="settingsPinErr"></div>
+    <div class="pin-links">
+      <button class="pin-link" onclick="showScreen('s-pin')">← BACK</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MAIN APP ════════════════════════════════════ -->
+<div class="screen" id="s-app">
+  <div style="width:100%;display:flex;flex-direction:column;height:100vh;">
+    <div class="app-header">
+      <div>
+        <div class="logo">LS <span>AIRMOTIVE</span> BOOKINGS</div>
+        <div class="logo-sub">LS AIRMOTIVE · LONDON OXFORD · EGTK</div>
+      </div>
+      <div class="header-right">
+        <div class="clock" id="clock">--:--</div>
+        <div class="clock-date" id="clockDate">--- -- ----</div>
+      </div>
+    </div>
+    <div class="tabs">
+      <button class="tab-btn active" onclick="switchTab('booking', this)">📋 FLIGHT NOTIFICATION</button>
+      <button class="tab-btn" onclick="switchTab('circuits', this)">🔄 CIRCUITS SLOTS</button>
+    </div>
+
+    <div class="app-body">
+    <!-- BOOKING TAB -->
+    <div class="tab-pane active" id="tab-booking">
+      <div class="form-col">
+
+        <!-- Header card -->
+        <div class="form-header-card">
+          <div class="form-header-band">
+            <div class="form-header-band-title">Booking Out Form</div>
+          </div>
+          <div class="form-header-body">Complete this form to book out with Oxford ATC</div>
+        </div>
+
+        <!-- Aircraft Reg -->
+        <div class="fcard">
+          <div class="fcard-label">Aircraft Reg <span class="req">*</span></div>
+          <div class="radio-list" id="acList"></div>
+        </div>
+
+        <!-- Departure Time -->
+        <div class="fcard">
+          <div class="fcard-label">Departure Time (UTC) <span class="req">*</span></div>
+          <input class="form-input" id="depTime" type="text" placeholder="e.g. 14:30"
+            maxlength="5" autocomplete="off"
+            style="font-family:var(--mono);font-size:18px;letter-spacing:.12em;max-width:160px;"
+            oninput="formatDepTime(this)">
+          <div class="field-hint">24-HR FORMAT · UTC</div>
+        </div>
+
+        <!-- Instructor -->
+        <div class="fcard">
+          <div class="fcard-label">Instructor <span class="req">*</span></div>
+          <div class="radio-list" id="instrList"></div>
+        </div>
+
+        <!-- POB -->
+        <div class="fcard">
+          <div class="fcard-label">POB <span class="req">*</span></div>
+          <div class="select-wrap">
+            <select class="form-select" id="pob">
+              <option value="">Choose</option>
+              <option value="1">1</option>
+              <option value="2">2</option>
+              <option value="3">3</option>
+              <option value="4">4</option>
+              <option value="5">5</option>
+              <option value="6">6</option>
+              <option value="7">7</option>
+              <option value="8">8</option>
+              <option value="9">9</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Route / Circuits -->
+        <div class="fcard">
+          <div class="fcard-label">Route / Circuits <span class="req">*</span></div>
+          <div class="radio-list" id="routeList"></div>
+        </div>
+
+        <!-- Duration of Flight -->
+        <div class="fcard">
+          <div class="fcard-label">Duration of Flight <span class="req">*</span></div>
+          <div class="select-wrap">
+            <select class="form-select" id="duration">
+              <option value="">Choose</option>
+              <option value="30 mins">30 mins</option>
+              <option value="1 hr">1 hr</option>
+              <option value="1 hr 30 mins">1 hr 30 mins</option>
+              <option value="2 hrs">2 hrs</option>
+              <option value="2 hrs 30 mins">2 hrs 30 mins</option>
+              <option value="3 hrs">3 hrs</option>
+              <option value="3 hrs 30 mins">3 hrs 30 mins</option>
+              <option value="4 hrs">4 hrs</option>
+              <option value="4 hrs 30 mins">4 hrs 30 mins</option>
+              <option value="5 hrs">5 hrs</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Destination -->
+        <div class="fcard">
+          <div class="fcard-label">Destination <span class="req">*</span></div>
+          <div class="radio-list" id="destList"></div>
+        </div>
+
+        <!-- Notes -->
+        <div class="fcard">
+          <div class="fcard-label">Notes (including ETA back at Oxford if a land-away)</div>
+          <textarea class="form-input" id="notes" rows="4" placeholder="Your answer"></textarea>
+        </div>
+
+        <!-- Submit -->
+        <div class="submit-row">
+          <button class="submit-btn" onclick="submitBooking()" id="submitBtn">NOTIFY ATC →</button>
+          <span class="submit-msg" id="submitMsg"></span>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- CIRCUITS TAB -->
+    <div class="tab-pane" id="tab-circuits">
+
+      <!-- Status bar -->
+      <div class="ct-statusbar">
+        <div class="fetch-dot" id="slotsStatusDot"></div>
+        <span class="fetch-label" id="slotsStatusLabel">LOADING…</span>
+        <span class="ct-lastupdate" id="ctLastUpdate"></span>
+        <div style="margin-left:auto;display:flex;gap:8px;align-items:center;">
+          <button class="ct-toggle-btn" id="ctDayToggle" onclick="toggleFullDay()">FULL DAY ↓</button>
+          <button class="refresh-btn" onclick="loadSlots()">↺ REFRESH</button>
+        </div>
+      </div>
+
+      <!-- Load indicator -->
+      <div class="ct-load-bar" id="ctLoadBar" style="display:none;">
+        <span class="ct-load-label">TRAFFIC LOAD:</span>
+        <span class="ct-load-badge" id="ctLoadBadge"></span>
+        <span class="ct-load-hint" id="ctLoadHint"></span>
+      </div>
+
+      <!-- Grid -->
+      <div class="ct-grid-wrap">
+        <!-- Desktop table -->
+        <div class="ct-desktop" id="ctDesktop">
+          <div id="ctContent">
+            <div class="slots-loading"><div class="spinner"></div> FETCHING CIRCUITS SHEET…</div>
+          </div>
+        </div>
+        <!-- Mobile stacked -->
+        <div class="ct-mobile" id="ctMobile" style="display:none;">
+          <div id="ctMobileContent">
+            <div class="slots-loading"><div class="spinner"></div> FETCHING CIRCUITS SHEET…</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Footer link -->
+      <div class="ct-footer">
+        <span style="font-family:var(--mono);font-size:10px;color:var(--dim);letter-spacing:.08em;">VIEW FULL SHEET:</span>
+        <a class="google-form-link"
+           href="https://docs.google.com/spreadsheets/d/1fnMYghrTIi8EdHDN6JxFrAdqqFMuRbnB4Oj8041Y5ZY/edit?gid=818960255"
+           target="_blank">Open Google Sheet ↗</a>
+      </div>
+
+    </div>
+    </div><!-- /app-body -->
+  </div>
+</div>
+
+<!-- ══ SETTINGS ════════════════════════════════════ -->
+<div class="screen" id="s-settings">
+  <div style="width:100%;">
+    <div class="settings-header">
+      <button class="back-btn" onclick="showScreen('s-pin')">← BACK</button>
+      <div class="settings-title">⚙ Settings</div>
+    </div>
+    <div class="settings-body">
+
+      <div class="settings-section">
+        <div class="settings-section-title">Aircraft Registrations</div>
+        <div class="tag-editor" id="acTags"></div>
+        <div class="tag-add-row">
+          <input class="tag-input" id="acInput" placeholder="G-XXXX" maxlength="10">
+          <button class="tag-add-btn" onclick="addTag('ac')">+ ADD</button>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <div class="settings-section-title">Instructors</div>
+        <div class="tag-editor" id="instrTags"></div>
+        <div class="tag-add-row">
+          <input class="tag-input" id="instrInput" placeholder="Name - Rating">
+          <button class="tag-add-btn" onclick="addTag('instr')">+ ADD</button>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <div class="settings-section-title">Route / Activity Options</div>
+        <div class="tag-editor" id="routeTags"></div>
+        <div class="tag-add-row">
+          <input class="tag-input" id="routeInput" placeholder="Route name">
+          <button class="tag-add-btn" onclick="addTag('route')">+ ADD</button>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <div class="settings-section-title">Destination Options</div>
+        <div class="tag-editor" id="destTags"></div>
+        <div class="tag-add-row">
+          <input class="tag-input" id="destInput" placeholder="Airfield name">
+          <button class="tag-add-btn" onclick="addTag('dest')">+ ADD</button>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <div class="settings-section-title">Email Settings</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+          <div>
+            <div class="form-label" style="margin-bottom:8px;">ATC Email Address</div>
+            <input class="form-input" id="atcEmail" type="email" placeholder="atc@example.com">
+          </div>
+          <div>
+            <div class="form-label" style="margin-bottom:8px;">From Address</div>
+            <input class="form-input" id="fromEmail" type="email" placeholder="ops@example.com">
+          </div>
+          <div>
+            <div class="form-label" style="margin-bottom:8px;">EmailJS Service ID</div>
+            <input class="form-input" id="ejsService" placeholder="service_xxxxxxx">
+          </div>
+          <div>
+            <div class="form-label" style="margin-bottom:8px;">EmailJS Template ID</div>
+            <input class="form-input" id="ejsTemplate" placeholder="template_xxxxxxx">
+          </div>
+          <div style="grid-column:1/-1;">
+            <div class="form-label" style="margin-bottom:8px;">EmailJS Public Key</div>
+            <input class="form-input" id="ejsKey" placeholder="Your EmailJS public key">
+          </div>
+        </div>
+        <div style="margin-top:12px;background:#060a10;border:1px solid var(--border);border-radius:6px;padding:12px 14px;font-family:var(--mono);font-size:10px;color:var(--dim);line-height:1.8;">
+          To enable email sending: create a free account at <span style="color:var(--accent)">emailjs.com</span>, set up a service (Gmail/SMTP), create a template, then paste the IDs above.<br>
+          Template variables to include: <span style="color:var(--text)">{{aircraft}}, {{dep_time}}, {{instructor}}, {{pob}}, {{route}}, {{duration}}, {{destination}}, {{notes}}, {{eta}}</span>
+        </div>
+      </div>
+
+      <div>
+        <button class="settings-save" onclick="saveSettings()">SAVE ALL SETTINGS</button>
+        <span class="settings-flash" id="settingsFlash">✓ SAVED</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ CONFIRMATION OVERLAY ════════════════════════ -->
+<div class="confirm-overlay" id="confirmOverlay">
+  <div class="confirm-box">
+    <div class="confirm-icon">✈</div>
+    <div class="confirm-title">ATC NOTIFIED</div>
+    <div class="confirm-sub">FLIGHT NOTIFICATION SENT SUCCESSFULLY</div>
+    <div class="confirm-detail" id="confirmDetail"></div>
+    <button class="confirm-close" onclick="closeConfirm()">NEW BOOKING</button>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+<script>
+// ══ DEFAULTS ══════════════════════════════════════
+const DEFAULTS = {
+  ac:       ['G-BCGJ','G-BTGO','G-FIAT','N150PK','G-MKAS','G-PETR','G-EGTB','G-BOTN','G-HRYZ','G-SETG'],
+  instr:    [
+    'Tom Newell (HoT/CFI)','Pete Williams','George Simmonds','Dan Griffiths',
+    'Donough Wilson','Brien Nelson','Lauri Chen','Jon Killerby',
+    'Konstantinos Engonopoulos','Tom Boothby','James Pearson','Harry Tanner',
+    'Neil Tuck','Chris Boyle','Mark Gurney-Coombs','Robert Norris',
+    'Raresh Moldovan','Charlie Walker','Scott Rawlings','Adrian Black','Matt Lane CFI'
+  ],
+  route:    ['Circuits','Local Area - North','Local Area - South','Local Area - West','Local Area - East',
+             'Conington (Land)','Enstone (Land)','Thruxton (Land)','Wellesbourne (Land)',
+             'Dual to Solo Check (Details in notes)','Other'],
+  dest:     ['Oxford','Enstone','Leicester','Wellesbourne','Thruxton','Kemble','Other'],
+  atcEmail: 'atc1@londonoxfordairport.com',
+  fromEmail:'ops@limasierra.org',
+  ejsService:'',ejsTemplate:'',ejsKey:''
+};
+
+// ══ STATE ══════════════════════════════════════════
+let ST = loadSettings();
+
+
+function loadSettings() {
+  try {
+    const s = JSON.parse(localStorage.getItem('lsa_settings') || '{}');
+    return {
+      ac:        s.ac        || [...DEFAULTS.ac],
+      instr:     s.instr     || [...DEFAULTS.instr],
+      route:     s.route     || [...DEFAULTS.route],
+      dest:      s.dest      || [...DEFAULTS.dest],
+      atcEmail:  s.atcEmail  || DEFAULTS.atcEmail,
+      fromEmail: s.fromEmail || DEFAULTS.fromEmail,
+      ejsService:s.ejsService|| '',
+      ejsTemplate:s.ejsTemplate||'',
+      ejsKey:    s.ejsKey    || ''
+    };
+  } catch(e){ return {...DEFAULTS, ac:[...DEFAULTS.ac], instr:[...DEFAULTS.instr], route:[...DEFAULTS.route], dest:[...DEFAULTS.dest]}; }
+}
+
+function saveSettingsToStorage() {
+  localStorage.setItem('lsa_settings', JSON.stringify(ST));
+}
+
+// ══ SCREENS ════════════════════════════════════════
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+// ══ PIN ════════════════════════════════════════════
+document.getElementById('pinInput').addEventListener('keydown', e => { if(e.key==='Enter') checkPin(); });
+document.getElementById('settingsPinInput').addEventListener('keydown', e => { if(e.key==='Enter') checkSettingsPin(); });
+
+function checkPin() {
+  const v = document.getElementById('pinInput').value;
+  if(v === '0814') {
+    showScreen('s-app');
+    document.getElementById('pinInput').value = '';
+    document.getElementById('pinErr').textContent = '';
+    buildForm();
+    startClock();
+    switchTab('booking', document.querySelector('.tab-btn'));
+  } else {
+    document.getElementById('pinErr').textContent = 'Incorrect PIN';
+    document.getElementById('pinInput').value = '';
+  }
+}
+
+function showSettingsPin() {
+  showScreen('s-settings-pin');
+  document.getElementById('settingsPinInput').value = '';
+  document.getElementById('settingsPinErr').textContent = '';
+}
+
+function checkSettingsPin() {
+  const v = document.getElementById('settingsPinInput').value;
+  if(v === 'limasierra') {
+    showScreen('s-settings');
+    loadSettingsUI();
+  } else {
+    document.getElementById('settingsPinErr').textContent = 'Incorrect password';
+    document.getElementById('settingsPinInput').value = '';
+  }
+}
+
+// ══ CLOCK ══════════════════════════════════════════
+function startClock() {
+  function tick() {
+    const now = new Date();
+    const hh = now.getUTCHours().toString().padStart(2,'0');
+    const mm = now.getUTCMinutes().toString().padStart(2,'0');
+    document.getElementById('clock').textContent = hh+':'+mm+' UTC';
+    document.getElementById('clockDate').textContent = now.toUTCString().slice(5,16).toUpperCase();
+  }
+  tick();
+  setInterval(tick, 10000);
+}
+
+// ══ TABS ═══════════════════════════════════════════
+function switchTab(name, btn) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('tab-'+name).classList.add('active');
+  if(name === 'circuits') loadSlots();
+}
+
+// ══ BUILD FORM ═════════════════════════════════════
+function buildRadioList(containerId, items, stateKey, hasOther) {
+  const container = document.getElementById(containerId);
+  container.innerHTML = '';
+  items.forEach(item => {
+    const row = document.createElement('div');
+    row.className = 'radio-row';
+    row.innerHTML = `<div class="radio-circle"><div class="radio-dot"></div></div><span class="radio-label">${item}</span>`;
+    row.dataset.val = item;
+    row.onclick = () => selectRadio(container, row, stateKey);
+    container.appendChild(row);
+  });
+  if(hasOther) {
+    const row = document.createElement('div');
+    row.className = 'radio-row';
+    row.innerHTML = `<div class="radio-circle"><div class="radio-dot"></div></div><span class="radio-label" style="flex-shrink:0">Other:</span><input class="radio-other-input" placeholder="Your answer" onclick="event.stopPropagation()">`;
+    row.dataset.val = '__other__';
+    row.onclick = () => { selectRadio(container, row, stateKey); row.querySelector('input').focus(); };
+    row.querySelector('input').oninput = e => { formState[stateKey] = e.target.value || '__other__'; };
+    container.appendChild(row);
+  }
+}
+
+function selectRadio(container, row, stateKey) {
+  container.querySelectorAll('.radio-row').forEach(r => r.classList.remove('checked'));
+  row.classList.add('checked');
+  if(row.dataset.val === '__other__') {
+    formState[stateKey] = row.querySelector('input').value || '';
+  } else {
+    formState[stateKey] = row.dataset.val;
+  }
+}
+
+let formState = { ac: null, instr: null, route: null, dest: null };
+
+function buildForm() {
+  formState = { ac: null, instr: null, route: null, dest: null };
+
+  buildRadioList('acList',    ST.ac,    'ac',    true);
+  buildRadioList('instrList', ST.instr, 'instr', true);
+  buildRadioList('routeList', ST.route, 'route', false);
+  buildRadioList('destList',  ST.dest,  'dest',  true);
+
+  // Pre-fill departure time with current UTC + 10 mins rounded to 5
+  const now = new Date();
+  const base = new Date(now.getTime() + 10*60000);
+  base.setUTCSeconds(0,0);
+  base.setUTCMinutes(Math.round(base.getUTCMinutes()/5)*5);
+  const hh = base.getUTCHours().toString().padStart(2,'0');
+  const mm = base.getUTCMinutes().toString().padStart(2,'0');
+  document.getElementById('depTime').value = hh+':'+mm;
+
+  document.getElementById('pob').value = '';
+  document.getElementById('duration').value = '';
+  document.getElementById('notes').value = '';
+  document.getElementById('submitMsg').textContent = '';
+}
+
+// ══ DEP TIME FORMAT ═══════════════════════════════
+function formatDepTime(input) {
+  // Auto-insert colon after 2 digits
+  let v = input.value.replace(/[^0-9]/g,'');
+  if(v.length > 2) v = v.slice(0,2) + ':' + v.slice(2,4);
+  input.value = v;
+}
+
+function validateDepTime(val) {
+  if(!val) return false;
+  const m = val.match(/^(\d{2}):(\d{2})$/);
+  if(!m) return false;
+  const h = parseInt(m[1]), mn = parseInt(m[2]);
+  return h>=0 && h<=23 && mn>=0 && mn<=59;
+}
+
+// ══ SUBMIT ═════════════════════════════════════════
+async function submitBooking() {
+  const ac       = formState.ac;
+  const depTime  = document.getElementById('depTime').value.trim();
+  const duration = document.getElementById('duration').value;
+  const instr    = formState.instr;
+  const route    = formState.route;
+  const dest     = formState.dest;
+  const notes    = document.getElementById('notes').value.trim();
+  const pob      = document.getElementById('pob').value;
+
+  // Validation
+  if(!ac)       return flashMsg('⚠ Please select an aircraft', 'err');
+  if(!validateDepTime(depTime)) return flashMsg('⚠ Enter departure time as HH:MM (e.g. 14:30)', 'err');
+  if(!instr)    return flashMsg('⚠ Please select an instructor', 'err');
+  if(!pob)      return flashMsg('⚠ Please select POB', 'err');
+  if(!route)    return flashMsg('⚠ Please select a route/activity', 'err');
+  if(!duration) return flashMsg('⚠ Please select duration', 'err');
+  if(!dest)     return flashMsg('⚠ Please select a destination', 'err');
+
+  const btn = document.getElementById('submitBtn');
+  btn.disabled = true;
+  flashMsg('Sending…', '');
+
+  // Calculate ETA from duration string like "1 hr 30 mins"
+  let eta = '';
+  try {
+    const [dh, dm] = depTime.split(':').map(Number);
+    const hrMatch  = duration.match(/(\d+)\s*hr/);
+    const minMatch = duration.match(/(\d+)\s*min/);
+    const duh = hrMatch  ? parseInt(hrMatch[1])  : 0;
+    const dum = minMatch ? parseInt(minMatch[1]) : 0;
+    let etaH = dh + duh + Math.floor((dm + dum) / 60);
+    let etaM = (dm + dum) % 60;
+    etaH = etaH % 24;
+    eta = etaH.toString().padStart(2,'0') + ':' + etaM.toString().padStart(2,'0') + ' UTC';
+  } catch(e){}
+
+  const data = { aircraft:ac, dep_time:depTime+' UTC', instructor:instr, pob, route, duration, destination:dest||'Oxford', notes:notes||'None', eta };
+
+  // Try EmailJS if configured
+  let sent = false;
+  if(ST.ejsService && ST.ejsTemplate && ST.ejsKey) {
+    try {
+      emailjs.init({ publicKey: ST.ejsKey });
+      await emailjs.send(ST.ejsService, ST.ejsTemplate, {
+        to_email:   ST.atcEmail,
+        from_name:  'LSA OPS',
+        reply_to:   ST.fromEmail,
+        ...data
+      });
+      sent = true;
+    } catch(e) {
+      console.warn('EmailJS error:', e);
+    }
+  }
+
+  // Fallback: mailto
+  if(!sent) {
+    const subject = encodeURIComponent(`FLIGHT NOTIFICATION — ${ac} DEP ${depTime}Z`);
+    const body = encodeURIComponent(
+`FLIGHT NOTIFICATION — LS AIRMOTIVE
+=====================================
+Aircraft:    ${ac}
+Departure:   ${depTime} UTC
+Duration:    ${duration}
+ETA Return:  ${eta}
+Instructor:  ${instr}
+POB:         ${pob}
+Route:       ${route}
+Destination: ${dest||'Oxford'}
+Notes:       ${notes||'None'}
+=====================================
+Sent from LSA Bookings System`
+    );
+    window.open(`mailto:${ST.atcEmail}?subject=${subject}&body=${body}`);
+    sent = true;
+  }
+
+  btn.disabled = false;
+
+  if(sent) {
+    document.getElementById('submitMsg').textContent = '';
+    showConfirm(data, eta);
+  } else {
+    flashMsg('⚠ Could not send — check settings', 'err');
+  }
+}
+
+function flashMsg(msg, type) {
+  const el = document.getElementById('submitMsg');
+  el.textContent = msg;
+  el.className = 'submit-msg ' + (type || '');
+}
+
+function showConfirm(d, eta) {
+  document.getElementById('confirmDetail').innerHTML = `
+    <b>Aircraft</b>   ${d.aircraft}<br>
+    <b>Departure</b>  ${d.dep_time}<br>
+    <b>Duration</b>   ${d.duration}<br>
+    <b>ETA Return</b> ${eta||'—'}<br>
+    <b>Instructor</b> ${d.instructor}<br>
+    <b>POB</b>        ${d.pob}<br>
+    <b>Route</b>      ${d.route}<br>
+    <b>Destination</b>${d.destination}<br>
+    <b>Notes</b>      ${d.notes}
+  `;
+  document.getElementById('confirmOverlay').classList.add('active');
+}
+
+function closeConfirm() {
+  document.getElementById('confirmOverlay').classList.remove('active');
+  buildForm();
+}
+
+// ══ CIRCUITS SLOTS ═════════════════════════════════
+const SHEET_ID  = '1fnMYghrTIi8EdHDN6JxFrAdqqFMuRbnB4Oj8041Y5ZY';
+const SHEET_GID = '818960255';
+let slotsFullDay = false;
+let slotsAutoRefresh = null;
+
+const LOAD_WORDS = ['calm','light','moderate','busy','heavy'];
+const LOAD_HINTS = {
+  calm:     '— Straight in likely',
+  light:    '— Minimal delay expected',
+  moderate: '— Possible delay',
+  busy:     '— Orbit likely',
+  heavy:    '— Expect holding',
+};
+
+function toggleFullDay() {
+  slotsFullDay = !slotsFullDay;
+  const btn = document.getElementById('ctDayToggle');
+  btn.textContent = slotsFullDay ? 'NEXT 3 HRS ↑' : 'FULL DAY ↓';
+  btn.classList.toggle('active', slotsFullDay);
+  loadSlots();
+}
+
+function setSlotsStatus(state, label) {
+  const dot = document.getElementById('slotsStatusDot');
+  dot.className = 'fetch-dot' + (state==='loading'?' loading':state==='error'?' error':'');
+  document.getElementById('slotsStatusLabel').textContent = label;
+  if(state==='ok') {
+    const now = new Date();
+    document.getElementById('ctLastUpdate').textContent =
+      '· ' + now.getUTCHours().toString().padStart(2,'0')+':'+now.getUTCMinutes().toString().padStart(2,'0') + 'Z';
+  }
+}
+
+async function loadSlots() {
+  setSlotsStatus('loading','FETCHING…');
+  try {
+    const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&gid=${SHEET_GID}`;
+    const res  = await fetch(url);
+    const text = await res.text();
+    const json = JSON.parse(text.replace(/^[^(]+\(/,'').replace(/\);?\s*$/,''));
+    renderSlotsGrid(json);
+    setSlotsStatus('ok','LIVE');
+    // auto-refresh every 2 mins
+    clearInterval(slotsAutoRefresh);
+    slotsAutoRefresh = setInterval(loadSlots, 120000);
+  } catch(e) {
+    setSlotsStatus('error','FETCH FAILED');
+    document.getElementById('ctContent').innerHTML = '<div class="slots-err">⚠ Could not load circuits sheet.</div>';
+    document.getElementById('ctMobileContent').innerHTML = '<div class="slots-err">⚠ Could not load circuits sheet.</div>';
+  }
+}
+
+function parseSheetSlots(json) {
+  const rows = json.table.rows;
+  const grid = rows.map(row=>(row.c||[]).map(cell=>{
+    if(!cell) return '';
+    if(cell.f) return cell.f.toString().trim();
+    if(cell.v!=null) return cell.v.toString().trim();
+    return '';
+  }));
+
+  const timeRx = /^\d{2}:\d{2}$/;
+  const fleet = new Set(ST.ac.map(r=>r.replace(/[\s-]/g,'').toUpperCase()));
+  const SECTION_WIDTH = 6;
+  const maxCols = grid.reduce((m,r)=>Math.max(m,r.length),0);
+
+  // slot offsets within section: 1=DEP,2=ARR,3=CCT1,4=CCT2  load=5
+  const OFFSETS = [{o:1,l:'DEP'},{o:2,l:'ARR'},{o:3,l:'CCT1'},{o:4,l:'CCT2'}];
+
+  // raw entries keyed by time+lane
+  const raw = {}; // key: "HH:MM|LANE" -> { reg, isFleet, time, lane }
+  const loadMap = {}; // "HH:MM" -> load string
+
+  function roundDown15(t) {
+    const [h,m] = t.split(':').map(Number);
+    return String(h).padStart(2,'0')+':'+String(Math.floor(m/15)*15).padStart(2,'0');
+  }
+
+  for(const row of grid) {
+    for(let c=0; c<maxCols; c+=SECTION_WIDTH) {
+      const rawTime = (row[c]||'').trim();
+      if(!timeRx.test(rawTime)) continue;
+      const slotTime = roundDown15(rawTime);
+
+      // load
+      const loadVal = (row[c+5]||'').trim().toLowerCase();
+      if(loadVal && !loadMap[slotTime]) loadMap[slotTime] = loadVal;
+
+      for(const {o,l} of OFFSETS) {
+        const val = (row[c+o]||'').trim().toUpperCase().replace(/[\s-]/g,'');
+        if(!val) continue;
+        const key = slotTime+'|'+l;
+        if(!raw[key]) raw[key] = { reg: val, isFleet: fleet.has(val), time: slotTime, lane: l };
+      }
+    }
+  }
+
+  // Build list of unique 15-min slots
+  const slotList = Object.values(raw).map(s => ({...s}));
+
+  // Group into bookings: consecutive 15-min blocks of same reg in same lane
+  const byLaneReg = {};
+  slotList.forEach(s => {
+    const k = s.lane+'|'+s.reg;
+    if(!byLaneReg[k]) byLaneReg[k] = [];
+    byLaneReg[k].push(s.time);
+  });
+
+  const bookings = [];
+  Object.entries(byLaneReg).forEach(([k, times]) => {
+    times.sort();
+    const [lane, reg] = k.split('|');
+    const isFleet = fleet.has(reg);
+    let start = times[0], prev = times[0];
+    for(let i=1; i<=times.length; i++) {
+      const cur = times[i];
+      const prevMins = parseInt(prev.split(':')[0])*60 + parseInt(prev.split(':')[1]);
+      const curMins  = cur ? parseInt(cur.split(':')[0])*60 + parseInt(cur.split(':')[1]) : -1;
+      if(curMins !== prevMins + 15) {
+        // end of run
+        const endMins = prevMins + 15;
+        const endH = Math.floor(endMins/60)%24, endM = endMins%60;
+        const endStr = String(endH).padStart(2,'0')+':'+String(endM).padStart(2,'0');
+        bookings.push({ lane, reg, isFleet, start, end: endStr });
+        start = cur;
+      }
+      prev = cur;
+    }
+  });
+
+  return { bookings, loadMap };
+}
+
+function nowUTCMins() {
+  const d = new Date();
+  return d.getUTCHours()*60 + d.getUTCMinutes();
+}
+function toMins(t) {
+  const [h,m] = t.split(':').map(Number); return h*60+m;
+}
+function toHHMM(mins) {
+  return String(Math.floor(mins/60)%24).padStart(2,'0')+':'+String(mins%60).padStart(2,'0');
+}
+
+function getLoadClass(l) {
+  if(!l) return '';
+  const w = l.toLowerCase();
+  if(w.includes('calm'))     return 'load-calm';
+  if(w.includes('light'))    return 'load-light';
+  if(w.includes('moderate')) return 'load-moderate';
+  if(w.includes('busy'))     return 'load-busy';
+  if(w.includes('heavy'))    return 'load-heavy';
+  return '';
+}
+function getLoadLabel(l) {
+  if(!l) return '';
+  const w = l.toLowerCase();
+  if(w.includes('calm'))     return 'Calm';
+  if(w.includes('light'))    return 'Light';
+  if(w.includes('moderate')) return 'Moderate';
+  if(w.includes('busy'))     return 'Busy';
+  if(w.includes('heavy'))    return 'Heavy';
+  return l;
+}
+
+function renderSlotsGrid(json) {
+  if(!json||!json.table||!json.table.rows||!json.table.rows.length) {
+    document.getElementById('ctContent').innerHTML = '<div class="slots-err">No data in sheet.</div>';
+    return;
+  }
+
+  const { bookings, loadMap } = parseSheetSlots(json);
+  const nowMins = nowUTCMins();
+
+  // Window
+  const winStart = slotsFullDay ? 6*60 : Math.max(6*60, Math.floor(nowMins/15)*15 - 15);
+  const winEnd   = slotsFullDay ? 22*60 : winStart + 3*60;
+
+  // Current load
+  const nowSlot = toHHMM(Math.floor(nowMins/15)*15);
+  const curLoad = loadMap[nowSlot] || '';
+  const curLoadLabel = getLoadLabel(curLoad);
+  const curLoadClass = getLoadClass(curLoad);
+  const loadBar = document.getElementById('ctLoadBar');
+  if(curLoadLabel) {
+    loadBar.style.display = 'flex';
+    const badge = document.getElementById('ctLoadBadge');
+    badge.textContent = curLoadLabel.toUpperCase();
+    badge.className = 'ct-load-badge ' + curLoadClass;
+    document.getElementById('ctLoadHint').textContent = LOAD_HINTS[curLoadLabel.toLowerCase()] || '';
+  } else {
+    loadBar.style.display = 'none';
+  }
+
+  // Build slot lookup: "HH:MM|LANE" -> booking
+  const slotLookup = {};
+  bookings.forEach(b => {
+    let t = toMins(b.start);
+    while(t < toMins(b.end)) {
+      slotLookup[toHHMM(t)+'|'+b.lane] = b;
+      t += 15;
+    }
+  });
+
+  // ── DESKTOP TABLE ──────────────────────────────────
+  let html = '<table class="ct-table"><thead><tr>';
+  html += '<th class="th-time">UTC</th>';
+  html += '<th class="th-cct1">CCT 1</th>';
+  html += '<th class="th-cct2">CCT 2</th>';
+  html += '<th class="th-arr">ARR / APPROACH</th>';
+  html += '<th class="th-load">TRAFFIC LOAD</th>';
+  html += '</tr></thead><tbody>';
+
+  let firstNowDone = false;
+
+  // Pre-calculate rowspan for each booking at each time slot
+  // For each lane, track which slots are "start" rows (render with rowspan)
+  // and which are "continuation" rows (skip that cell)
+  function getRowspan(bk, winStart, winEnd) {
+    const s = Math.max(toMins(bk.start), winStart);
+    const e = Math.min(toMins(bk.end),   winEnd);
+    return Math.max(1, Math.ceil((e - s) / 15));
+  }
+
+  for(let t=winStart; t<winEnd; t+=15) {
+    const tStr   = toHHMM(t);
+    const isPast = t + 15 <= nowMins;
+    const isNow  = t <= nowMins && nowMins < t+15;
+    const rowClass = isPast ? 'row-past' : (isNow ? 'row-now' : (Math.floor((t-winStart)/15)%2===0?'row-even':'row-odd'));
+    const rowIdAttr = (isNow && !firstNowDone) ? 'id="ctNowRow"' : '';
+    if(isNow) firstNowDone = true;
+
+    html += `<tr class="${rowClass}" ${rowIdAttr}>`;
+
+    // time cell
+    html += `<td class="tc-time${isNow?' is-now':''}">${tStr}${isNow?'<span class="now-pip">▶ NOW</span>':''}</td>`;
+
+    // CCT1, CCT2, ARR
+    for(const lane of ['CCT1','CCT2','ARR']) {
+      const key = tStr+'|'+lane;
+      const bk  = slotLookup[key];
+
+      if(bk) {
+        const isStart = tStr === toHHMM(Math.max(toMins(bk.start), winStart));
+        if(isStart) {
+          const span = getRowspan(bk, winStart, winEnd);
+          const cls = bk.isFleet
+            ? (lane==='CCT1'?'slot-cct1-lsa':lane==='CCT2'?'slot-cct2-lsa':'slot-arr-lsa')
+            : 'slot-cell-ext';
+          const cellCls = bk.isFleet ? 'slot-cell-lsa' : 'slot-cell-ext';
+          const reg = bk.reg.replace(/^([A-Z])([A-Z])/, '$1-$2'); // re-add hyphen G-XXXX
+          html += `<td rowspan="${span}" style="vertical-align:middle;padding:4px 6px;">`;
+          html += `<div class="${cellCls} ${cls}" style="height:100%;justify-content:center;display:flex;flex-direction:column;">`;
+          html += `<span class="sr">${reg}</span>`;
+          html += `<span class="sd">${bk.start}→${bk.end}</span>`;
+          html += `</div></td>`;
+        }
+        // continuation rows: cell already covered by rowspan — emit nothing
+      } else {
+        html += `<td><div class="slot-empty-cell">—</div></td>`;
+      }
+    }
+
+    // load cell
+    const lv = loadMap[tStr] || '';
+    const ll = getLoadLabel(lv);
+    const lc = getLoadClass(lv);
+    html += `<td>${ll ? `<span class="lc ${lc}">${ll}</span>` : ''}</td>`;
+
+    html += '</tr>';
+  }
+
+  html += '</tbody></table>';
+  document.getElementById('ctContent').innerHTML = html;
+
+  // scroll now row into view
+  setTimeout(() => {
+    const nr = document.getElementById('ctNowRow');
+    if(nr) nr.scrollIntoView({ block:'center', behavior:'smooth' });
+  }, 100);
+
+  // ── MOBILE STACKED ─────────────────────────────────
+  let mhtml = '';
+  for(const lane of ['CCT1','CCT2','ARR']) {
+    const laneTitle = lane==='CCT1'?'CCT 1':lane==='CCT2'?'CCT 2':'ARR / APPROACH';
+    const titleCls  = lane==='CCT1'?'tl-cct1':lane==='CCT2'?'tl-cct2':'tl-arr';
+    mhtml += `<div class="mob-lane">
+      <div class="mob-lane-title ${titleCls}">${laneTitle}</div>
+      <table class="mob-table">`;
+
+    for(let t=winStart; t<winEnd; t+=15) {
+      const tStr   = toHHMM(t);
+      const isPast = t+15 <= nowMins;
+      const isNow  = t <= nowMins && nowMins < t+15;
+      const rc     = isPast?'row-past':isNow?'row-now':'';
+      const key    = tStr+'|'+lane;
+      const bk     = slotLookup[key];
+
+      mhtml += `<tr class="${rc}">`;
+      mhtml += `<td class="mob-time${isNow?' is-now':''}">${tStr}${isNow?'▶':''}</td>`;
+
+      if(bk) {
+        const isStart = tStr === toHHMM(Math.max(toMins(bk.start), winStart));
+        if(isStart) {
+          const span = Math.max(1, Math.ceil((Math.min(toMins(bk.end),winEnd) - Math.max(toMins(bk.start),winStart)) / 15));
+          const cls = bk.isFleet
+            ? (lane==='CCT1'?'slot-cct1-lsa':lane==='CCT2'?'slot-cct2-lsa':'slot-arr-lsa')
+            : 'slot-cell-ext';
+          const reg = bk.reg.replace(/^([A-Z])([A-Z])/, '$1-$2');
+          mhtml += `<td rowspan="${span}" style="vertical-align:middle;">`;
+          mhtml += `<div class="slot-cell-lsa ${cls}" style="padding:4px 8px;">`;
+          mhtml += `<span class="sr">${reg}</span><span class="sd">${bk.start}→${bk.end}</span>`;
+          mhtml += `</div></td>`;
+        }
+        // continuation: covered by rowspan
+      } else {
+        mhtml += `<td class="slot-empty-cell">—</td>`;
+      }
+
+      const lv = loadMap[tStr]||'';
+      const ll = getLoadLabel(lv);
+      const lc = getLoadClass(lv);
+      mhtml += `<td>${ll?`<span class="lc ${lc}" style="font-size:8px;">${ll}</span>`:''}</td>`;
+      mhtml += '</tr>';
+    }
+    mhtml += '</table></div>';
+  }
+  document.getElementById('ctMobileContent').innerHTML = mhtml;
+}
+
+// ══ SETTINGS UI ════════════════════════════════════
+function loadSettingsUI() {
+  renderTags('acTags', ST.ac, 'ac');
+  renderTags('instrTags', ST.instr, 'instr');
+  renderTags('routeTags', ST.route, 'route');
+  renderTags('destTags', ST.dest, 'dest');
+  document.getElementById('atcEmail').value  = ST.atcEmail;
+  document.getElementById('fromEmail').value = ST.fromEmail;
+  document.getElementById('ejsService').value  = ST.ejsService;
+  document.getElementById('ejsTemplate').value = ST.ejsTemplate;
+  document.getElementById('ejsKey').value     = ST.ejsKey;
+}
+
+function renderTags(containerId, items, key) {
+  const container = document.getElementById(containerId);
+  container.innerHTML = '';
+  items.forEach((item, i) => {
+    const tag = document.createElement('div');
+    tag.className = 'tag';
+    tag.innerHTML = `<span>${item}</span><button class="tag-del" onclick="removeTag('${key}',${i})">×</button>`;
+    container.appendChild(tag);
+  });
+}
+
+function removeTag(key, idx) {
+  const map = {ac:'ac',instr:'instr',route:'route',dest:'dest'};
+  ST[map[key]].splice(idx,1);
+  renderTags(key+'Tags', ST[map[key]], key);
+}
+
+function addTag(key) {
+  const inputId = key+'Input';
+  const val = document.getElementById(inputId).value.trim();
+  if(!val) return;
+  const map = {ac:'ac',instr:'instr',route:'route',dest:'dest'};
+  ST[map[key]].push(val);
+  renderTags(key+'Tags', ST[map[key]], key);
+  document.getElementById(inputId).value = '';
+}
+
+// Enter key support for tag inputs
+['acInput','instrInput','routeInput','destInput'].forEach(id => {
+  const el = document.getElementById(id);
+  if(el) el.addEventListener('keydown', e => {
+    if(e.key==='Enter') addTag(id.replace('Input',''));
+  });
+});
+
+function saveSettings() {
+  ST.atcEmail   = document.getElementById('atcEmail').value.trim();
+  ST.fromEmail  = document.getElementById('fromEmail').value.trim();
+  ST.ejsService = document.getElementById('ejsService').value.trim();
+  ST.ejsTemplate= document.getElementById('ejsTemplate').value.trim();
+  ST.ejsKey     = document.getElementById('ejsKey').value.trim();
+  saveSettingsToStorage();
+  const flash = document.getElementById('settingsFlash');
+  flash.style.opacity = '1';
+  setTimeout(()=>flash.style.opacity='0', 2500);
+}
+</script>
+</body>
+</html>
