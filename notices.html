@@ -520,6 +520,20 @@ window.addEventListener('load', () => {
   }
 });
 
+// Re-fetch data every 2 minutes to prevent stale data overwrites
+setInterval(() => {
+  if (sessionStorage.getItem('noticesAuth') === '1' && dataLoaded) {
+    // Only refresh if no unsaved edits in progress
+    const editNoticeId = document.getElementById('editNoticeId');
+    const editNotamId  = document.getElementById('editNotamId');
+    const hasUnsaved   = (editNoticeId && editNoticeId.value) || (editNotamId && editNotamId.value);
+    if (!hasUnsaved) {
+      dataLoaded = false; // reset guard before re-fetching
+      loadData();
+    }
+  }
+}, 120000); // every 2 minutes
+
 function exportBackup() {
   const data = { notices: allData.notices || [], notams: allData.notams || [] };
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
