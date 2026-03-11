@@ -311,8 +311,10 @@ function showStatus(msg, type) {
 // ── JSONBIN ──
 async function readBin() {
   const res = await fetch(BIN_URL + '/latest', { headers: { 'X-Master-Key': JSONBIN_KEY } });
+  if (!res.ok) throw new Error(`JSONBin returned ${res.status}`);
   const data = await res.json();
-  return data.record || {};
+  if (!data.record) throw new Error('JSONBin response missing record — possible rate limit or error');
+  return data.record;
 }
 
 async function writeBin(record) {
