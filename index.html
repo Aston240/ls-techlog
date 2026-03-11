@@ -2082,6 +2082,8 @@ function addDowntime(){
 
 function removeDowntime(idx){
   if(!ST.downtimeLog) return;
+  const e = ST.downtimeLog[idx];
+  if(!confirm(`Remove downtime entry for ${e.reg}?\n${e.start}${e.end?' → '+e.end:' (ongoing)'}\n${e.reason||''}\n\nThis cannot be undone.`)) return;
   ST.downtimeLog.splice(idx,1);
   saveDowntime();
   render();
@@ -2094,6 +2096,18 @@ function saveDowntime(){
 
 
 function rSettings(){
+  const unlocked = !!sessionStorage.getItem('settings_unlocked');
+  const lockBanner = `
+    <div style="display:flex;align-items:center;justify-content:space-between;background:${unlocked?'#0d2e1a':'#1a0d0d'};border:1px solid ${unlocked?'var(--grn)':'var(--red)'};border-radius:10px;padding:12px 18px;margin-bottom:20px">
+      <div>
+        <span style="font-size:13px;font-weight:700;color:${unlocked?'var(--grn)':'#ff8080'}">${unlocked?'🔓 Settings Unlocked':'🔒 Settings Locked'}</span>
+        <span style="font-size:11px;color:var(--mut);margin-left:10px">${unlocked?'Changes can be made and saved.':'Unlock to make changes.'}</span>
+      </div>
+      <button onclick="${unlocked?'lockSettings()':'unlockSettings()'}" style="background:${unlocked?'#1a3a1a':'#3a1a1a'};border:1px solid ${unlocked?'var(--grn)':'var(--red)'};color:${unlocked?'var(--grn)':'#ff8080'};border-radius:6px;padding:6px 16px;font-size:12px;font-weight:700;cursor:pointer">
+        ${unlocked?'🔒 Lock Settings':'🔓 Unlock to Edit'}
+      </button>
+    </div>`;
+
   const savedKey=localStorage.getItem('tl_key');
   const keyBlock=savedKey?`
     <div class="card" style="margin-bottom:20px">
@@ -2200,21 +2214,32 @@ function rSettings(){
       <div style="font-size:10px;color:var(--dim);margin-top:8px">Tab moves between fields &nbsp;·&nbsp; Esc closes form</div>
     </div>`;
 
-  return`${keyBlock}
+  const lockedStyle = unlocked ? '' : 'pointer-events:none;opacity:0.45;user-select:none;';
+
+  return`${lockBanner}${keyBlock}
   <p style="font-size:13px;color:var(--mut);margin-bottom:16px">
     Airbly aircraft settings pre-fill the printed tech log header. Manual aircraft are tracked locally only.
   </p>
   <div style="font-size:11px;color:var(--dim);margin-bottom:14px">AIRBLY AIRCRAFT (${ST.aircraft.length})</div>
-  ${airblyCards}
+  <div style="${lockedStyle}">${airblyCards}</div>
   <div style="font-size:11px;color:var(--dim);margin:20px 0 14px">MANUAL AIRCRAFT (${ST.manualAircraft.length})</div>
-  ${manualCards}
-  ${addBtn}
+  <div style="${lockedStyle}">${manualCards}
+  ${addBtn}</div>
   <div style="margin-top:24px;padding-top:16px;border-top:1px solid var(--border)">
     <button onclick="debugAirblyFields()" style="background:none;border:1px solid var(--dim);color:var(--dim);border-radius:7px;padding:7px 16px;font-size:11px;cursor:pointer">🔍 Inspect raw Airbly field names (debug)</button>
     <button onclick="forcePull()" style="background:none;border:1px solid var(--acc);color:var(--acc);border-radius:7px;padding:7px 16px;font-size:11px;cursor:pointer;margin-left:8px">☁ Pull latest from cloud</button>
     <button onclick="forcePush()" style="background:none;border:1px solid var(--grn);color:var(--grn);border-radius:7px;padding:7px 16px;font-size:11px;cursor:pointer;margin-left:8px">☁ Push my settings to cloud</button>
     <p style="font-size:11px;color:var(--dim);margin-top:6px">Opens a window showing every field name returned by the Airbly API — use this to diagnose missing last flight dates.</p>
   </div>`;
+}
+
+function unlockSettings(){
+  sessionStorage.setItem('settings_unlocked','1');
+  render();
+}
+function lockSettings(){
+  sessionStorage.removeItem('settings_unlocked');
+  render();
 }
 
 // ── MANUAL AIRCRAFT CRUD ─────────────────────────────
