@@ -1833,6 +1833,86 @@ function settingsCardFields(id, ac, c, isManual){
 
 
 // MAINTENANCE PLANNER
+function toggleMxHelp(){
+  const el = document.getElementById('mx-help-panel');
+  if(!el) return;
+  el.style.display = el.style.display==='none' ? 'block' : 'none';
+}
+
+function mxHelpPanel(){
+  return '<div id="mx-help-panel" style="display:none;background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:22px 26px;margin-bottom:16px;max-width:860px;font-size:13px;line-height:1.7;color:var(--txt)">'
+
+  // Close button
+  +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">'
+  +'<span style="font-size:16px;font-weight:800;color:#fff">How the Maintenance Planner Works</span>'
+  +'<button onclick="toggleMxHelp()" style="background:none;border:none;color:var(--mut);font-size:18px;cursor:pointer;line-height:1">&#10005;</button>'
+  +'</div>'
+
+  // Cloud sync
+  +'<div style="font-size:12px;font-weight:700;color:var(--acc);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px">Cloud Sync</div>'
+  +'<p style="margin:0 0 6px 0">All aircraft settings are saved in your browser and backed up to the cloud. The app pulls from the cloud every 60 seconds and pushes whenever you save a setting. If your local data is newer than the cloud, the pull will not overwrite it — it will push your version up instead.</p>'
+  +'<p style="margin:0 0 16px 0">Use the <span style="color:var(--grn);font-weight:700">Push to Cloud</span> button in the top bar before uploading a new version of the HTML file. After uploading, go into Aircraft Settings and re-save any one field to activate timestamp protection.</p>'
+
+  // Fleet tiers
+  +'<div style="font-size:12px;font-weight:700;color:var(--acc);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px">Fleet Tiers</div>'
+  +'<p style="margin:0 0 4px 0"><span style="color:#4a90d9;font-weight:700">Tier 1 — PPL Trainers:</span> G-BCGJ, G-PETR, G-MKAS, G-BTGO, G-FIAT, N150PK. Fly these first. Hours burned down first.</p>'
+  +'<p style="margin:0 0 4px 0"><span style="color:#a070d0;font-weight:700">Tier 2 — Leased:</span> G-EGTB, G-BOTN. Fly when Tier 1 is fully used or specifically requested. Target 15 hrs/month each.</p>'
+  +'<p style="margin:0 0 16px 0"><span style="color:#d09040;font-weight:700">Tier 3 — Advanced:</span> G-HRYZ, G-SETG. Instrument training only. Never assigned as standby.</p>'
+
+  // Status labels
+  +'<div style="font-size:12px;font-weight:700;color:var(--acc);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">Card Status Labels</div>'
+  +'<p style="margin:0 0 4px 0">Only the <strong>hours check</strong> and <strong>Annual due date</strong> drive status labels. ARC never triggers any action.</p>'
+  +'<div style="display:grid;grid-template-columns:auto 1fr;gap:4px 14px;margin-bottom:16px;font-size:12px">'
+  +'<span style="color:#40d080;font-weight:700">ON TRACK</span><span>No deadline within 10 days. Fly normally.</span>'
+  +'<span style="color:#f0c040;font-weight:700">BOOK CHECK</span><span>A deadline is within 10 days at current burn rate. Book the engineer slot now.</span>'
+  +'<span style="color:#ff6060;font-weight:700">FLY NOW</span><span>A deadline is within 7 days. This aircraft needs to move up the queue — fly it hard to reach its check before others.</span>'
+  +'<span style="color:#ff6060;font-weight:700">OVERDUE</span><span>A deadline has passed. Immediate action required.</span>'
+  +'<span style="color:#ff6060;font-weight:700">GROUNDED</span><span>Open downtime entry. Aircraft is unserviceable.</span>'
+  +'</div>'
+
+  // Sequence
+  +'<div style="font-size:12px;font-weight:700;color:var(--acc);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px">Sequence Logic</div>'
+  +'<p style="margin:0 0 4px 0">The planner manages the whole fleet together. The goal is to send aircraft in for checks 3 days apart in a rolling sequence, so at least one aircraft is always available.</p>'
+  +'<p style="margin:0 0 4px 0">Within each tier, the aircraft with the <strong>fewest hours remaining</strong> goes first. If a deadline is within 30 days, urgency overrides tier and the aircraft moves to the top.</p>'
+  +'<p style="margin:0 0 4px 0"><strong>FLY NOW</strong> means this aircraft needs to move up the queue — at its current burn rate it will not reach its check at the right point in the sequence.</p>'
+  +'<p style="margin:0 0 16px 0">A <span style="color:#f0c040;font-weight:700">Sequence Clash</span> banner appears if two aircraft are predicted to need their check within 3 days of each other. It tells you which one to fly harder to spread them out.</p>'
+
+  // Burn rate
+  +'<div style="font-size:12px;font-weight:700;color:var(--acc);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px">Burn Rate & Predictions</div>'
+  +'<p style="margin:0 0 4px 0">Burn rate = total hours flown ÷ total calendar days over the last 30 days. Calendar days are used because the check deadline does not pause for bad weather.</p>'
+  +'<p style="margin:0 0 16px 0">The <strong>Predicted Check</strong> date on each card shows when the aircraft will reach its next check at current burn rate, with a plain-English label such as “in ~3 weeks” or “less than 1 week”.</p>'
+
+  // Annual alignment
+  +'<div style="font-size:12px;font-weight:700;color:var(--acc);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px">Annual Alignment Warning</div>'
+  +'<p style="margin:0 0 16px 0">If an aircraft will arrive at its Annual with more than 15 hours still remaining on its check interval, a yellow warning appears on the card showing the exact numbers. The fix is to fly the aircraft harder before the Annual so it completes its check first.</p>'
+
+  // ARC
+  +'<div style="font-size:12px;font-weight:700;color:var(--acc);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px">ARC (Air Registration Certificate)</div>'
+  +'<p style="margin:0 0 16px 0">ARC date is shown on each card for information only — red if within 10 days, amber within 30 days. It does not affect sequence position or trigger any action status. An ARC renewal is a one-day visit that does not reset hours.</p>'
+
+  // Standby
+  +'<div style="font-size:12px;font-weight:700;color:var(--acc);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px">Today's Standby</div>'
+  +'<p style="margin:0 0 4px 0">Only <strong>ON TRACK</strong> aircraft can be standby. G-HRYZ and G-SETG are never standby.</p>'
+  +'<p style="margin:0 0 4px 0">G-EGTB and G-BOTN are preferred as standby — they fly last anyway, so holding one back has less impact. But if either is behind on its 15 hr/month target, it is excluded and should be flying. The banner flags this in amber and falls back to the Tier 1 aircraft furthest from its check.</p>'
+  +'<p style="margin:0 0 16px 0">The standby banner shows how many hours the aircraft has flown this month so you can check its pace.</p>'
+
+  // Downtime
+  +'<div style="font-size:12px;font-weight:700;color:var(--acc);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px">Downtime Log</div>'
+  +'<p style="margin:0 0 4px 0">Record downtime with a start date and reason. Leave end date blank while the aircraft is grounded.</p>'
+  +'<p style="margin:0 0 16px 0">When the aircraft is fixed, click the green <strong>Back Online</strong> button on the downtime row. Enter the end date (defaults to today) and the aircraft immediately returns to the sequence.</p>'
+
+  // Settings
+  +'<div style="font-size:12px;font-weight:700;color:var(--acc);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px">Keep These Settings Up to Date</div>'
+  +'<div style="display:grid;grid-template-columns:auto 1fr;gap:4px 14px;font-size:12px">'
+  +'<span style="font-weight:700;color:#fff">Next Maintenance Due (hrs)</span><span>Hobbs hours at which the next check is due. Without this, no predictions are possible.</span>'
+  +'<span style="font-weight:700;color:#fff">Check Type</span><span>50hr (1 day downtime) or 100hr (3 days downtime).</span>'
+  +'<span style="font-weight:700;color:#fff">Annual Due</span><span>Drives the alignment warning and can trigger BOOK CHECK or FLY NOW.</span>'
+  +'<span style="font-weight:700;color:#fff">ARC Due</span><span>Information only. Shown with colour coding but no action triggered.</span>'
+  +'</div>'
+
+  +'</div>';
+}
+
 function rMxPlanner(){
   const _all = allAircraft();
   const now = Date.now();
@@ -2246,7 +2326,7 @@ function rMxPlanner(){
 
     // Hrs remaining colour
     const hrsRemNum = hrsRem ? parseFloat(hrsRem) : null;
-    const hrsRemCol = hrsRemNum===null?'var(--txt)':hrsRemNum<15?'#ff6060':hrsRemNum<30?'var(--amb)':'var(--grn)';
+    const hrsRemCol = hrsRemNum===null?'var(--txt)':hrsRemNum<5?'#ff6060':hrsRemNum<10?'var(--amb)':'var(--grn)';
 
     // Predicted check label: use weeks wording
     const mxWksLabel = mxDays!==null ? weeksLabel(mxDays) : null;
@@ -2343,8 +2423,12 @@ function rMxPlanner(){
 
   return '<div style="padding:18px 22px;max-width:980px">'
 
-    // subtitle
-    +'<div style="font-size:11px;color:var(--mut);margin-bottom:10px">Aircraft sorted by priority \u2014 fly from the top down \u00b7 Tier 1 = PPL Trainers \u00b7 Tier 2 = Leased \u00b7 Tier 3 = Advanced</div>'
+    // subtitle + help button
+    +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">'
+    +'<div style="font-size:11px;color:var(--mut)">Aircraft sorted by priority \u2014 fly from the top down \u00b7 Tier 1 = PPL Trainers \u00b7 Tier 2 = Leased \u00b7 Tier 3 = Advanced</div>'
+    +'<button onclick="toggleMxHelp()" style="font-size:11px;padding:4px 12px;background:var(--panel);border:1px solid var(--border);color:var(--acc);border-radius:6px;cursor:pointer;font-weight:700;white-space:nowrap">&#9432; How this works</button>'
+    +'</div>'
+    +mxHelpPanel()
 
     // standby banner
     +standbyBanner
