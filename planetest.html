@@ -216,11 +216,15 @@ async function startFetch(months=6){
       return;
     }
 
-  // Build weekly summary
-  buildWeekly();
-  renderSummary(months, totalFlights, monthsWithData);
-  renderWeeklyTable();
-  renderRawTable();
+    // Build weekly summary
+    buildWeekly();
+    renderSummary(months, totalFlights);
+    renderWeeklyTable();
+    renderRawTable();
+
+  } catch(e){
+    log(`\nFetch failed: ${e.message}`,'err');
+  }
 
   btn.disabled = false;
 }
@@ -246,7 +250,7 @@ function buildWeekly(){
   });
 }
 
-function renderSummary(months, totalFlights, monthsWithData){
+function renderSummary(months, totalFlights){
   const card = document.getElementById('summary-card');
   card.classList.remove('hidden');
 
@@ -273,9 +277,9 @@ function renderSummary(months, totalFlights, monthsWithData){
   const grid = document.getElementById('stat-grid');
   grid.innerHTML = `
     <div class="stat-box">
-      <div class="lbl">Months with data</div>
-      <div class="val">${monthsWithData}/${months}</div>
-      <div class="sub2">out of ${months} months requested</div>
+      <div class="lbl">Period covered</div>
+      <div class="val" style="font-size:16px">${months} months</div>
+      <div class="sub2">flights filtered client-side</div>
     </div>
     <div class="stat-box">
       <div class="lbl">Total flights found</div>
