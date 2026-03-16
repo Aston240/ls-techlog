@@ -1836,37 +1836,19 @@ function rMxPlanner(){
   const grounded = new Set(dt.filter(function(e){return !e.end;}).map(function(e){return e.reg;}));
 
   // ── Burn rate: hours per day, excluding weather days (fleet-wide zero) ──
+  // Burn rate: total hours over total calendar days in the window.
+  // Calendar days used (not active days) so predictions correctly reflect
+  // real elapsed time — the check deadline does not pause for weather.
   function activeDaysBurnRate(ac){
     const snaps = ST.hoursSnapshots[ac.id]||{};
     const dates = Object.keys(snaps).sort();
     const cutoff = new Date(now-30*DAY).toISOString().slice(0,10);
     const recent = dates.filter(function(d){return d>=cutoff;});
     if(recent.length<2) return ac.totalHobbs/90||0;
-
-    // Build fleet-wide daily hours to detect weather days
-    const fleetDailyHrs = {};
-    _all.forEach(function(a){
-      const s = ST.hoursSnapshots[a.id]||{};
-      const sd = Object.keys(s).sort().filter(function(d){return d>=cutoff;});
-      for(var i=1;i<sd.length;i++){
-        const d = sd[i];
-        const delta = Math.max(0,(s[sd[i]]||0)-(s[sd[i-1]]||0));
-        fleetDailyHrs[d] = (fleetDailyHrs[d]||0)+delta;
-      }
-    });
-
-    // Only count days where fleet flew >0.1 hrs total
-    var totalHrs=0, activeDays=0;
-    for(var i=1;i<recent.length;i++){
-      const d = recent[i];
-      const fleetFlew = (fleetDailyHrs[d]||0)>0.1;
-      if(fleetFlew){
-        totalHrs += Math.max(0,(snaps[recent[i]]||0)-(snaps[recent[i-1]]||0));
-        activeDays++;
-      }
-    }
-    if(activeDays<2) return ac.totalHobbs/90||0;
-    return totalHrs/activeDays;
+    const first = recent[0], last = recent[recent.length-1];
+    const calDays = Math.max(1,(new Date(last)-new Date(first))/DAY);
+    const hrsFlown = Math.max(0,(snaps[last]||0)-(snaps[first]||0));
+    return hrsFlown/calDays;
   }
 
   function burnRatePday(ac){
@@ -2259,7 +2241,7 @@ function rMxPlanner(){
          cfg.check_type?stat('Next Check',cfg.check_type,'var(--acc)'):null,
          due?stat('Check Due At',due+' hrs'):null,
          hrsRem?stat('Hrs Remaining',hrsRem+' hrs',hrsRemCol):null,
-         stat('Burn Rate (active days)',rateWk+' hrs/wk'),
+         stat('Burn Rate',rateWk+' hrs/wk'),
          predDate&&mxWksLabel?stat('Predicted Check',predDate+' \u2014 '+mxWksLabel,predCol):null,
          cfg.cofa_exp?stat('ARC Due',fmtDate(cfg.cofa_exp)+(arcDays!==null?' ('+arcDays+'d)':''),arcDays!==null&&arcDays<=10?'#ff6060':arcDays!==null&&arcDays<30?'var(--amb)':'var(--grn)'):null,
          cfg.annual_due?stat('Annual Due',fmtDate(cfg.annual_due)+(annDays!==null?' ('+annDays+'d)':''),annDays!==null&&annDays<=10?'#ff6060':annDays!==null&&annDays<30?'var(--amb)':'var(--grn)'):null];
@@ -2313,16 +2295,23 @@ function rMxPlanner(){
   // ── Downtime log rows ──
   const dtRows = dt.length ? dt.slice().reverse().map(function(e,i){
     const idx = dt.length-1-i;
-    const endStr = e.end ? e.end : '<span style="color:var(--amb)">Ongoing</span>';
+    const isOngoing = !e.end;
+    const endStr = isOngoing ? '<span style="color:var(--amb)">Ongoing</span>' : e.end;
     const days = e.end ? Math.round((new Date(e.end)-new Date(e.start))/DAY) : Math.round((now-new Date(e.start))/DAY);
+    const closeBtn = isOngoing
+      ? '<button onclick="closeDowntime('+idx+')" '
+        +'style="background:#0a2318;border:1px solid var(--grn);color:var(--grn);border-radius:5px;'
+        +'padding:3px 10px;font-size:11px;font-weight:700;cursor:pointer;margin-right:6px">Back Online</button>'
+      : '';
     return '<tr style="border-bottom:1px solid var(--border)">'
       +'<td style="padding:9px 12px;font-weight:700;color:#fff">'+esc(e.reg)+'</td>'
       +'<td style="padding:9px 12px">'+e.start+'</td>'
       +'<td style="padding:9px 12px">'+endStr+'</td>'
       +'<td style="padding:9px 12px;color:var(--acc)">'+days+'d</td>'
       +'<td style="padding:9px 12px;color:var(--mut);font-size:11px">'+esc(e.reason||'')+'</td>'
-      +'<td style="padding:9px 12px"><button onclick="removeDowntime('+idx+')" '
-      +'style="background:none;border:none;color:var(--mut);cursor:pointer;font-size:13px">&#10005;</button></td>'
+      +'<td style="padding:9px 12px;white-space:nowrap">'+closeBtn
+        +'<button onclick="removeDowntime('+idx+')" '
+        +'style="background:none;border:none;color:var(--mut);cursor:pointer;font-size:13px">&#10005;</button></td>'
       +'</tr>';
   }).join('') : '<tr><td colspan="6" style="color:var(--mut);text-align:center;padding:14px">No downtime recorded</td></tr>';
 
@@ -2389,6 +2378,19 @@ function addDowntime(){
   if(!reg||!start) return;
   if(!ST.downtimeLog) ST.downtimeLog=[];
   ST.downtimeLog.push({reg:reg,start:start,end:end||null,reason:reason});
+  saveDowntime();
+  render();
+}
+
+function closeDowntime(idx){
+  const e = (ST.downtimeLog||[])[idx];
+  if(!e) return;
+  const today = new Date().toISOString().slice(0,10);
+  const entered = prompt('Enter end date for ' + e.reg + ' downtime\n(Format: YYYY-MM-DD)', today);
+  if(!entered) return;
+  const parsed = new Date(entered);
+  if(isNaN(parsed)){ alert('Invalid date. Please use YYYY-MM-DD format.'); return; }
+  ST.downtimeLog[idx].end = entered;
   saveDowntime();
   render();
 }
