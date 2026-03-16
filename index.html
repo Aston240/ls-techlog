@@ -2351,6 +2351,26 @@ function rMxPlanner(){
     +'<th style="padding:8px 12px;text-align:left;color:var(--mut);font-size:10px;letter-spacing:.8px;background:var(--sb)">REASON</th>'
     +'<th style="background:var(--sb)"></th>'
     +'</tr></thead><tbody>'+dtRows+'</tbody></table></div>'
+
+    // add downtime form
+    +'<div style="background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:18px 20px;max-width:700px">'
+    +'<div style="font-size:11px;font-weight:700;color:var(--mut);letter-spacing:2px;text-transform:uppercase;margin-bottom:14px">Record Downtime</div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px">'
+    +'<div><div style="font-size:10px;color:var(--mut);letter-spacing:1px;text-transform:uppercase;margin-bottom:5px">Aircraft</div>'
+    +'<select id="dt-reg" style="'+inp+'">'+acOptions+'</select></div>'
+    +'<div><div style="font-size:10px;color:var(--mut);letter-spacing:1px;text-transform:uppercase;margin-bottom:5px">Start Date</div>'
+    +'<input id="dt-start" type="date" value="'+today+'" style="'+inp+'"></div>'
+    +'<div><div style="font-size:10px;color:var(--mut);letter-spacing:1px;text-transform:uppercase;margin-bottom:5px">End Date <span style="color:var(--dim);font-size:9px">(blank = ongoing)</span></div>'
+    +'<input id="dt-end" type="date" style="'+inp+'"></div>'
+    +'</div>'
+    +'<div style="margin-bottom:14px"><div style="font-size:10px;color:var(--mut);letter-spacing:1px;text-transform:uppercase;margin-bottom:5px">Reason / Defect</div>'
+    +'<input id="dt-reason" type="text" placeholder="e.g. Awaiting engine part, Annual inspection..." style="'+inp+'"></div>'
+    +'<button onclick="addDowntime()" style="background:var(--blue);color:#fff;border:none;border-radius:8px;padding:9px 22px;font-weight:700;font-size:12px;cursor:pointer;letter-spacing:.5px">+ Add Downtime Entry</button>'
+    +'</div>'
+
+    +'</div>';
+}
+
 function addDowntime(){
   const reg    = document.getElementById('dt-reg')&&document.getElementById('dt-reg').value||'';
   const start  = document.getElementById('dt-start')&&document.getElementById('dt-start').value||'';
