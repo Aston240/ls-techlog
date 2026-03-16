@@ -310,6 +310,7 @@ tfoot td{padding:11px;background:#112240;font-weight:700;}
       <div class="tbar-title" id="view-title">Fleet Dashboard</div>
       <div style="display:flex;align-items:center;gap:12px">
         <div id="sync-status" style="font-size:11px;color:var(--mut)"></div>
+        <button onclick="manualPush()" style="font-size:11px;padding:4px 12px;background:#0a2318;border:1px solid var(--grn);color:var(--grn);border-radius:6px;cursor:pointer;font-weight:700">&#9729; Push to Cloud</button>
         <div id="print-btns" style="display:none;gap:8px;align-items:center"><button class="btn-print" onclick="doPrint(false)">🖨 Print THIS Tech Log</button><button class="btn-print" style="background:#1a4a20;border:1px solid var(--grn)" onclick="doPrint(true)">🖨 Print ALL Tech Logs</button></div>
       </div>
     </div>
@@ -351,13 +352,20 @@ async function syncPull(){
     });
     if(!r.ok) throw new Error('HTTP '+r.status);
     const remote=await r.json();
-    // Merge: remote is authoritative for cfg and manualAircraft
+    // Merge: remote is authoritative for cfg UNLESS local was saved more recently
     if(remote.cfg && typeof remote.cfg==='object'){
-      // Deep merge: remote wins on conflict (last-write-wins)
-      Object.keys(remote.cfg).forEach(k=>{
-        ST.cfg[k]=Object.assign({},ST.cfg[k]||{},remote.cfg[k]);
-      });
-      localStorage.setItem('tl_cfg',JSON.stringify(ST.cfg));
+      const remoteTs = remote._cfgSavedAt || (remote._updated ? new Date(remote._updated).getTime() : 0);
+      const localTs  = ST._cfgSavedAt || 0;
+      if(localTs > remoteTs){
+        // Local cfg is newer — push it up instead of letting remote overwrite
+        console.log('[sync] Local cfg is newer than cloud (' + new Date(localTs).toLocaleTimeString() + ' vs ' + new Date(remoteTs).toLocaleTimeString() + ') — skipping remote cfg merge, pushing local up');
+        syncPush();
+      } else {
+        Object.keys(remote.cfg).forEach(k=>{
+          ST.cfg[k]=Object.assign({},ST.cfg[k]||{},remote.cfg[k]);
+        });
+        localStorage.setItem('tl_cfg',JSON.stringify(ST.cfg));
+      }
     }
     if(Array.isArray(remote.manual)){
       ST.manualAircraft=remote.manual;
@@ -417,6 +425,7 @@ function syncPush(){
           Object.keys(ST.cfg).map(id=>[id, ST.cfg[id]?.sheet_start||'1'])
         ),
         _updated: new Date().toISOString(),
+        _cfgSavedAt: ST._cfgSavedAt||0,
       };
       const r=await fetch(JB.URL+JB.BIN,{
         method:'PUT',
@@ -451,12 +460,15 @@ const ST={
   manualAircraft: JSON.parse(localStorage.getItem('tl_manual')||'[]'),
   dailyLog: JSON.parse(localStorage.getItem('tl_dailylog')||'{}'),
   hoursSnapshots: JSON.parse(localStorage.getItem('tl_snapshots')||'{}'),
+  _cfgSavedAt: parseInt(localStorage.getItem('tl_cfg_ts')||'0'),
   downtimeLog: JSON.parse(localStorage.getItem('tl_downtime')||'[]'),
 };
 
 // Save locally AND push to cloud
 function saveCfg(){
+  ST._cfgSavedAt = Date.now();
   localStorage.setItem('tl_cfg',JSON.stringify(ST.cfg));
+  localStorage.setItem('tl_cfg_ts', ST._cfgSavedAt.toString());
   syncPush();
 }
 function saveManual(){
@@ -470,6 +482,16 @@ function saveDailyLog(){
 function saveSnapshots(){
   localStorage.setItem('tl_snapshots',JSON.stringify(ST.hoursSnapshots));
   syncPush();
+}
+
+// Manual push button handler
+function manualPush(){
+  ST._cfgSavedAt = Date.now();
+  localStorage.setItem('tl_cfg_ts', ST._cfgSavedAt.toString());
+  clearTimeout(JB._timer);
+  JB._pushing=false;
+  syncPush();
+  syncStatus('syncing','Pushing to cloud…');
 }
 
 // Returns all aircraft (Airbly + manual) for display purposes
