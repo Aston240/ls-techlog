@@ -1975,9 +1975,9 @@ function rMxPlanner(){
     const cfg = ST.cfg[ac.id]||{};
     const due = parseFloat(cfg.maint_due)||null;
     const mxDays = due ? predictDays(ac,due) : null;
-    const arcDays = daysUntilDate(cfg.cofa_exp);
     const annDays = daysUntilDate(cfg.annual_due);
-    const candidates = [mxDays, arcDays, annDays].filter(function(x){return x!==null;});
+    // ARC deliberately excluded — it doesn't reset hours or affect sequence
+    const candidates = [mxDays, annDays].filter(function(x){return x!==null;});
     const minDays = candidates.length ? Math.min.apply(null,candidates) : 9000;
     // Tier offset: tier1=0, tier2=500, tier3=1000 — so tier1 aircraft sort first
     // But urgency overrides tier: if minDays<30, ignore tier offset
@@ -2029,7 +2029,16 @@ function rMxPlanner(){
   // Never HRYZ or SETG
   var standbyAc = null, standbyNote = '', standbyWarn = false;
   const standbyPool = _all.filter(function(ac){
-    return !grounded.has(ac.reg) && NO_STANDBY.indexOf(ac.reg)<0;
+    if(grounded.has(ac.reg)) return false;
+    if(NO_STANDBY.indexOf(ac.reg)>=0) return false;
+    // Only ON TRACK aircraft can be standby
+    const cfg = ST.cfg[ac.id]||{};
+    const due = parseFloat(cfg.maint_due)||null;
+    const mxDays = due ? predictDays(ac,due) : null;
+    const annDays = daysUntilDate(cfg.annual_due);
+    const candidates = [mxDays,annDays].filter(function(x){return x!==null;});
+    const minDays = candidates.length ? Math.min.apply(null,candidates) : 9999;
+    return minDays > 10; // must be ON TRACK (not FLY NOW ≤7, not BOOK CHECK ≤10)
   });
 
   // Check TIER2 monthly progress
@@ -2169,7 +2178,7 @@ function rMxPlanner(){
     var drivingDays = null;
     const deadlineMap = [];
     if(mxDays!==null) deadlineMap.push({label:'Hours check', days:mxDays, type:'mx'});
-    if(arcDays!==null) deadlineMap.push({label:'ARC', days:arcDays, type:'arc'});
+    // ARC excluded from action triggers — info only on card
     if(annDays!==null) deadlineMap.push({label:'Annual', days:annDays, type:'ann'});
     if(deadlineMap.length>0){
       deadlineMap.sort(function(a,b){return a.days-b.days;});
@@ -2247,6 +2256,7 @@ function rMxPlanner(){
          cfg.cofa_exp?stat('ARC Due',fmtDate(cfg.cofa_exp),(arcDays!==null&&arcDays<30)?'#ff6060':'var(--grn)'):null,
          cfg.annual_due?stat('Annual Due',fmtDate(cfg.annual_due),(annDays!==null&&annDays<30)?'#ff6060':'var(--grn)'):null]
       : [stat('Total Hrs',ac.totalHobbs.toFixed(1),'var(--acc)'),
+         cfg.check_type?stat('Next Check',cfg.check_type,'var(--acc)'):null,
          due?stat('Check Due At',due+' hrs'):null,
          hrsRem?stat('Hrs Remaining',hrsRem+' hrs',hrsRemCol):null,
          stat('Burn Rate (active days)',rateWk+' hrs/wk'),
