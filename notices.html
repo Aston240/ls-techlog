@@ -332,18 +332,23 @@ async function writeBin(record) {
 let allData = {};
 let dataLoaded = false;
 
-async function loadData() {
-  showStatus('LOADING...', 'load');
+async function loadData(isAutoRefresh = false) {
+  if (!isAutoRefresh) showStatus('LOADING...', 'load');
   try {
-    allData = await readBin();
-    if (!allData.notices) allData.notices = [];
-    if (!allData.notams)  allData.notams  = [];
+    const fresh = await readBin();
+    if (!fresh.notices) fresh.notices = [];
+    if (!fresh.notams)  fresh.notams  = [];
+    allData = fresh;
     dataLoaded = true;
     renderNotices();
     renderNotams();
-    document.getElementById('statusBar').classList.remove('show');
+    if (!isAutoRefresh) document.getElementById('statusBar').classList.remove('show');
+    console.log('[notices] data loaded OK —', fresh.notices.length, 'notices,', fresh.notams.length, 'NOTAMs');
   } catch(e) {
-    showStatus('ERROR LOADING DATA — ' + e.message, 'err');
+    // On error, restore dataLoaded so existing in-memory data stays writable
+    dataLoaded = true;
+    console.warn('[notices] auto-refresh fetch failed — keeping existing data in memory:', e.message);
+    if (!isAutoRefresh) showStatus('ERROR LOADING DATA — ' + e.message, 'err');
   }
 }
 
@@ -528,8 +533,8 @@ setInterval(() => {
     const editNotamId  = document.getElementById('editNotamId');
     const hasUnsaved   = (editNoticeId && editNoticeId.value) || (editNotamId && editNotamId.value);
     if (!hasUnsaved) {
-      dataLoaded = false; // reset guard before re-fetching
-      loadData();
+      // NOTE: do NOT set dataLoaded=false here — if fetch fails, we keep existing data safe
+      loadData(true); // isAutoRefresh=true: silent, non-destructive
     }
   }
 }, 120000); // every 2 minutes
