@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Planetest — LS Airmotive Airbly Historical Data</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:Arial,sans-serif;background:#0b1a2e;color:#c8d8e8;min-height:100vh;padding:24px;}
+  h1{font-size:20px;font-weight:800;color:#fff;margin-bottom:4px;}
+  .sub{font-size:12px;color:#5a7a9a;margin-bottom:24px;}
+  .card{background:#0f2035;border:1px solid #1a3050;border-radius:12px;padding:20px;margin-bottom:20px;}
+  .card h2{font-size:12px;font-weight:700;color:#5a8aaa;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:14px;}
+  button{background:#1a7a5a;color:#fff;border:none;border-radius:8px;padding:10px 22px;font-size:13px;font-weight:700;cursor:pointer;}
+  button:disabled{opacity:.5;cursor:not-allowed;}
+  button.sec{background:#1a3a5a;color:#7ab8d8;}
+  button.danger{background:#3a1010;color:#ff8080;border:1px solid #6a2020;}
+  .log{background:#07111e;border:1px solid #1a3050;border-radius:8px;padding:14px;font-family:monospace;font-size:11px;color:#7ab8d8;max-height:280px;overflow-y:auto;margin-top:14px;white-space:pre-wrap;word-break:break-all;}
+  .log .ok{color:#40d080;}
+  .log .warn{color:#f0c040;}
+  .log .err{color:#ff6060;}
+  table{width:100%;border-collapse:collapse;font-size:12px;margin-top:10px;}
+  th{padding:7px 10px;text-align:left;color:#5a8aaa;font-size:10px;letter-spacing:.8px;background:#07111e;border-bottom:1px solid #1a3050;white-space:nowrap;}
+  th.num{text-align:center;}
+  td{padding:7px 10px;border-bottom:1px solid #0d2040;vertical-align:top;}
+  td.num{text-align:center;}
+  tr:hover td{background:#0d2040;}
+  .pill{display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;}
+  .pill.ok{background:#0a2318;color:#40d080;border:1px solid #1a5030;}
+  .pill.warn{background:#2a1e08;color:#f0c040;border:1px solid #5a3a10;}
+  .pill.none{background:#1a1a2a;color:#5a7a9a;border:1px solid #2a3a5a;}
+  .bar-wrap{background:#07111e;border-radius:4px;height:8px;width:100%;margin-top:4px;}
+  .bar{height:8px;border-radius:4px;background:#1a7a5a;}
+  .yr-btn{background:#0f2035;color:#5a8aaa;border:1px solid #1a3050;border-radius:6px;padding:5px 14px;font-size:11px;font-weight:700;cursor:pointer;margin-right:6px;margin-bottom:6px;}
+  .yr-btn.act{background:#1a7a5a;color:#fff;border-color:#1a7a5a;}
+  .stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-top:10px;}
+  .stat-box{background:#07111e;border:1px solid #1a3050;border-radius:8px;padding:12px;}
+  .stat-box .lbl{font-size:9px;color:#5a7a9a;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px;}
+  .stat-box .val{font-size:22px;font-weight:800;color:#40d080;}
+  .stat-box .sub2{font-size:10px;color:#5a7a9a;margin-top:2px;}
+  .progress{background:#07111e;border:1px solid #1a3050;border-radius:8px;padding:12px;margin-top:14px;}
+  .progress-bar-wrap{background:#07111e;border-radius:6px;height:12px;margin-top:8px;overflow:hidden;}
+  .progress-bar{height:12px;border-radius:6px;background:linear-gradient(90deg,#1a5a3a,#40d080);transition:width .3s;}
+  .hidden{display:none;}
+</style>
+</head>
+<body>
+
+<h1>✈ Planetest — Airbly Historical Data</h1>
+<p class="sub">Standalone test page · LS Airmotive · Fetches up to 6 months of flight data direct from Airbly</p>
+
+<!-- Controls -->
+<div class="card">
+  <h2>Fetch Historical Data</h2>
+  <p style="font-size:12px;color:#5a7a9a;margin-bottom:14px">Queries Airbly month by month going back 6 months. Shows how far back data is available and calculates weekly hours per aircraft.</p>
+  <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+    <button id="btn-fetch" onclick="startFetch()">▶ Fetch Last 6 Months</button>
+    <button class="sec" onclick="startFetch(12)">▶ Try 12 Months</button>
+    <button class="danger" onclick="clearResults()">✕ Clear</button>
+  </div>
+  <div class="progress hidden" id="progress-wrap">
+    <div style="font-size:11px;color:#5a7a9a;margin-bottom:4px" id="progress-label">Fetching...</div>
+    <div class="progress-bar-wrap"><div class="progress-bar" id="progress-bar" style="width:0%"></div></div>
+  </div>
+  <div class="log hidden" id="log"></div>
+</div>
+
+<!-- Summary stats -->
+<div class="card hidden" id="summary-card">
+  <h2>Summary</h2>
+  <div class="stat-grid" id="stat-grid"></div>
+</div>
+
+<!-- Weekly table -->
+<div class="card hidden" id="table-card">
+  <h2>Weekly Hours Per Aircraft</h2>
+  <div id="yr-btns" style="margin-bottom:14px"></div>
+  <div id="weekly-tables"></div>
+  <p style="font-size:10px;color:#3a5a7a;margin-top:10px">ISO week numbers · darker green = more hours · hover rows for details</p>
+</div>
+
+<!-- Raw data inspect -->
+<div class="card hidden" id="raw-card">
+  <h2>Raw Flight Count Per Aircraft Per Month</h2>
+  <div id="raw-table"></div>
+</div>
+
+<script>
+const PRIMARY_KEY = 'AamCntOnk72udRQvYYiX4oUlcpHcgg';
+const SECOND_KEY  = '6W9TZU5ECtrE3U1UeptzaNsCaXoWcQ';
+
+let results = {}; // { acId: { reg, flights:[] } }
+let weeklyData = {}; // { acId: { reg, weeks:{ "2024-W12": hrs } } }
+
+function log(msg, cls=''){
+  const el = document.getElementById('log');
+  el.classList.remove('hidden');
+  el.innerHTML += `<span class="${cls}">${msg}</span>\n`;
+  el.scrollTop = el.scrollHeight;
+}
+
+function setProgress(pct, label){
+  const w = document.getElementById('progress-wrap');
+  const b = document.getElementById('progress-bar');
+  const l = document.getElementById('progress-label');
+  w.classList.remove('hidden');
+  b.style.width = pct+'%';
+  l.textContent = label;
+}
+
+function getISOWeekKey(dateStr){
+  const d = new Date(dateStr+'T12:00:00Z');
+  const jan4 = new Date(Date.UTC(d.getUTCFullYear(),0,4));
+  const weekNum = Math.ceil(((d-jan4)/86400000 + jan4.getUTCDay()+1)/7);
+  return `${d.getUTCFullYear()}-W${String(weekNum).padStart(2,'0')}`;
+}
+
+async function fetchMonth(key, afterMs, beforeMs){
+  const url = `https://airbly.com/api/v3/assetList?groupKey=${encodeURIComponent(key)}&log_types=flight&log_completed_after=${afterMs}&log_completed_before=${beforeMs}&log_limit_per_asset=100`;
+  const r = await fetch(url);
+  if(!r.ok) throw new Error('HTTP '+r.status);
+  const raw = await r.json();
+  if(raw.auth_group_success===false) throw new Error('API key rejected');
+  return raw;
+}
+
+function parseFlights(raw){
+  const list = raw?.assetList?.assets||[];
+  const out = {};
+  list.forEach(a=>{
+    const reg = (a.asset?.registration||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
+    if(!reg) return;
+    const id = a.asset?.uuid || reg;
+    if(!out[id]) out[id] = { reg, id, flights:[] };
+    const logs = a.logs||[];
+    logs.forEach(l=>{
+      if(l.status!=='closed') return;
+      const airSec = l.air_seconds||l.air_time_seconds||0;
+      if(airSec<=0) return;
+      const ts = l.engine_stop_at || l.happened_at;
+      if(!ts) return;
+      out[id].flights.push({
+        date: new Date(ts).toISOString().slice(0,10),
+        airHrs: airSec/3600
+      });
+    });
+  });
+  return out;
+}
+
+async function startFetch(months=6){
+  const btn = document.getElementById('btn-fetch');
+  btn.disabled = true;
+  results = {};
+  weeklyData = {};
+  document.getElementById('log').innerHTML = '';
+  document.getElementById('log').classList.remove('hidden');
+  ['summary-card','table-card','raw-card'].forEach(id=>document.getElementById(id).classList.add('hidden'));
+
+  log(`Starting fetch — last ${months} months from Airbly...`,'ok');
+
+  const now = Date.now();
+  const DAY = 86400*1000;
+  const MONTH = 30*DAY;
+
+  let totalFlights = 0;
+  let monthsWithData = 0;
+
+  // Build month chunks going back
+  const chunks = [];
+  for(let i=0;i<months;i++){
+    const before = now - i*MONTH;
+    const after  = now - (i+1)*MONTH;
+    const label  = new Date(after).toLocaleDateString('en-GB',{month:'short',year:'numeric'});
+    chunks.push({after, before, label, i});
+  }
+
+  for(const chunk of chunks){
+    const pct = Math.round((chunk.i/chunks.length)*100);
+    setProgress(pct, `Fetching ${chunk.label}...`);
+    log(`→ Fetching ${chunk.label}...`);
+
+    try{
+      const [r1, r2] = await Promise.allSettled([
+        fetchMonth(PRIMARY_KEY, chunk.after, chunk.before),
+        fetchMonth(SECOND_KEY,  chunk.after, chunk.before)
+      ]);
+
+      let monthFlights = 0;
+      const parsed = {};
+
+      if(r1.status==='fulfilled'){
+        const p = parseFlights(r1.value);
+        Object.assign(parsed, p);
+      } else {
+        log(`  ✕ Primary key failed: ${r1.reason?.message}`,'err');
+      }
+      if(r2.status==='fulfilled'){
+        const p = parseFlights(r2.value);
+        // Merge — add any aircraft not in primary
+        Object.keys(p).forEach(id=>{
+          if(!parsed[id]) parsed[id]=p[id];
+          else parsed[id].flights.push(...p[id].flights);
+        });
+      }
+
+      // Merge into results
+      Object.keys(parsed).forEach(id=>{
+        const ac = parsed[id];
+        if(!results[id]) results[id] = {reg:ac.reg, id, flights:[]};
+        results[id].flights.push(...ac.flights);
+        monthFlights += ac.flights.length;
+      });
+
+      if(monthFlights > 0){
+        monthsWithData++;
+        log(`  ✓ ${monthFlights} flights found across ${Object.keys(parsed).length} aircraft`,'ok');
+      } else {
+        log(`  — No flights found for ${chunk.label}`,'warn');
+      }
+
+      totalFlights += monthFlights;
+
+    } catch(e){
+      log(`  ✕ Error fetching ${chunk.label}: ${e.message}`,'err');
+    }
+
+    // Small delay to avoid rate limiting
+    await new Promise(res=>setTimeout(res,300));
+  }
+
+  setProgress(100, 'Complete');
+  log(`\nDone. ${totalFlights} total flights found across ${monthsWithData}/${months} months.`,'ok');
+  log(`Aircraft found: ${Object.values(results).map(a=>a.reg).join(', ')}`,'ok');
+
+  if(totalFlights === 0){
+    log('\nNo data returned — Airbly may not hold historical data on this account tier.','warn');
+    btn.disabled = false;
+    return;
+  }
+
+  // Build weekly summary
+  buildWeekly();
+  renderSummary(months, totalFlights, monthsWithData);
+  renderWeeklyTable();
+  renderRawTable();
+
+  btn.disabled = false;
+}
+
+function buildWeekly(){
+  weeklyData = {};
+  Object.keys(results).forEach(id=>{
+    const ac = results[id];
+    weeklyData[id] = { reg: ac.reg, weeks:{} };
+    // Deduplicate flights by date+hrs (same flight may appear in multiple monthly fetches)
+    const seen = new Set();
+    ac.flights.forEach(f=>{
+      const key = f.date+'|'+f.airHrs.toFixed(4);
+      if(seen.has(key)) return;
+      seen.add(key);
+      const wk = getISOWeekKey(f.date);
+      weeklyData[id].weeks[wk] = (weeklyData[id].weeks[wk]||0) + f.airHrs;
+    });
+    // Round all week values
+    Object.keys(weeklyData[id].weeks).forEach(w=>{
+      weeklyData[id].weeks[w] = parseFloat(weeklyData[id].weeks[w].toFixed(2));
+    });
+  });
+}
+
+function renderSummary(months, totalFlights, monthsWithData){
+  const card = document.getElementById('summary-card');
+  card.classList.remove('hidden');
+
+  // Find date range
+  let earliest = null;
+  Object.values(results).forEach(ac=>{
+    ac.flights.forEach(f=>{
+      if(!earliest || f.date < earliest) earliest = f.date;
+    });
+  });
+
+  // Total fleet hours
+  let totalHrs = 0;
+  Object.values(weeklyData).forEach(ac=>{
+    Object.values(ac.weeks).forEach(h=>totalHrs+=h);
+  });
+
+  // Most active aircraft
+  const acTotals = Object.values(weeklyData).map(ac=>({
+    reg: ac.reg,
+    hrs: Object.values(ac.weeks).reduce((s,h)=>s+h,0)
+  })).sort((a,b)=>b.hrs-a.hrs);
+
+  const grid = document.getElementById('stat-grid');
+  grid.innerHTML = `
+    <div class="stat-box">
+      <div class="lbl">Months with data</div>
+      <div class="val">${monthsWithData}/${months}</div>
+      <div class="sub2">out of ${months} months requested</div>
+    </div>
+    <div class="stat-box">
+      <div class="lbl">Total flights found</div>
+      <div class="val">${totalFlights}</div>
+      <div class="sub2">across all aircraft</div>
+    </div>
+    <div class="stat-box">
+      <div class="lbl">Total fleet hours</div>
+      <div class="val">${totalHrs.toFixed(1)}</div>
+      <div class="sub2">reconstructed from flight logs</div>
+    </div>
+    <div class="stat-box">
+      <div class="lbl">Earliest data found</div>
+      <div class="val" style="font-size:16px">${earliest||'—'}</div>
+      <div class="sub2">&nbsp;</div>
+    </div>
+    <div class="stat-box">
+      <div class="lbl">Most active aircraft</div>
+      <div class="val" style="font-size:16px">${acTotals[0]?.reg||'—'}</div>
+      <div class="sub2">${acTotals[0]?.hrs.toFixed(1)||0} hrs in period</div>
+    </div>
+    <div class="stat-box">
+      <div class="lbl">Aircraft tracked</div>
+      <div class="val">${Object.keys(weeklyData).length}</div>
+      <div class="sub2">${Object.values(weeklyData).map(a=>a.reg).join(', ')}</div>
+    </div>
+  `;
+}
+
+function renderWeeklyTable(){
+  const card = document.getElementById('table-card');
+  card.classList.remove('hidden');
+
+  const allWeeks = new Set();
+  Object.values(weeklyData).forEach(ac=>Object.keys(ac.weeks).forEach(w=>allWeeks.add(w)));
+  const weeks = Array.from(allWeeks).sort().reverse();
+
+  const years = Array.from(new Set(weeks.map(w=>w.slice(0,4)))).sort().reverse();
+
+  // Year buttons
+  const btnDiv = document.getElementById('yr-btns');
+  btnDiv.innerHTML = years.map((yr,i)=>
+    `<button class="yr-btn${i===0?' act':''}" id="yrbtn-${yr}" onclick="wuYear('${yr}')">${yr}</button>`
+  ).join('');
+
+  // Tables per year
+  const container = document.getElementById('weekly-tables');
+  container.innerHTML = years.map((yr,yi)=>{
+    const yrWeeks = weeks.filter(w=>w.startsWith(yr));
+    const acs = Object.values(weeklyData).filter(ac=>yrWeeks.some(w=>ac.weeks[w]));
+
+    const fleetMax = Math.max(...yrWeeks.map(w=>
+      Object.values(weeklyData).reduce((s,ac)=>s+(ac.weeks[w]||0),0)
+    ),1);
+
+    const hdr = yrWeeks.map(w=>`<th class="num">${w.replace(/.*-W/,'W')}</th>`).join('');
+
+    const rows = acs.map(ac=>{
+      const yearTotal = yrWeeks.reduce((s,w)=>s+(ac.weeks[w]||0),0);
+      const cells = yrWeeks.map(w=>{
+        const hrs = ac.weeks[w]||0;
+        const pct = hrs/fleetMax;
+        const bg = hrs===0?'':'background:'+(pct>0.6?'#1a4a2a':pct>0.3?'#142e1e':'#0d2018');
+        const col = hrs===0?'color:#2a4a6a':hrs>=5?'color:#40d080;font-weight:700':hrs>=2?'color:#20c060':'color:#5a9a7a';
+        return `<td class="num" style="${bg};${col}">${hrs>0?hrs.toFixed(1):'—'}</td>`;
+      }).join('');
+      return `<tr>
+        <td style="font-weight:700;color:#fff;white-space:nowrap">${ac.reg}</td>
+        ${cells}
+        <td class="num" style="font-weight:700;color:#7ab8d8;border-left:1px solid #1a3050">${yearTotal.toFixed(1)}</td>
+      </tr>`;
+    }).join('');
+
+    // Fleet total row
+    const fleetCells = yrWeeks.map(w=>{
+      const t = Object.values(weeklyData).reduce((s,ac)=>s+(ac.weeks[w]||0),0);
+      return `<td class="num" style="font-weight:700;color:#7ab8d8;background:#07111e">${t>0?t.toFixed(1):'—'}</td>`;
+    }).join('');
+    const grandTotal = Object.values(weeklyData).reduce((s,ac)=>s+yrWeeks.reduce((ss,w)=>ss+(ac.weeks[w]||0),0),0);
+    const fleetRow = `<tr style="border-top:2px solid #1a3050">
+      <td style="font-size:10px;color:#5a8aaa;letter-spacing:.8px;background:#07111e">FLEET TOTAL</td>
+      ${fleetCells}
+      <td class="num" style="font-weight:700;color:#7ab8d8;background:#07111e;border-left:1px solid #1a3050">${grandTotal.toFixed(1)}</td>
+    </tr>`;
+
+    return `<div class="wu-tbl" data-yr="${yr}" style="display:${yi===0?'block':'none'};overflow-x:auto">
+      <table>
+        <thead><tr>
+          <th style="text-align:left;min-width:90px">Aircraft</th>
+          ${hdr}
+          <th class="num" style="border-left:1px solid #1a3050">${yr} Total</th>
+        </tr></thead>
+        <tbody>${rows}${fleetRow}</tbody>
+      </table>
+    </div>`;
+  }).join('');
+}
+
+function renderRawTable(){
+  const card = document.getElementById('raw-card');
+  card.classList.remove('hidden');
+
+  // Show flight counts per aircraft per month
+  const months = new Set();
+  Object.values(results).forEach(ac=>ac.flights.forEach(f=>months.add(f.date.slice(0,7))));
+  const sortedMonths = Array.from(months).sort().reverse();
+
+  const hdr = sortedMonths.map(m=>`<th class="num">${m}</th>`).join('');
+  const rows = Object.values(results).sort((a,b)=>a.reg.localeCompare(b.reg)).map(ac=>{
+    const cells = sortedMonths.map(m=>{
+      const count = ac.flights.filter(f=>f.date.startsWith(m)).length;
+      const col = count===0?'color:#2a4a6a':count>10?'color:#40d080;font-weight:700':'color:#7ab8d8';
+      return `<td class="num" style="${col}">${count||'—'}</td>`;
+    }).join('');
+    const total = ac.flights.length;
+    return `<tr>
+      <td style="font-weight:700;color:#fff">${ac.reg}</td>
+      ${cells}
+      <td class="num" style="font-weight:700;color:#7ab8d8;border-left:1px solid #1a3050">${total}</td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('raw-table').innerHTML = `
+    <div style="overflow-x:auto">
+    <table>
+      <thead><tr>
+        <th style="text-align:left">Aircraft</th>
+        ${hdr}
+        <th class="num" style="border-left:1px solid #1a3050">Total Flights</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    </div>
+    <p style="font-size:10px;color:#3a5a7a;margin-top:10px">Flight counts per aircraft per month. Confirms how far back Airbly holds data for this account.</p>
+  `;
+}
+
+function wuYear(yr){
+  document.querySelectorAll('.wu-tbl').forEach(el=>{
+    el.style.display = el.dataset.yr===yr?'block':'none';
+  });
+  document.querySelectorAll('.yr-btn').forEach(btn=>{
+    const active = btn.id==='yrbtn-'+yr;
+    btn.classList.toggle('act',active);
+  });
+}
+
+function clearResults(){
+  results={};weeklyData={};
+  document.getElementById('log').innerHTML='';
+  document.getElementById('log').classList.add('hidden');
+  document.getElementById('progress-wrap').classList.add('hidden');
+  ['summary-card','table-card','raw-card'].forEach(id=>document.getElementById(id).classList.add('hidden'));
+}
+</script>
+</body>
+</html>

@@ -367,6 +367,13 @@ async function syncPull(){
       ST.downtimeLog = remote.downtimeLog;
       localStorage.setItem('tl_downtime',JSON.stringify(ST.downtimeLog));
     }
+    if(remote.weeklyUsage && typeof remote.weeklyUsage==='object'){
+      Object.keys(remote.weeklyUsage).forEach(id=>{
+        if(!ST.weeklyUsage[id]) ST.weeklyUsage[id]={};
+        Object.assign(ST.weeklyUsage[id], remote.weeklyUsage[id]);
+      });
+      localStorage.setItem('tl_weekly',JSON.stringify(ST.weeklyUsage));
+    }
     if(remote.hoursSnapshots && typeof remote.hoursSnapshots==='object'){
       Object.keys(remote.hoursSnapshots).forEach(id=>{
         if(!ST.hoursSnapshots[id]) ST.hoursSnapshots[id]={};
@@ -413,6 +420,7 @@ function syncPush(){
         dailyLog: ST.dailyLog||{},
         hoursSnapshots: ST.hoursSnapshots||{},
         downtimeLog: ST.downtimeLog||[],
+        weeklyUsage: ST.weeklyUsage||{},
         sheets: Object.fromEntries(
           Object.keys(ST.cfg).map(id=>[id, ST.cfg[id]?.sheet_start||'1'])
         ),
@@ -452,6 +460,7 @@ const ST={
   dailyLog: JSON.parse(localStorage.getItem('tl_dailylog')||'{}'),
   hoursSnapshots: JSON.parse(localStorage.getItem('tl_snapshots')||'{}'),
   downtimeLog: JSON.parse(localStorage.getItem('tl_downtime')||'[]'),
+  weeklyUsage: JSON.parse(localStorage.getItem('tl_weekly')||'{}'),
 };
 
 // Save locally AND push to cloud
@@ -469,6 +478,10 @@ function saveDailyLog(){
 }
 function saveSnapshots(){
   localStorage.setItem('tl_snapshots',JSON.stringify(ST.hoursSnapshots));
+  syncPush();
+}
+function saveWeeklyUsage(){
+  localStorage.setItem('tl_weekly',JSON.stringify(ST.weeklyUsage));
   syncPush();
 }
 
@@ -781,6 +794,15 @@ function scheduleMidnightSnapshot(){
   console.log(`[Snapshot] Next snapshot in ${Math.round(msUntilMidnight/60000)} minutes`);
 }
 
+// Returns ISO week key e.g. "2024-W12" for a given date string "2024-03-21"
+function getISOWeekKey(dateStr){
+  const d = new Date(dateStr+'T12:00:00Z');
+  const jan4 = new Date(Date.UTC(d.getUTCFullYear(),0,4));
+  const weekNum = Math.ceil(((d-jan4)/86400000 + jan4.getUTCDay()+1)/7);
+  const yr = d.getUTCFullYear();
+  return `${yr}-W${String(weekNum).padStart(2,'0')}`;
+}
+
 function takeHoursSnapshot(){
   if(ST.isDemo || !ST.aircraft.length) return;
   const today = new Date().toISOString().slice(0,10);
@@ -790,15 +812,31 @@ function takeHoursSnapshot(){
     if(!ST.hoursSnapshots[ac.id]) ST.hoursSnapshots[ac.id]={};
     ST.hoursSnapshots[ac.id][today] = ac.totalHobbs;
     changed = true;
-    // Trim snapshots older than 35 days
+
+    // Before trimming, archive any about-to-expire days into weekly summaries
     const cutoff = new Date(Date.now()-35*86400*1000).toISOString().slice(0,10);
-    Object.keys(ST.hoursSnapshots[ac.id]).forEach(d=>{
-      if(d<cutoff) delete ST.hoursSnapshots[ac.id][d];
+    if(!ST.weeklyUsage[ac.id]) ST.weeklyUsage[ac.id]={};
+    Object.keys(ST.hoursSnapshots[ac.id]).sort().forEach((d,i,arr)=>{
+      if(d < cutoff && i > 0){
+        // Calculate hours flown between this day and the previous snapshot day
+        const prevD = arr[i-1];
+        const hrsThisDay = ST.hoursSnapshots[ac.id][d];
+        const hrsPrevDay = ST.hoursSnapshots[ac.id][prevD];
+        if(hrsThisDay != null && hrsPrevDay != null){
+          const flown = parseFloat((hrsThisDay - hrsPrevDay).toFixed(2));
+          if(flown > 0){
+            const wk = getISOWeekKey(d);
+            ST.weeklyUsage[ac.id][wk] = parseFloat(((ST.weeklyUsage[ac.id][wk]||0) + flown).toFixed(2));
+          }
+        }
+        delete ST.hoursSnapshots[ac.id][d];
+      }
     });
   }
   if(changed){
     saveSnapshots();
-    console.log('[Snapshot] Hours snapshot saved for',new Date().toISOString().slice(0,10));
+    saveWeeklyUsage();
+    console.log('[Snapshot] Hours snapshot + weekly archive saved for', today);
   }
 }
 
@@ -866,6 +904,24 @@ async function bootstrapSnapshotsFromFlightLogs(){
       }
     }
 
+    // Archive any old snapshots into weekly summaries before trimming
+    if(!ST.weeklyUsage[ac.id]) ST.weeklyUsage[ac.id]={};
+    const sortedDays = Object.keys(ST.hoursSnapshots[ac.id]).sort();
+    sortedDays.forEach((d,i,arr)=>{
+      if(d < cutoff && i > 0){
+        const prevD = arr[i-1];
+        const hrsThis = ST.hoursSnapshots[ac.id][d];
+        const hrsPrev = ST.hoursSnapshots[ac.id][prevD];
+        if(hrsThis != null && hrsPrev != null){
+          const flown = parseFloat((hrsThis - hrsPrev).toFixed(2));
+          if(flown > 0){
+            const wk = getISOWeekKey(d);
+            ST.weeklyUsage[ac.id][wk] = parseFloat(((ST.weeklyUsage[ac.id][wk]||0) + flown).toFixed(2));
+          }
+        }
+      }
+    });
+
     // Trim old entries
     Object.keys(ST.hoursSnapshots[ac.id]).forEach(d=>{
       if(d < cutoff) delete ST.hoursSnapshots[ac.id][d];
@@ -875,6 +931,7 @@ async function bootstrapSnapshotsFromFlightLogs(){
   }
 
   saveSnapshots();
+  saveWeeklyUsage();
   console.log('[Bootstrap] Done.');
   if(ST.dashGraph) drawHoursGraph(ST.dashGraph);
 }
@@ -2065,7 +2122,130 @@ function rMxPlanner(){
     +'<button onclick="addDowntime()" style="background:var(--blue);color:#fff;border:none;border-radius:8px;padding:9px 22px;font-weight:700;font-size:12px;cursor:pointer;letter-spacing:.5px">+ Add Downtime Entry</button>'
     +'</div>'
 
+    // weekly usage
+    +'<div style="height:28px"></div>'
+    +rWeeklyUsage()
+
     +'</div>';
+}
+
+function rWeeklyUsage(){
+  const _all = allAircraft();
+  const wu = ST.weeklyUsage||{};
+
+  // Collect all weeks across all aircraft, sorted newest first
+  const allWeeks = new Set();
+  _all.forEach(function(ac){ Object.keys(wu[ac.id]||{}).forEach(function(w){ allWeeks.add(w); }); });
+  const weeks = Array.from(allWeeks).sort().reverse();
+
+  if(!weeks.length){
+    return '<div style="font-size:11px;font-weight:700;color:var(--mut);letter-spacing:2px;text-transform:uppercase;margin-bottom:12px;padding-bottom:6px;border-bottom:1px solid var(--border)">Fleet Weekly Usage</div>'
+      +'<div style="background:var(--panel);border:1px solid var(--border);border-radius:11px;padding:24px;color:var(--mut);font-size:12px;text-align:center">'
+      +'Weekly usage data will appear here as it accumulates. Data is archived automatically every 35 days.'
+      +'</div>';
+  }
+
+  // Year filter — build list of years present
+  const years = Array.from(new Set(weeks.map(function(w){ return w.slice(0,4); }))).sort().reverse();
+  const selYear = 'wu-year-sel';
+
+  // Group weeks by year for the selected year
+  // We render all years but hide non-selected via a simple inline filter using data attributes
+  // Build table header: Reg | week cols...
+  // Limit to 52 weeks shown at once, filtered by selected year
+  const thStyle = 'padding:7px 10px;text-align:center;color:var(--mut);font-size:10px;letter-spacing:.8px;background:var(--sb);white-space:nowrap;min-width:52px';
+  const tdStyle = 'padding:7px 8px;text-align:center;font-size:12px;border-bottom:1px solid var(--border)';
+
+  // Build per-year tables
+  const tables = years.map(function(yr){
+    const yrWeeks = weeks.filter(function(w){ return w.startsWith(yr); });
+
+    // Monthly totals per aircraft for this year
+    // Also find fleet total per week for the bar
+    const fleetMax = Math.max.apply(null, yrWeeks.map(function(w){
+      return _all.reduce(function(s,ac){ return s+(wu[ac.id]&&wu[ac.id][w]||0); },0);
+    }).concat([1]));
+
+    const headerCols = yrWeeks.map(function(w){
+      return '<th style="'+thStyle+'">'+w.replace(/.*-W/,'W')+'</th>';
+    }).join('');
+
+    const rows = _all.map(function(ac){
+      const acData = wu[ac.id]||{};
+      const yearTotal = yrWeeks.reduce(function(s,w){ return s+(acData[w]||0); },0);
+      if(yearTotal===0) return '';
+      const cells = yrWeeks.map(function(w){
+        const hrs = acData[w]||0;
+        const pct = hrs/fleetMax;
+        const bg = hrs===0 ? 'background:transparent' :
+                   pct>0.6 ? 'background:#1a4a2a' :
+                   pct>0.3 ? 'background:#142e1e' : 'background:#0d2018';
+        const col = hrs===0 ? 'color:var(--dim)' :
+                    hrs>=5  ? 'color:#40d080;font-weight:700' :
+                    hrs>=2  ? 'color:var(--grn)' : 'color:var(--mut)';
+        return '<td style="'+tdStyle+';'+bg+';'+col+'">'+(hrs>0?hrs.toFixed(1):'&mdash;')+'</td>';
+      }).join('');
+      const annualCol = yearTotal>0
+        ? '<td style="'+tdStyle+';font-weight:700;color:var(--acc);border-left:1px solid var(--border)">'+yearTotal.toFixed(1)+'</td>'
+        : '<td style="'+tdStyle+';color:var(--dim);border-left:1px solid var(--border)">&mdash;</td>';
+      return '<tr>'
+        +'<td style="'+tdStyle+';font-weight:700;color:#fff;text-align:left;padding-left:12px;white-space:nowrap;border-left:none">'+esc(ac.reg)+'</td>'
+        +cells
+        +annualCol
+        +'</tr>';
+    }).filter(Boolean).join('');
+
+    // Fleet total row
+    const fleetTotalCells = yrWeeks.map(function(w){
+      const t = _all.reduce(function(s,ac){ return s+(wu[ac.id]&&wu[ac.id][w]||0); },0);
+      return '<td style="'+tdStyle+';font-weight:700;color:var(--acc);background:var(--sb)">'+(t>0?t.toFixed(1):'&mdash;')+'</td>';
+    }).join('');
+    const grandTotal = _all.reduce(function(s,ac){
+      return s+yrWeeks.reduce(function(ss,w){ return ss+(wu[ac.id]&&wu[ac.id][w]||0); },0);
+    },0);
+    const fleetRow = '<tr style="border-top:2px solid var(--border)">'
+      +'<td style="'+tdStyle+';font-weight:700;color:var(--mut);text-align:left;padding-left:12px;background:var(--sb);font-size:10px;letter-spacing:.8px">FLEET TOTAL</td>'
+      +fleetTotalCells
+      +'<td style="'+tdStyle+';font-weight:700;color:var(--acc);background:var(--sb);border-left:1px solid var(--border)">'+grandTotal.toFixed(1)+'</td>'
+      +'</tr>';
+
+    if(!rows) return '';
+    return '<div class="wu-yr" data-yr="'+yr+'" style="display:none;overflow-x:auto;margin-bottom:8px">'
+      +'<table style="border-collapse:collapse;font-size:12px;min-width:100%">'
+      +'<thead><tr style="border-bottom:1px solid var(--border)">'
+      +'<th style="'+thStyle+';text-align:left;padding-left:12px;min-width:90px">Aircraft</th>'
+      +headerCols
+      +'<th style="'+thStyle+';border-left:1px solid var(--border)">'+yr+' Total</th>'
+      +'</tr></thead>'
+      +'<tbody>'+rows+fleetRow+'</tbody>'
+      +'</table></div>';
+  }).join('');
+
+  const yearBtns = years.map(function(yr,i){
+    return '<button onclick="wuSetYear(\''+yr+'\')" id="wu-btn-'+yr+'" '
+      +'style="background:'+(i===0?'var(--acc)':'var(--panel)')+';color:'+(i===0?'#000':'var(--mut)')+';'
+      +'border:1px solid '+(i===0?'var(--acc)':'var(--border)')+';border-radius:6px;padding:5px 14px;font-size:11px;font-weight:700;cursor:pointer">'+yr+'</button>';
+  }).join('');
+
+  return '<div style="font-size:11px;font-weight:700;color:var(--mut);letter-spacing:2px;text-transform:uppercase;margin-bottom:12px;padding-bottom:6px;border-bottom:1px solid var(--border)">Fleet Weekly Usage</div>'
+    +'<div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">'+yearBtns+'</div>'
+    +'<div style="background:var(--panel);border:1px solid var(--border);border-radius:11px;overflow:hidden">'
+    +tables
+    +'</div>'
+    +'<div style="font-size:10px;color:var(--dim);margin-top:8px">Hours flown per aircraft per ISO week. Archived permanently from daily snapshots. Darker green = busier week.</div>'
+    +'<script>setTimeout(function(){ wuSetYear("'+years[0]+'"); },0);<\/script>';
+}
+
+function wuSetYear(yr){
+  document.querySelectorAll('.wu-yr').forEach(function(el){
+    el.style.display = el.dataset.yr===yr ? 'block' : 'none';
+  });
+  document.querySelectorAll('[id^="wu-btn-"]').forEach(function(btn){
+    const active = btn.id==='wu-btn-'+yr;
+    btn.style.background = active?'var(--acc)':'var(--panel)';
+    btn.style.color = active?'#000':'var(--mut)';
+    btn.style.borderColor = active?'var(--acc)':'var(--border)';
+  });
 }
 
 function addDowntime(){
@@ -2082,8 +2262,6 @@ function addDowntime(){
 
 function removeDowntime(idx){
   if(!ST.downtimeLog) return;
-  const e = ST.downtimeLog[idx];
-  if(!confirm(`Remove downtime entry for ${e.reg}?\n${e.start}${e.end?' → '+e.end:' (ongoing)'}\n${e.reason||''}\n\nThis cannot be undone.`)) return;
   ST.downtimeLog.splice(idx,1);
   saveDowntime();
   render();
@@ -2096,18 +2274,6 @@ function saveDowntime(){
 
 
 function rSettings(){
-  const unlocked = !!sessionStorage.getItem('settings_unlocked');
-  const lockBanner = `
-    <div style="display:flex;align-items:center;justify-content:space-between;background:${unlocked?'#0d2e1a':'#1a0d0d'};border:1px solid ${unlocked?'var(--grn)':'var(--red)'};border-radius:10px;padding:12px 18px;margin-bottom:20px">
-      <div>
-        <span style="font-size:13px;font-weight:700;color:${unlocked?'var(--grn)':'#ff8080'}">${unlocked?'🔓 Settings Unlocked':'🔒 Settings Locked'}</span>
-        <span style="font-size:11px;color:var(--mut);margin-left:10px">${unlocked?'Changes can be made and saved.':'Unlock to make changes.'}</span>
-      </div>
-      <button onclick="${unlocked?'lockSettings()':'unlockSettings()'}" style="background:${unlocked?'#1a3a1a':'#3a1a1a'};border:1px solid ${unlocked?'var(--grn)':'var(--red)'};color:${unlocked?'var(--grn)':'#ff8080'};border-radius:6px;padding:6px 16px;font-size:12px;font-weight:700;cursor:pointer">
-        ${unlocked?'🔒 Lock Settings':'🔓 Unlock to Edit'}
-      </button>
-    </div>`;
-
   const savedKey=localStorage.getItem('tl_key');
   const keyBlock=savedKey?`
     <div class="card" style="margin-bottom:20px">
@@ -2214,32 +2380,21 @@ function rSettings(){
       <div style="font-size:10px;color:var(--dim);margin-top:8px">Tab moves between fields &nbsp;·&nbsp; Esc closes form</div>
     </div>`;
 
-  const lockedStyle = unlocked ? '' : 'pointer-events:none;opacity:0.45;user-select:none;';
-
-  return`${lockBanner}${keyBlock}
+  return`${keyBlock}
   <p style="font-size:13px;color:var(--mut);margin-bottom:16px">
     Airbly aircraft settings pre-fill the printed tech log header. Manual aircraft are tracked locally only.
   </p>
   <div style="font-size:11px;color:var(--dim);margin-bottom:14px">AIRBLY AIRCRAFT (${ST.aircraft.length})</div>
-  <div style="${lockedStyle}">${airblyCards}</div>
+  ${airblyCards}
   <div style="font-size:11px;color:var(--dim);margin:20px 0 14px">MANUAL AIRCRAFT (${ST.manualAircraft.length})</div>
-  <div style="${lockedStyle}">${manualCards}
-  ${addBtn}</div>
+  ${manualCards}
+  ${addBtn}
   <div style="margin-top:24px;padding-top:16px;border-top:1px solid var(--border)">
     <button onclick="debugAirblyFields()" style="background:none;border:1px solid var(--dim);color:var(--dim);border-radius:7px;padding:7px 16px;font-size:11px;cursor:pointer">🔍 Inspect raw Airbly field names (debug)</button>
     <button onclick="forcePull()" style="background:none;border:1px solid var(--acc);color:var(--acc);border-radius:7px;padding:7px 16px;font-size:11px;cursor:pointer;margin-left:8px">☁ Pull latest from cloud</button>
     <button onclick="forcePush()" style="background:none;border:1px solid var(--grn);color:var(--grn);border-radius:7px;padding:7px 16px;font-size:11px;cursor:pointer;margin-left:8px">☁ Push my settings to cloud</button>
     <p style="font-size:11px;color:var(--dim);margin-top:6px">Opens a window showing every field name returned by the Airbly API — use this to diagnose missing last flight dates.</p>
   </div>`;
-}
-
-function unlockSettings(){
-  sessionStorage.setItem('settings_unlocked','1');
-  render();
-}
-function lockSettings(){
-  sessionStorage.removeItem('settings_unlocked');
-  render();
 }
 
 // ── MANUAL AIRCRAFT CRUD ─────────────────────────────
