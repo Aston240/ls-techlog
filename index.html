@@ -1817,8 +1817,57 @@ function rMxPlanner(){
   const DAY = 86400*1000;
   const dt = ST.downtimeLog||[];
 
+  // Fleet tier definitions
+  const TIER1 = ['G-BCGJ','G-PETR','G-MKAS','G-BTGO','G-FIAT','N150PK'];
+  const TIER2 = ['G-EGTB','G-BOTN'];
+  const TIER3 = ['G-HRYZ','G-SETG'];
+  const NO_STANDBY = ['G-HRYZ','G-SETG'];
+  const MONTHLY_TARGET = {'G-EGTB':15,'G-BOTN':15};
+
+  function acTier(ac){
+    const r = ac.reg;
+    if(TIER1.indexOf(r)>=0) return 1;
+    if(TIER2.indexOf(r)>=0) return 2;
+    if(TIER3.indexOf(r)>=0) return 3;
+    return 2;
+  }
+
   // Set of grounded regs
   const grounded = new Set(dt.filter(function(e){return !e.end;}).map(function(e){return e.reg;}));
+
+  // ── Burn rate: hours per day, excluding weather days (fleet-wide zero) ──
+  function activeDaysBurnRate(ac){
+    const snaps = ST.hoursSnapshots[ac.id]||{};
+    const dates = Object.keys(snaps).sort();
+    const cutoff = new Date(now-30*DAY).toISOString().slice(0,10);
+    const recent = dates.filter(function(d){return d>=cutoff;});
+    if(recent.length<2) return ac.totalHobbs/90||0;
+
+    // Build fleet-wide daily hours to detect weather days
+    const fleetDailyHrs = {};
+    _all.forEach(function(a){
+      const s = ST.hoursSnapshots[a.id]||{};
+      const sd = Object.keys(s).sort().filter(function(d){return d>=cutoff;});
+      for(var i=1;i<sd.length;i++){
+        const d = sd[i];
+        const delta = Math.max(0,(s[sd[i]]||0)-(s[sd[i-1]]||0));
+        fleetDailyHrs[d] = (fleetDailyHrs[d]||0)+delta;
+      }
+    });
+
+    // Only count days where fleet flew >0.1 hrs total
+    var totalHrs=0, activeDays=0;
+    for(var i=1;i<recent.length;i++){
+      const d = recent[i];
+      const fleetFlew = (fleetDailyHrs[d]||0)>0.1;
+      if(fleetFlew){
+        totalHrs += Math.max(0,(snaps[recent[i]]||0)-(snaps[recent[i-1]]||0));
+        activeDays++;
+      }
+    }
+    if(activeDays<2) return ac.totalHobbs/90||0;
+    return totalHrs/activeDays;
+  }
 
   function burnRatePday(ac){
     const snaps = ST.hoursSnapshots[ac.id]||{};
@@ -1833,7 +1882,7 @@ function rMxPlanner(){
   }
 
   function predictDays(ac, targetHrs){
-    const rate = burnRatePday(ac);
+    const rate = activeDaysBurnRate(ac);
     if(rate<=0) return null;
     const left = targetHrs - ac.totalHobbs;
     if(left<=0) return 0;
@@ -1843,16 +1892,14 @@ function rMxPlanner(){
   function parseUKDate(str){
     if(!str) return null;
     str = str.trim();
-    // "dd/mm/yyyy" or "d/m/yyyy"
     let m = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
     if(m) return new Date(parseInt(m[3]), parseInt(m[2])-1, parseInt(m[1]));
-    // "dd Mon yyyy" e.g. "14 Nov 2025"
     m = str.match(/^(\d{1,2}) ([A-Za-z]{3,}) (\d{4})$/);
     if(m) return new Date(m[2]+' '+m[1]+' '+m[3]);
-    // "Mon dd yyyy" or ISO — let JS try but warn
     const d = new Date(str);
     return isNaN(d) ? null : d;
   }
+
   function daysUntilDate(str){
     const d = parseUKDate(str);
     if(!d || isNaN(d)) return null;
@@ -1868,8 +1915,61 @@ function rMxPlanner(){
 
   function addDays(ms, days){ return new Date(ms+days*DAY).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}); }
 
-  // Score each aircraft: lower = more urgent = higher priority
-  // Grounded = always last
+  function weeksLabel(days){
+    if(days===null) return null;
+    if(days<=0) return 'OVERDUE';
+    if(days<=7) return 'less than 1 week';
+    if(days<=14) return 'in ~'+Math.round(days/7)+' weeks';
+    if(days<=21) return 'in ~3 weeks';
+    if(days<=35) return 'in ~'+Math.round(days/7)+' weeks';
+    return 'in ~'+Math.round(days/7)+' weeks';
+  }
+
+  // ── Monthly hours flown for a given aircraft (current calendar month) ──
+  function monthlyHrsFlown(ac){
+    const snaps = ST.hoursSnapshots[ac.id]||{};
+    const now_d = new Date();
+    const monthStart = new Date(now_d.getFullYear(), now_d.getMonth(), 1).toISOString().slice(0,10);
+    const dates = Object.keys(snaps).sort().filter(function(d){return d>=monthStart;});
+    if(dates.length<2) return 0;
+    return Math.max(0,(snaps[dates[dates.length-1]]||0)-(snaps[dates[0]]||0));
+  }
+
+  // ── Check type duration in days ──
+  function checkDurationDays(cfg){
+    const ct = (cfg.check_type||'').toLowerCase();
+    if(ct.indexOf('100')>=0) return 3;
+    if(ct.indexOf('50')>=0) return 1;
+    return 2; // default
+  }
+
+  // ── Annual alignment warning ──
+  // Returns object {warn:bool, msg:string} if check won't complete before annual
+  function annualAlignmentCheck(ac){
+    const cfg = ST.cfg[ac.id]||{};
+    const due = parseFloat(cfg.maint_due)||null;
+    if(!due || !cfg.annual_due) return null;
+    const annDays = daysUntilDate(cfg.annual_due);
+    if(annDays===null || annDays<0) return null;
+    const mxDays = predictDays(ac, due);
+    if(mxDays===null) return null;
+    const hrsRem = Math.max(0, due - ac.totalHobbs);
+    const rate = activeDaysBurnRate(ac);
+    const hrsAtAnnual = rate>0 ? hrsRem - (rate*annDays) : hrsRem;
+    // If aircraft will reach annual with >15hrs still on the check, flag it
+    if(hrsAtAnnual > 15){
+      return {
+        warn: true,
+        hrsRem: hrsRem.toFixed(1),
+        annDays: annDays,
+        hrsAtAnnual: hrsAtAnnual.toFixed(1),
+        mxDays: mxDays
+      };
+    }
+    return null;
+  }
+
+  // ── Urgency score for sorting — considers tier, then days to most urgent deadline ──
   function urgencyScore(ac){
     if(grounded.has(ac.reg)) return 99999;
     const cfg = ST.cfg[ac.id]||{};
@@ -1877,15 +1977,132 @@ function rMxPlanner(){
     const mxDays = due ? predictDays(ac,due) : null;
     const arcDays = daysUntilDate(cfg.cofa_exp);
     const annDays = daysUntilDate(cfg.annual_due);
-    // Worst (smallest days) across all three deadlines
     const candidates = [mxDays, arcDays, annDays].filter(function(x){return x!==null;});
-    if(!candidates.length) return 9000;
-    return Math.min.apply(null,candidates);
+    const minDays = candidates.length ? Math.min.apply(null,candidates) : 9000;
+    // Tier offset: tier1=0, tier2=500, tier3=1000 — so tier1 aircraft sort first
+    // But urgency overrides tier: if minDays<30, ignore tier offset
+    const tierOffset = minDays<30 ? 0 : (acTier(ac)-1)*500;
+    return minDays + tierOffset;
   }
 
   const sorted = _all.slice().sort(function(a,b){ return urgencyScore(a)-urgencyScore(b); });
 
-  // Ongoing downtime banners
+  // ── Fleet sequence: predict check-in dates for all non-grounded aircraft ──
+  // Space them 3 days apart, burn lower-hours aircraft first within tier
+  var sequenceSlot = 0;
+  const seqMap = {}; // ac.id -> {slotDay, expectedIn}
+  const nonGrounded = sorted.filter(function(ac){ return !grounded.has(ac.reg); });
+
+  // Sort by predicted days to check (ascending) within each tier for sequencing
+  const seqSorted = nonGrounded.slice().sort(function(a,b){
+    const tierDiff = acTier(a)-acTier(b);
+    if(tierDiff!==0) return tierDiff;
+    const cfg_a = ST.cfg[a.id]||{}, cfg_b = ST.cfg[b.id]||{};
+    const due_a = parseFloat(cfg_a.maint_due)||null;
+    const due_b = parseFloat(cfg_b.maint_due)||null;
+    const hrsA = due_a ? Math.max(0,due_a-a.totalHobbs) : 9999;
+    const hrsB = due_b ? Math.max(0,due_b-b.totalHobbs) : 9999;
+    return hrsA-hrsB; // lower hrs remaining = goes in first
+  });
+
+  seqSorted.forEach(function(ac,i){
+    const expectedSlotDay = i*3; // 3 days between each check-in
+    seqMap[ac.id] = {slotDay: expectedSlotDay, position: i+1};
+  });
+
+  // ── Clash detection: aircraft predicted to need check within 3 days of each other ──
+  const clashes = [];
+  for(var ci=0;ci<seqSorted.length-1;ci++){
+    const a = seqSorted[ci], b = seqSorted[ci+1];
+    const cfg_a = ST.cfg[a.id]||{}, cfg_b = ST.cfg[b.id]||{};
+    const due_a = parseFloat(cfg_a.maint_due)||null;
+    const due_b = parseFloat(cfg_b.maint_due)||null;
+    const dA = due_a ? predictDays(a,due_a) : null;
+    const dB = due_b ? predictDays(b,due_b) : null;
+    if(dA!==null && dB!==null && Math.abs(dA-dB)<=3 && Math.abs(dA-dB)<(ci===0?999:3)){
+      clashes.push({a:a.reg, b:b.reg, dA:dA, dB:dB});
+    }
+  }
+
+  // ── Standby selection ──
+  // Preference: TIER2 if on monthly target, else TIER1 furthest from check
+  // Never HRYZ or SETG
+  var standbyAc = null, standbyNote = '', standbyWarn = false;
+  const standbyPool = _all.filter(function(ac){
+    return !grounded.has(ac.reg) && NO_STANDBY.indexOf(ac.reg)<0;
+  });
+
+  // Check TIER2 monthly progress
+  const tier2candidates = standbyPool.filter(function(ac){ return TIER2.indexOf(ac.reg)>=0; });
+  var tier2OnTrack = tier2candidates.filter(function(ac){
+    const target = MONTHLY_TARGET[ac.reg]||15;
+    const flown = monthlyHrsFlown(ac);
+    const now_d = new Date();
+    const daysInMonth = new Date(now_d.getFullYear(), now_d.getMonth()+1, 0).getDate();
+    const dayOfMonth = now_d.getDate();
+    const paceNeeded = target * (dayOfMonth/daysInMonth);
+    return flown >= paceNeeded * 0.8; // within 80% of pace = on track
+  });
+
+  if(tier2OnTrack.length>0){
+    // Pick tier2 aircraft furthest from its next check
+    tier2OnTrack.sort(function(a,b){
+      const cfg_a=ST.cfg[a.id]||{}, cfg_b=ST.cfg[b.id]||{};
+      const due_a=parseFloat(cfg_a.maint_due)||null, due_b=parseFloat(cfg_b.maint_due)||null;
+      const hA=due_a?Math.max(0,due_a-a.totalHobbs):9999;
+      const hB=due_b?Math.max(0,due_b-b.totalHobbs):9999;
+      return hB-hA;
+    });
+    standbyAc = tier2OnTrack[0];
+    const flown = monthlyHrsFlown(standbyAc).toFixed(1);
+    const target = MONTHLY_TARGET[standbyAc.reg]||15;
+    standbyNote = flown+' hrs flown this month · on track for '+target+' hr target';
+    standbyWarn = false;
+  } else {
+    // Check if tier2 exists but behind on hours
+    const tier2Behind = tier2candidates.filter(function(ac){
+      const target = MONTHLY_TARGET[ac.reg]||15;
+      const flown = monthlyHrsFlown(ac);
+      const now_d = new Date();
+      const daysInMonth = new Date(now_d.getFullYear(), now_d.getMonth()+1, 0).getDate();
+      const dayOfMonth = now_d.getDate();
+      const paceNeeded = target * (dayOfMonth/daysInMonth);
+      return flown < paceNeeded * 0.8;
+    });
+    if(tier2Behind.length>0){
+      // Flag that tier2 should be flying, fall back to tier1
+      const behind = tier2Behind.map(function(ac){
+        return ac.reg+' ('+monthlyHrsFlown(ac).toFixed(1)+'hrs of '+(MONTHLY_TARGET[ac.reg]||15)+' this month)';
+      }).join(', ');
+      standbyWarn = true;
+      // Fall back to tier1 furthest from check
+      const tier1pool = standbyPool.filter(function(ac){ return TIER1.indexOf(ac.reg)>=0; });
+      tier1pool.sort(function(a,b){
+        const cfg_a=ST.cfg[a.id]||{}, cfg_b=ST.cfg[b.id]||{};
+        const due_a=parseFloat(cfg_a.maint_due)||null, due_b=parseFloat(cfg_b.maint_due)||null;
+        const hA=due_a?Math.max(0,due_a-a.totalHobbs):9999;
+        const hB=due_b?Math.max(0,due_b-b.totalHobbs):9999;
+        return hB-hA;
+      });
+      standbyAc = tier1pool[0]||null;
+      standbyNote = 'Behind on monthly hrs: '+behind+' — should be flying today, not on standby';
+    } else {
+      // No tier2 at all, use tier1
+      const tier1pool = standbyPool.filter(function(ac){ return TIER1.indexOf(ac.reg)>=0; });
+      tier1pool.sort(function(a,b){
+        const cfg_a=ST.cfg[a.id]||{}, cfg_b=ST.cfg[b.id]||{};
+        const due_a=parseFloat(cfg_a.maint_due)||null, due_b=parseFloat(cfg_b.maint_due)||null;
+        const hA=due_a?Math.max(0,due_a-a.totalHobbs):9999;
+        const hB=due_b?Math.max(0,due_b-b.totalHobbs):9999;
+        return hB-hA;
+      });
+      standbyAc = tier1pool[0]||null;
+      standbyNote = 'No Tier 2 aircraft available';
+      standbyWarn = false;
+    }
+  }
+
+  // ── Ongoing downtime banners ──
   const banners = dt.filter(function(e){return !e.end;}).map(function(e){
     const days = Math.round((now-new Date(e.start))/DAY);
     return '<div style="display:flex;align-items:center;gap:10px;background:#2a1010;border:1px solid #6a2020;'
@@ -1896,14 +2113,43 @@ function rMxPlanner(){
       +'</div>';
   }).join('');
 
-  // Build priority cards
+  // ── Standby banner ──
+  var standbyBanner = '';
+  if(standbyAc){
+    const sbBg = standbyWarn ? '#2a1e08' : '#0a2318';
+    const sbBdr = standbyWarn ? '#5a3a10' : '#1a5030';
+    const sbCol = standbyWarn ? '#f0c040' : '#40d080';
+    const sbIco = standbyWarn ? '\u26a0\ufe0f' : '\u2708\ufe0f';
+    standbyBanner = '<div style="display:flex;align-items:center;gap:12px;background:'+sbBg+';border:1px solid '+sbBdr+';'
+      +'border-radius:8px;padding:12px 16px;margin-bottom:12px;font-size:12px">'
+      +'<span style="font-size:18px">'+sbIco+'</span>'
+      +'<div style="flex:1">'
+      +'<span style="font-weight:800;color:'+sbCol+';font-size:13px">TODAY\'S STANDBY: '+esc(standbyAc.reg)+'</span>'
+      +(standbyWarn ? '<span style="margin-left:10px;color:#f0c040;font-size:11px">⚠ Tier 2 behind on hours</span>' : '')
+      +'<div style="color:var(--mut);font-size:10px;margin-top:3px">'+standbyNote+'</div>'
+      +'</div>'
+      +'</div>';
+  }
+
+  // ── Clash warning banner ──
+  var clashBanner = '';
+  if(clashes.length>0){
+    const clashItems = clashes.map(function(c){
+      return esc(c.a)+' ('+c.dA+'d) and '+esc(c.b)+' ('+c.dB+'d) are within 3 days of each other \u2014 consider flying '+esc(c.dA<=c.dB?c.b:c.a)+' harder to spread the sequence';
+    }).join('<br>');
+    clashBanner = '<div style="background:#2a1e08;border:1px solid #5a3a10;border-radius:8px;padding:10px 14px;margin-bottom:10px;font-size:11px;color:#f0c040">'
+      +'<span style="font-weight:800;font-size:12px">\u26a0\ufe0f Sequence Clash</span><br>'+clashItems+'</div>';
+  }
+
+  // ── Build priority cards ──
   var rankNum = 0;
   const cards = sorted.map(function(ac){
     const cfg = ST.cfg[ac.id]||{};
     const isGrounded = grounded.has(ac.reg);
     const due = parseFloat(cfg.maint_due)||null;
     const rate = burnRatePday(ac);
-    const rateWk = (rate*7).toFixed(1);
+    const activeRate = activeDaysBurnRate(ac);
+    const rateWk = (activeRate*7).toFixed(1);
     const mxDays = due ? predictDays(ac,due) : null;
     const arcDays = daysUntilDate(cfg.cofa_exp);
     const annDays = daysUntilDate(cfg.annual_due);
@@ -1911,45 +2157,72 @@ function rMxPlanner(){
     const predDate = (mxDays!==null) ? addDays(now,mxDays) : null;
     const dtEntry = dt.filter(function(e){return e.reg===ac.reg&&!e.end;})[0];
     const downtimeDays = dtEntry ? Math.round((now-new Date(dtEntry.start))/DAY) : null;
+    const checkDur = checkDurationDays(cfg);
+    const isStandby = standbyAc && standbyAc.id===ac.id;
+    const tier = acTier(ac);
 
-    // Determine urgency tier
-    var tier, label, action, actionSub;
+    // Annual alignment check
+    const annAlign = annualAlignmentCheck(ac);
+
+    // ── Which deadline is driving the urgency ──
+    var drivingDeadline = '';
+    var drivingDays = null;
+    const deadlineMap = [];
+    if(mxDays!==null) deadlineMap.push({label:'Hours check', days:mxDays, type:'mx'});
+    if(arcDays!==null) deadlineMap.push({label:'ARC', days:arcDays, type:'arc'});
+    if(annDays!==null) deadlineMap.push({label:'Annual', days:annDays, type:'ann'});
+    if(deadlineMap.length>0){
+      deadlineMap.sort(function(a,b){return a.days-b.days;});
+      drivingDeadline = deadlineMap[0].label;
+      drivingDays = deadlineMap[0].days;
+    }
+
+    // ── Urgency tier ──
+    var urgTier, label, action, actionSub;
     if(isGrounded){
-      tier='urgent';
+      urgTier='urgent';
       label='GROUNDED';
       action='UNSERVICEABLE';
       actionSub=esc(dtEntry&&dtEntry.reason||'') + (downtimeDays!==null?'<br>Day '+downtimeDays+' of downtime.':'');
     } else {
       rankNum++;
-      // Find the most urgent deadline
-      const minDays = Math.min.apply(null,[mxDays,arcDays,annDays].filter(function(x){return x!==null;}).concat([9999]));
-      const hrsLeft = due ? (due-ac.totalHobbs) : null;
-      if(minDays<=0){
-        tier='urgent'; label='OVERDUE'; action='OVERDUE'; actionSub='Immediate action required.';
-      } else if(minDays<=14){
-        tier='urgent'; label='Fly now'; action='FLY NOW';
-        actionSub='Deadline in '+minDays+' days.<br>Prioritise this aircraft.';
-      } else if(minDays<=45){
-        tier='warn'; label='Plan check'; action='BOOK CHECK';
-        actionSub='Deadline in ~'+minDays+' days.<br>Book engineer slot now.';
-      } else if(hrsLeft!==null && hrsLeft<=10){
-        tier='warn'; label='Ease flying'; action='EASE OFF';
-        actionSub='Only '+hrsLeft+' hrs remaining.<br>Manage carefully.';
+      if(drivingDays!==null && drivingDays<=0){
+        urgTier='urgent'; label='OVERDUE'; action='OVERDUE';
+        actionSub='<span style="color:#ff8080">'+drivingDeadline+'</span> is overdue.<br>Immediate action required.';
+      } else if(drivingDays!==null && drivingDays<=7){
+        urgTier='urgent'; label='Fly now'; action='FLY NOW';
+        actionSub='<span style="color:#ff8080">'+drivingDeadline+'</span> in '+drivingDays+' days.<br>Prioritise this aircraft.';
+      } else if(drivingDays!==null && drivingDays<=10){
+        urgTier='warn'; label='Book check'; action='BOOK CHECK';
+        actionSub='<span style="color:#f0c040">'+drivingDeadline+'</span> in '+drivingDays+' days.<br>Book engineer slot now.';
       } else {
-        tier='ok'; label='On track'; action='ON TRACK';
-        actionSub='Next deadline in ~'+minDays+' days.<br>Fly normally.';
+        urgTier='ok'; label='On track'; action='ON TRACK';
+        if(drivingDays!==null){
+          actionSub='Next: <span style="color:#40d080">'+drivingDeadline+'</span><br>'+weeksLabel(drivingDays)+' (~'+drivingDays+'d)';
+        } else {
+          actionSub='No deadlines set.';
+        }
       }
     }
 
-    const rankBg   = tier==='urgent'?'#3a1010': tier==='warn'?'#2a1e08':'#0a2318';
+    const rankBg   = urgTier==='urgent'?'#3a1010': urgTier==='warn'?'#2a1e08':'#0a2318';
     const rankTxt  = isGrounded?'&mdash;':rankNum;
-    const rankIco  = tier==='urgent'?'&#128308;': tier==='warn'?'&#129000;':'&#128994;';
-    const labelBg  = tier==='urgent'?'background:#3a1010;color:#ff8080;border:1px solid #6a2020':
-                     tier==='warn'  ?'background:#2a1e08;color:#f0c040;border:1px solid #5a3a10':
-                                     'background:#0a2318;color:#40d080;border:1px solid #1a5030';
-    const actionCol= tier==='urgent'?'#ff6060': tier==='warn'?'var(--amb)':'var(--grn)';
+    const rankIco  = urgTier==='urgent'?'&#128308;': urgTier==='warn'?'&#129000;':'&#128994;';
+    const labelBg  = urgTier==='urgent'?'background:#3a1010;color:#ff8080;border:1px solid #6a2020':
+                     urgTier==='warn'  ?'background:#2a1e08;color:#f0c040;border:1px solid #5a3a10':
+                                        'background:#0a2318;color:#40d080;border:1px solid #1a5030';
+    const actionCol= urgTier==='urgent'?'#ff6060': urgTier==='warn'?'var(--amb)':'var(--grn)';
     const cardBdr  = isGrounded?'border-color:#3a1010;opacity:.7':'';
     const regCol   = isGrounded?'#ff8080':'#fff';
+
+    // Tier badge
+    const tierLabel = tier===1?'PPL Trainer':tier===2?'Leased':'Advanced';
+    const tierCol   = tier===1?'#4a90d9':tier===2?'#a070d0':'#d09040';
+
+    // Standby badge on card
+    const standbyBadge = isStandby
+      ? '<span style="font-size:11px;font-weight:700;padding:2px 8px;background:#0a2318;border:1px solid var(--grn);border-radius:4px;color:var(--grn);margin-left:6px">STANDBY</span>'
+      : '';
 
     function stat(lbl,val,col){
       return '<div style="display:flex;flex-direction:column;gap:1px">'
@@ -1958,7 +2231,15 @@ function rMxPlanner(){
         +'</div>';
     }
 
-    const stats = isGrounded
+    // Hrs remaining colour
+    const hrsRemNum = hrsRem ? parseFloat(hrsRem) : null;
+    const hrsRemCol = hrsRemNum===null?'var(--txt)':hrsRemNum<15?'#ff6060':hrsRemNum<30?'var(--amb)':'var(--grn)';
+
+    // Predicted check label: use weeks wording
+    const mxWksLabel = mxDays!==null ? weeksLabel(mxDays) : null;
+    const predCol = mxDays===null?'var(--txt)':mxDays<=7?'#ff6060':mxDays<=10?'var(--amb)':'var(--grn)';
+
+    const statsArr = isGrounded
       ? [stat('Total Hrs',ac.totalHobbs.toFixed(1),'var(--acc)'),
          due?stat('Check Due At',due+' hrs'):null,
          hrsRem?stat('Hrs Remaining',hrsRem+' hrs'):null,
@@ -1967,11 +2248,23 @@ function rMxPlanner(){
          cfg.annual_due?stat('Annual Due',fmtDate(cfg.annual_due),(annDays!==null&&annDays<30)?'#ff6060':'var(--grn)'):null]
       : [stat('Total Hrs',ac.totalHobbs.toFixed(1),'var(--acc)'),
          due?stat('Check Due At',due+' hrs'):null,
-         hrsRem?stat('Hrs Remaining',hrsRem+' hrs',(parseFloat(hrsRem)<15)?'#ff6060':(parseFloat(hrsRem)<30)?'var(--amb)':'var(--grn)'):null,
-         stat('Burn Rate',rateWk+' hrs/wk'),
-         predDate?stat('Predicted Check',predDate+(mxDays!==null?' ('+mxDays+'d)':''),mxDays!==null&&mxDays<30?'#ff6060':mxDays!==null&&mxDays<60?'var(--amb)':'var(--grn)'):null,
-         cfg.cofa_exp?stat('ARC Due',fmtDate(cfg.cofa_exp)+(arcDays!==null?' ('+arcDays+'d)':''),arcDays!==null&&arcDays<30?'#ff6060':arcDays!==null&&arcDays<60?'var(--amb)':'var(--grn)'):null,
-         cfg.annual_due?stat('Annual Due',fmtDate(cfg.annual_due)+(annDays!==null?' ('+annDays+'d)':''),annDays!==null&&annDays<30?'#ff6060':annDays!==null&&annDays<60?'var(--amb)':'var(--grn)'):null];
+         hrsRem?stat('Hrs Remaining',hrsRem+' hrs',hrsRemCol):null,
+         stat('Burn Rate (active days)',rateWk+' hrs/wk'),
+         predDate&&mxWksLabel?stat('Predicted Check',predDate+' \u2014 '+mxWksLabel,predCol):null,
+         cfg.cofa_exp?stat('ARC Due',fmtDate(cfg.cofa_exp)+(arcDays!==null?' ('+arcDays+'d)':''),arcDays!==null&&arcDays<=10?'#ff6060':arcDays!==null&&arcDays<30?'var(--amb)':'var(--grn)'):null,
+         cfg.annual_due?stat('Annual Due',fmtDate(cfg.annual_due)+(annDays!==null?' ('+annDays+'d)':''),annDays!==null&&annDays<=10?'#ff6060':annDays!==null&&annDays<30?'var(--amb)':'var(--grn)'):null];
+
+    // Annual alignment warning row
+    var alignWarning = '';
+    if(annAlign && annAlign.warn){
+      alignWarning = '<div style="margin-top:6px;padding:6px 10px;background:#1a1208;border:1px solid #5a3a10;border-radius:6px;font-size:10px;color:#f0c040">'
+        +'\u26a0\ufe0f Annual alignment: '+annAlign.hrsRem+' hrs remaining on check, annual in '+annAlign.annDays+' days. '
+        +'At current rate, '+annAlign.hrsAtAnnual+' hrs will still be on the clock at annual \u2014 consider flying harder to align.'
+        +'</div>';
+    }
+
+    // Check duration note
+    const checkDurNote = '<div style="font-size:9px;color:var(--mut);margin-top:2px">Check est. '+checkDur+' day'+(checkDur>1?'s':'')+' downtime</div>';
 
     return '<div style="background:var(--panel);border:1px solid var(--border);border-radius:12px;'
       +'display:grid;grid-template-columns:48px 1fr auto;align-items:center;overflow:hidden;'+cardBdr+'">'
@@ -1984,26 +2277,30 @@ function rMxPlanner(){
       +'</div>'
 
       // body
-      +'<div style="padding:12px 16px;display:flex;flex-direction:column;gap:8px">'
-      +'<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">'
+      +'<div style="padding:12px 16px;display:flex;flex-direction:column;gap:6px">'
+      +'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">'
       +'<span style="font-size:20px;font-weight:900;color:'+regCol+';letter-spacing:1px">'+esc(ac.reg)+'</span>'
       +(ac.type?'<span style="font-size:11px;color:var(--mut);padding:2px 8px;background:var(--dim);border-radius:4px">'+esc(ac.type)+'</span>':'')
+      +'<span style="font-size:11px;font-weight:700;padding:2px 8px;background:var(--dim);border-radius:4px;color:'+tierCol+'">'+tierLabel+'</span>'
       +'<span style="font-size:12px;font-weight:700;padding:3px 10px;border-radius:20px;'+labelBg+'">'+label+'</span>'
+      +standbyBadge
       +'</div>'
-      +'<div style="display:flex;gap:18px;flex-wrap:wrap">'+stats.filter(Boolean).join('')+'</div>'
+      +'<div style="display:flex;gap:18px;flex-wrap:wrap">'+statsArr.filter(Boolean).join('')+'</div>'
+      +alignWarning
       +'</div>'
 
       // action panel
       +'<div style="padding:12px 20px;text-align:right;min-width:160px;display:flex;flex-direction:column;'
-      +'align-items:flex-end;justify-content:center;gap:6px;border-left:1px solid var(--border)">'
+      +'align-items:flex-end;justify-content:center;gap:4px;border-left:1px solid var(--border)">'
       +'<div style="font-size:14px;font-weight:800;letter-spacing:.5px;color:'+actionCol+'">'+action+'</div>'
       +'<div style="font-size:10px;color:var(--mut);line-height:1.5;text-align:right">'+actionSub+'</div>'
+      +checkDurNote
       +'</div>'
 
       +'</div>';
   }).join('<div style="height:8px"></div>');
 
-  // Downtime log rows
+  // ── Downtime log rows ──
   const dtRows = dt.length ? dt.slice().reverse().map(function(e,i){
     const idx = dt.length-1-i;
     const endStr = e.end ? e.end : '<span style="color:var(--amb)">Ongoing</span>';
@@ -2026,12 +2323,18 @@ function rMxPlanner(){
   return '<div style="padding:18px 22px;max-width:980px">'
 
     // subtitle
-    +'<div style="font-size:11px;color:var(--mut);margin-bottom:16px">Aircraft sorted by priority \u2014 fly from the top down</div>'
+    +'<div style="font-size:11px;color:var(--mut);margin-bottom:10px">Aircraft sorted by priority \u2014 fly from the top down \u00b7 Tier 1 = PPL Trainers \u00b7 Tier 2 = Leased \u00b7 Tier 3 = Advanced</div>'
 
-    // banners
+    // standby banner
+    +standbyBanner
+
+    // clash banner
+    +clashBanner
+
+    // grounded banners
     +(banners||'')
 
-    // stack
+    // cards
     +cards
 
     // downtime log
@@ -2048,26 +2351,6 @@ function rMxPlanner(){
     +'<th style="padding:8px 12px;text-align:left;color:var(--mut);font-size:10px;letter-spacing:.8px;background:var(--sb)">REASON</th>'
     +'<th style="background:var(--sb)"></th>'
     +'</tr></thead><tbody>'+dtRows+'</tbody></table></div>'
-
-    // add downtime form
-    +'<div style="background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:18px 20px;max-width:700px">'
-    +'<div style="font-size:11px;font-weight:700;color:var(--mut);letter-spacing:2px;text-transform:uppercase;margin-bottom:14px">Record Downtime</div>'
-    +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px">'
-    +'<div><div style="font-size:10px;color:var(--mut);letter-spacing:1px;text-transform:uppercase;margin-bottom:5px">Aircraft</div>'
-    +'<select id="dt-reg" style="'+inp+'">'+acOptions+'</select></div>'
-    +'<div><div style="font-size:10px;color:var(--mut);letter-spacing:1px;text-transform:uppercase;margin-bottom:5px">Start Date</div>'
-    +'<input id="dt-start" type="date" value="'+today+'" style="'+inp+'"></div>'
-    +'<div><div style="font-size:10px;color:var(--mut);letter-spacing:1px;text-transform:uppercase;margin-bottom:5px">End Date <span style="color:var(--dim);font-size:9px">(blank = ongoing)</span></div>'
-    +'<input id="dt-end" type="date" style="'+inp+'"></div>'
-    +'</div>'
-    +'<div style="margin-bottom:14px"><div style="font-size:10px;color:var(--mut);letter-spacing:1px;text-transform:uppercase;margin-bottom:5px">Reason / Defect</div>'
-    +'<input id="dt-reason" type="text" placeholder="e.g. Awaiting engine part, Annual inspection..." style="'+inp+'"></div>'
-    +'<button onclick="addDowntime()" style="background:var(--blue);color:#fff;border:none;border-radius:8px;padding:9px 22px;font-weight:700;font-size:12px;cursor:pointer;letter-spacing:.5px">+ Add Downtime Entry</button>'
-    +'</div>'
-
-    +'</div>';
-}
-
 function addDowntime(){
   const reg    = document.getElementById('dt-reg')&&document.getElementById('dt-reg').value||'';
   const start  = document.getElementById('dt-start')&&document.getElementById('dt-start').value||'';
