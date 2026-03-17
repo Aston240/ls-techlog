@@ -258,28 +258,28 @@ textarea.form-input{resize:vertical;min-height:90px;}
 /* ── BOOKED SLOT BUBBLE ── */
 /* td has rowspan; inner div is the visible card */
 .slot-bk{
-  margin:3px;
-  padding:8px 12px;
-  border-radius:7px;
+  padding:10px 14px;
   font-family:var(--mono);font-weight:700;
   letter-spacing:.05em;line-height:1.3;
   display:flex;flex-direction:column;justify-content:center;
+  width:100%;height:100%;
+  box-sizing:border-box;
 }
-.slot-bk .s-reg{font-size:14px;}
-.slot-bk .s-dur{font-size:10px;opacity:.6;font-weight:400;margin-top:3px;}
+.slot-bk .s-reg{font-size:15px;font-weight:900;}
+.slot-bk .s-dur{font-size:10px;opacity:.9;font-weight:400;margin-top:4px;}
 
 /* LSA fleet — coloured bubbles */
-.bk-cct1{background:rgba(0,170,255,.18);border:1px solid rgba(0,170,255,.5);color:var(--accent);}
-.bk-cct2{background:rgba(170,255,0,.13);border:1px solid rgba(170,255,0,.45);color:#aaff00;}
-.bk-arr {background:rgba(255,171,0,.16);border:1px solid rgba(255,171,0,.5);color:#ffab00;}
-/* External aircraft — muted */
-.bk-ext {background:rgba(40,60,90,.25);border:1px solid rgba(58,85,112,.4);color:#5a7fa0;}
+.bk-cct1{background:#0d4a7a;border-left:4px solid #00aaff;color:#40c8ff;}
+.bk-cct2{background:#1e4a08;border-left:4px solid #aaff00;color:#ccff44;}
+.bk-arr {background:#4a3200;border-left:4px solid #ffab00;color:#ffd060;}
+/* External aircraft — clearly visible but distinct from fleet */
+.bk-ext {background:#1a2535;border-left:4px solid #4a6a8a;color:#8ab4d0;}
 
 /* ── AVBL CELL ── */
 .slot-avbl{
-  font-family:var(--mono);font-size:11px;font-weight:700;
-  letter-spacing:.12em;
-  color:rgba(0,200,80,.45);
+  font-family:var(--mono);font-size:10px;font-weight:400;
+  letter-spacing:.10em;
+  color:rgba(58,85,112,.5);
   padding:10px 14px;
   min-height:44px;
   display:flex;align-items:center;
@@ -1356,14 +1356,13 @@ function renderSlotsGrid(json) {
       if(startMap[k]) {
         const { b, span } = startMap[k];
         // height = span rows × 44px row height - 6px for margins
-        const bkH = (span * 44 - 6) + 'px';
-        html += `<td rowspan="${span}" style="padding:0;vertical-align:top;">`;
-        html += `<div class="slot-bk ${bkClass(lane, b.isFleet)}" style="height:${bkH}">`;
+        html += `<td rowspan="${span}" style="padding:0;vertical-align:top;height:1px;">`;
+        html += `<div class="slot-bk ${bkClass(lane, b.isFleet)}" style="min-height:100%;">`;
         html += `<span class="s-reg">${fmtReg(b.reg)}</span>`;
         html += `<span class="s-dur">${b.start} → ${b.end}</span>`;
         html += `</div></td>`;
       } else {
-        html += `<td><div class="slot-avbl">AVBL</div></td>`;
+        html += `<td style="padding:0;"><div class="slot-avbl">AVBL</div></td>`;
       }
     }
 
@@ -1422,9 +1421,8 @@ function renderSlotsGrid(json) {
         // spanned — no td
       } else if(lStartMap[t]) {
         const { b, span } = lStartMap[t];
-        const bkH = (span * 40 - 6) + 'px';
-        mhtml += `<td rowspan="${span}" style="padding:0;vertical-align:top;">`;
-        mhtml += `<div class="slot-bk ${bkClass(lane, b.isFleet)}" style="height:${bkH}">`;
+        mhtml += `<td rowspan="${span}" style="padding:0;vertical-align:top;height:1px;">`;
+        mhtml += `<div class="slot-bk ${bkClass(lane, b.isFleet)}" style="min-height:100%;">`;
         mhtml += `<span class="s-reg">${fmtReg(b.reg)}</span>`;
         mhtml += `<span class="s-dur">${b.start} → ${b.end}</span>`;
         mhtml += `</div></td>`;
