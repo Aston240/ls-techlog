@@ -527,7 +527,7 @@ textarea.form-input{resize:vertical;min-height:90px;}
 
         <!-- Instructor -->
         <div class="fcard">
-          <div class="fcard-label">Instructor <span class="req">*</span></div>
+          <div class="fcard-label">Pilot in Command <span class="req">*</span></div>
           <div class="radio-list" id="instrList"></div>
         </div>
 
@@ -1047,7 +1047,7 @@ Aircraft:    ${ac}
 Departure:   ${depTime} UTC
 Duration:    ${duration}
 ETA Return:  ${eta}
-Instructor:  ${instr}
+PIC:         ${instr}
 POB:         ${pob}
 Route:       ${route}
 Destination: ${dest||'Oxford'}
@@ -1085,7 +1085,7 @@ function showConfirm(d, eta) {
     <b>Departure</b>  ${d.dep_time}<br>
     <b>Duration</b>   ${d.duration}<br>
     <b>ETA Return</b> ${eta||'—'}<br>
-    <b>Instructor</b> ${d.instructor}<br>
+    <b>PIC</b>        ${d.instructor}<br>
     <b>POB</b>        ${d.pob}<br>
     <b>Route</b>      ${d.route}<br>
     <b>Destination</b>${d.destination}<br>
