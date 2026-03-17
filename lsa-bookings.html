@@ -1039,27 +1039,8 @@ async function submitBooking() {
 
   const data = { aircraft:ac, dep_time:depTime+' UTC', instructor:instr, pob, route, duration, destination:dest||'Oxford', notes:notes||'None', eta };
 
-  // Try EmailJS if configured
-  let sent = false;
-  if(ST.ejsService && ST.ejsTemplate && ST.ejsKey) {
-    try {
-      emailjs.init({ publicKey: ST.ejsKey });
-      await emailjs.send(ST.ejsService, ST.ejsTemplate, {
-        to_email:   ST.atcEmail,
-        from_name:  'LSA OPS',
-        reply_to:   ST.fromEmail,
-        ...data
-      });
-      sent = true;
-    } catch(e) {
-      console.warn('EmailJS error:', e);
-    }
-  }
-
-  // Fallback: mailto
-  if(!sent) {
-    const subject = encodeURIComponent(`FLIGHT NOTIFICATION — ${ac} DEP ${depTime}Z`);
-    const body = encodeURIComponent(
+  const subject = `FLIGHT NOTIFICATION — ${ac} DEP ${depTime}Z`;
+  const body =
 `FLIGHT NOTIFICATION — LS AIRMOTIVE
 =====================================
 Aircraft:    ${ac}
@@ -1072,20 +1053,24 @@ Route:       ${route}
 Destination: ${dest||'Oxford'}
 Notes:       ${notes||'None'}
 =====================================
-Sent from LSA Bookings System`
-    );
-    window.open(`mailto:${ST.atcEmail}?subject=${subject}&body=${body}`);
-    sent = true;
-  }
+Sent from LSA Bookings System`;
 
-  btn.disabled = false;
-
-  if(sent) {
-    document.getElementById('submitMsg').textContent = '';
-    showConfirm(data, eta);
-  } else {
-    flashMsg('⚠ Could not send — check settings', 'err');
-  }
+  sendEmail({
+    to:      ST.atcEmail || 'atc1@londonoxfordairport.com',
+    cc:      'LSAOPS814@gmail.com',
+    from:    'LSAOPS814@gmail.com',
+    subject,
+    body,
+    onSuccess: () => {
+      btn.disabled = false;
+      document.getElementById('submitMsg').textContent = '';
+      showConfirm(data, eta);
+    },
+    onError: (msg) => {
+      btn.disabled = false;
+      flashMsg('⚠ ' + msg, 'err');
+    }
+  });
 }
 
 function flashMsg(msg, type) {
