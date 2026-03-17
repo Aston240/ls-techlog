@@ -204,70 +204,207 @@ textarea.form-input{resize:vertical;min-height:90px;}
 .load-busy    {background:rgba(255,112,32,.15);color:#ff7020;border:1px solid rgba(255,112,32,.3);}
 .load-heavy   {background:rgba(255,61,61,.15); color:#ff3d3d;border:1px solid rgba(255,61,61,.3);}
 
-/* grid table */
+/* ── CIRCUITS TIMETABLE ── */
 .ct-grid-wrap{margin-bottom:20px;}
 .ct-desktop{}
 .ct-mobile{display:none;}
-.ct-table{width:100%;border-collapse:collapse;font-size:12px;}
-.ct-table th{
-  font-family:var(--mono);font-size:10px;letter-spacing:.12em;
-  padding:9px 12px;text-align:left;
+
+/* Outer table wrapper — border around whole grid */
+.ct-table-wrap{border:1px solid var(--border);border-radius:8px;overflow:hidden;}
+
+.ct-table{width:100%;border-collapse:collapse;table-layout:fixed;}
+.ct-table col.col-time{width:70px;}
+.ct-table col.col-lane{} /* equal share */
+.ct-table col.col-load{width:96px;}
+
+/* sticky header */
+.ct-table thead th{
+  font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.14em;
+  padding:11px 0 11px 14px;text-align:left;
   background:#07111e;border-bottom:2px solid var(--border);
   white-space:nowrap;position:sticky;top:0;z-index:2;
 }
-.ct-table th.th-time{color:var(--dim);width:64px;}
+.ct-table th.th-time{color:var(--dim);}
 .ct-table th.th-cct1{color:var(--accent);}
 .ct-table th.th-cct2{color:#aaff00;}
 .ct-table th.th-arr {color:#ffab00;}
-.ct-table th.th-load{color:var(--dim);}
-.ct-table td{padding:4px 6px;border-bottom:1px solid rgba(26,40,64,.35);vertical-align:middle;}
-.ct-table tr.row-odd  td{background:#080e1a;}
-.ct-table tr.row-even td{background:#0a1525;}
-.ct-table tr.row-now  td{background:rgba(0,170,255,.06)!important;border-top:2px solid var(--accent)!important;}
-.ct-table tr.row-past td{opacity:.3;}
+.ct-table th.th-load{color:var(--dim);font-size:10px;}
 
-/* time cell */
-.tc-time{font-family:var(--mono);font-size:12px;color:var(--dim);padding:4px 12px 4px 14px;white-space:nowrap;border-right:1px solid var(--border);}
+/* every cell strips padding — inner divs own it */
+.ct-table td{padding:0;border-bottom:1px solid rgba(26,40,64,.5);vertical-align:top;}
+
+/* row banding */
+.ct-table tr.row-odd  td{background:#07101a;}
+.ct-table tr.row-even td{background:#090f1c;}
+.ct-table tr.row-now  td{background:rgba(0,170,255,.07)!important;}
+.ct-table tr.row-now  td.td-time{border-left:3px solid var(--accent);}
+.ct-table tr.row-past{opacity:.35;}
+
+/* ── TIME CELL ── */
+.td-time{border-right:2px solid var(--border);}
+.tc-time{
+  font-family:var(--mono);font-size:13px;font-weight:700;
+  color:var(--dim);padding:10px 8px 10px 14px;
+  white-space:nowrap;line-height:1;
+  display:flex;flex-direction:column;justify-content:center;
+  min-height:44px;
+}
 .tc-time.is-now{color:var(--accent);}
-.now-pip{display:block;font-family:var(--mono);font-size:8px;color:var(--accent);letter-spacing:.06em;margin-top:1px;}
+.now-pip{
+  display:inline-block;font-size:8px;color:var(--accent);
+  letter-spacing:.06em;margin-top:3px;
+}
 
-/* slot cells */
-.slot-cell-lsa{border-radius:5px;padding:6px 10px;font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.06em;line-height:1.4;}
-.slot-cell-lsa .sr{display:block;font-size:12px;}
-.slot-cell-lsa .sd{display:block;font-size:9px;opacity:.65;margin-top:1px;}
-.slot-cct1-lsa{background:rgba(0,170,255,.15);border:1px solid rgba(0,170,255,.4);color:var(--accent);}
-.slot-cct2-lsa{background:rgba(170,255,0,.12);border:1px solid rgba(170,255,0,.35);color:#aaff00;}
-.slot-arr-lsa {background:rgba(255,171,0,.15);border:1px solid rgba(255,171,0,.4); color:#ffab00;}
+/* ── BOOKED SLOT BUBBLE ── */
+/* td has rowspan; inner div is the visible card */
+.slot-bk{
+  margin:3px;
+  padding:8px 12px;
+  border-radius:7px;
+  font-family:var(--mono);font-weight:700;
+  letter-spacing:.05em;line-height:1.3;
+  display:flex;flex-direction:column;justify-content:center;
+}
+.slot-bk .s-reg{font-size:14px;}
+.slot-bk .s-dur{font-size:10px;opacity:.6;font-weight:400;margin-top:3px;}
 
-.slot-cell-ext{border-radius:5px;padding:6px 10px;font-family:var(--mono);font-size:11px;letter-spacing:.06em;line-height:1.4;background:rgba(58,85,112,.15);border:1px solid rgba(58,85,112,.3);color:var(--dim);}
-.slot-cell-ext .sr{display:block;font-size:11px;}
-.slot-cell-ext .sd{display:block;font-size:9px;opacity:.55;margin-top:1px;}
+/* LSA fleet — coloured bubbles */
+.bk-cct1{background:rgba(0,170,255,.18);border:1px solid rgba(0,170,255,.5);color:var(--accent);}
+.bk-cct2{background:rgba(170,255,0,.13);border:1px solid rgba(170,255,0,.45);color:#aaff00;}
+.bk-arr {background:rgba(255,171,0,.16);border:1px solid rgba(255,171,0,.5);color:#ffab00;}
+/* External aircraft — muted */
+.bk-ext {background:rgba(40,60,90,.25);border:1px solid rgba(58,85,112,.4);color:#5a7fa0;}
 
-.slot-cont{border-radius:5px;padding:5px 10px;font-family:var(--mono);font-size:10px;color:rgba(58,85,112,.5);letter-spacing:.04em;border:1px solid transparent;}
-.slot-empty-cell{font-family:var(--mono);font-size:10px;color:rgba(58,85,112,.25);padding:5px 10px;}
+/* ── AVBL CELL ── */
+.slot-avbl{
+  font-family:var(--mono);font-size:11px;font-weight:700;
+  letter-spacing:.12em;
+  color:rgba(0,200,80,.45);
+  padding:10px 14px;
+  min-height:44px;
+  display:flex;align-items:center;
+}
 
-/* load cell */
-.lc{font-family:var(--mono);font-size:9px;letter-spacing:.06em;padding:3px 8px;border-radius:3px;white-space:nowrap;display:inline-block;}
+/* ── LOAD CELL ── */
+.lc{font-family:var(--mono);font-size:9px;letter-spacing:.08em;
+  padding:3px 8px;border-radius:3px;white-space:nowrap;display:inline-block;
+  margin:12px 8px;}
+.load-calm    {background:rgba(0,230,118,.15);color:#00e676;border:1px solid rgba(0,230,118,.3);}
+.load-light   {background:rgba(170,255,0,.1); color:#aaff00;border:1px solid rgba(170,255,0,.25);}
+.load-moderate{background:rgba(255,171,0,.15);color:#ffab00;border:1px solid rgba(255,171,0,.3);}
+.load-busy    {background:rgba(255,112,32,.15);color:#ff7020;border:1px solid rgba(255,112,32,.3);}
+.load-heavy   {background:rgba(255,61,61,.15); color:#ff3d3d;border:1px solid rgba(255,61,61,.3);}
 
 /* mobile stacked */
 @media(max-width:600px){
   .ct-desktop{display:none;}
   .ct-mobile{display:block!important;}
 }
-.mob-lane{margin-bottom:18px;}
-.mob-lane-title{font-family:var(--mono);font-size:10px;letter-spacing:.18em;padding:7px 12px;background:#07111e;border-bottom:2px solid var(--border);border-radius:6px 6px 0 0;}
+.mob-lane{margin-bottom:18px;border:1px solid var(--border);border-radius:8px;overflow:hidden;}
+.mob-lane-title{font-family:var(--mono);font-size:11px;letter-spacing:.18em;font-weight:700;
+  padding:9px 14px;background:#07111e;border-bottom:2px solid var(--border);}
 .mob-lane-title.tl-cct1{color:var(--accent);}
 .mob-lane-title.tl-cct2{color:#aaff00;}
 .mob-lane-title.tl-arr {color:#ffab00;}
-.mob-table{width:100%;border-collapse:collapse;border-radius:0 0 6px 6px;overflow:hidden;}
-.mob-table td{padding:4px 10px;border-bottom:1px solid rgba(26,40,64,.35);font-size:12px;}
-.mob-table tr.row-now td{background:rgba(0,170,255,.06)!important;border-top:2px solid var(--accent)!important;}
-.mob-table tr.row-past td{opacity:.3;}
-.mob-time{font-family:var(--mono);font-size:11px;color:var(--dim);width:54px;white-space:nowrap;}
-.mob-time.is-now{color:var(--accent);}
+.mob-table{width:100%;border-collapse:collapse;}
+.mob-table td{padding:0;border-bottom:1px solid rgba(26,40,64,.4);}
+.mob-table tr.row-now td{background:rgba(0,170,255,.07)!important;}
+.mob-table tr.row-past{opacity:.35;}
+.mob-time-cell{border-right:2px solid var(--border);}
+.mob-tc{font-family:var(--mono);font-size:12px;font-weight:700;color:var(--dim);
+  padding:9px 8px 9px 12px;min-height:40px;display:flex;align-items:center;}
+.mob-tc.is-now{color:var(--accent);}
 
 /* footer */
 .ct-footer{display:flex;align-items:center;gap:12px;padding-top:16px;border-top:1px solid var(--border);flex-wrap:wrap;}
+
+
+/* ── CIRCUIT BOOK / CANCEL BUTTONS ── */
+.ct-action-btn{font-family:var(--mono);font-size:10px;letter-spacing:.08em;
+  border:none;border-radius:4px;padding:4px 12px;cursor:pointer;font-weight:700;}
+.ct-book-btn{background:rgba(0,170,255,.2);color:var(--accent);border:1px solid rgba(0,170,255,.5);}
+.ct-book-btn:hover{background:rgba(0,170,255,.35);}
+.ct-cancel-btn{background:rgba(255,61,61,.12);color:#ff6b6b;border:1px solid rgba(255,61,61,.35);}
+.ct-cancel-btn:hover{background:rgba(255,61,61,.25);}
+
+/* ── CANCEL LOG ── */
+.ct-cancel-log{margin-bottom:14px;background:rgba(255,61,61,.06);
+  border:1px solid rgba(255,61,61,.2);border-radius:8px;overflow:hidden;}
+.ct-cancel-log-title{font-family:var(--mono);font-size:10px;letter-spacing:.15em;
+  color:#ff6b6b;padding:8px 14px;border-bottom:1px solid rgba(255,61,61,.2);
+  display:flex;align-items:center;gap:8px;}
+.ct-cancel-log-row{font-family:var(--mono);font-size:11px;color:var(--text);
+  padding:7px 14px;border-bottom:1px solid rgba(26,40,64,.3);display:flex;gap:14px;flex-wrap:wrap;}
+.ct-cancel-log-row:last-child{border-bottom:none;}
+.ct-cancel-log-row .cl-time{color:var(--dim);font-size:10px;white-space:nowrap;}
+.ct-cancel-log-row .cl-slot{color:#ff6b6b;font-weight:700;}
+.ct-cancel-log-row .cl-who{color:var(--text);}
+.ct-cancel-log-row .cl-reason{color:var(--dim);font-size:10px;}
+
+/* ── MODAL OVERLAY ── */
+.ct-modal-overlay{
+  display:none;position:fixed;inset:0;z-index:900;
+  background:rgba(5,10,18,.85);backdrop-filter:blur(4px);
+  align-items:center;justify-content:center;padding:20px;
+}
+.ct-modal-overlay.open{display:flex;}
+.ct-modal{
+  background:#0d1a2d;border:1px solid var(--border);border-radius:12px;
+  width:100%;max-width:500px;max-height:90vh;overflow-y:auto;
+  display:flex;flex-direction:column;
+}
+.ct-modal-head{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:16px 20px;border-bottom:1px solid var(--border);
+}
+.ct-modal-title{font-family:var(--mono);font-size:12px;letter-spacing:.18em;color:var(--accent);}
+.ct-modal-close{background:none;border:none;color:var(--dim);font-size:16px;cursor:pointer;padding:2px 6px;}
+.ct-modal-close:hover{color:var(--text);}
+.ct-modal-body{padding:20px;display:flex;flex-direction:column;gap:16px;}
+.ct-modal-foot{
+  padding:14px 20px;border-top:1px solid var(--border);
+  display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap;
+}
+
+/* modal fields */
+.ct-field{display:flex;flex-direction:column;gap:6px;}
+.ct-field-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.ct-label{font-family:var(--mono);font-size:9px;letter-spacing:.14em;color:var(--dim);}
+.ct-input{
+  font-family:var(--mono);font-size:13px;color:var(--text);letter-spacing:.06em;
+  background:#07111e;border:1px solid var(--border);border-radius:6px;
+  padding:9px 12px;outline:none;transition:border-color .2s;
+}
+.ct-input:focus{border-color:var(--accent);}
+.ct-radio-row{display:flex;gap:8px;flex-wrap:wrap;}
+.ct-radio-opt{
+  font-family:var(--mono);font-size:11px;color:var(--text);
+  background:#07111e;border:1px solid var(--border);border-radius:5px;
+  padding:6px 12px;cursor:pointer;display:flex;align-items:center;gap:6px;
+  transition:border-color .2s;
+}
+.ct-radio-opt:has(input:checked){border-color:var(--accent);color:var(--accent);}
+.ct-radio-opt input{display:none;}
+
+/* modal buttons */
+.ct-modal-cancel-btn{
+  font-family:var(--mono);font-size:10px;letter-spacing:.08em;
+  background:none;border:1px solid var(--border);color:var(--dim);
+  border-radius:5px;padding:8px 16px;cursor:pointer;
+}
+.ct-modal-cancel-btn:hover{border-color:var(--text);color:var(--text);}
+.ct-modal-submit-btn{
+  font-family:var(--mono);font-size:10px;letter-spacing:.08em;font-weight:700;
+  background:rgba(0,170,255,.2);border:1px solid rgba(0,170,255,.5);color:var(--accent);
+  border-radius:5px;padding:8px 16px;cursor:pointer;
+}
+.ct-modal-submit-btn:hover{background:rgba(0,170,255,.35);}
+.ct-modal-cancel-submit{
+  background:rgba(255,61,61,.15)!important;border-color:rgba(255,61,61,.4)!important;
+  color:#ff6b6b!important;
+}
+.ct-modal-cancel-submit:hover{background:rgba(255,61,61,.3)!important;}
+.ct-modal-err{font-family:var(--mono);font-size:11px;color:#ff6b6b;min-height:16px;}
 
 /* ── ANIMATIONS ── */
 @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.4;}}
@@ -435,11 +572,15 @@ textarea.form-input{resize:vertical;min-height:90px;}
         <div class="fetch-dot" id="slotsStatusDot"></div>
         <span class="fetch-label" id="slotsStatusLabel">LOADING…</span>
         <span class="ct-lastupdate" id="ctLastUpdate"></span>
-        <div style="margin-left:auto;display:flex;gap:8px;align-items:center;">
-          <button class="ct-toggle-btn" id="ctDayToggle" onclick="toggleFullDay()">FULL DAY ↓</button>
+        <div style="margin-left:auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          <button class="ct-action-btn ct-book-btn" onclick="openBookModal()">＋ BOOK SLOT</button>
+          <button class="ct-action-btn ct-cancel-btn" onclick="openCancelModal()">✕ CANCEL SLOT</button>
           <button class="refresh-btn" onclick="loadSlots()">↺ REFRESH</button>
         </div>
       </div>
+
+      <!-- Cancel log -->
+      <div id="ctCancelLog" style="display:none;"></div>
 
       <!-- Load indicator -->
       <div class="ct-load-bar" id="ctLoadBar" style="display:none;">
@@ -452,7 +593,7 @@ textarea.form-input{resize:vertical;min-height:90px;}
       <div class="ct-grid-wrap">
         <!-- Desktop table -->
         <div class="ct-desktop" id="ctDesktop">
-          <div id="ctContent">
+          <div class="ct-table-wrap" id="ctContent">
             <div class="slots-loading"><div class="spinner"></div> FETCHING CIRCUITS SHEET…</div>
           </div>
         </div>
@@ -474,6 +615,101 @@ textarea.form-input{resize:vertical;min-height:90px;}
 
     </div>
     </div><!-- /app-body -->
+  </div>
+</div>
+
+
+<!-- ══ BOOK SLOT MODAL ══════════════════════════════ -->
+<div class="ct-modal-overlay" id="bookModalOverlay" onclick="closeBookModal(event)">
+  <div class="ct-modal">
+    <div class="ct-modal-head">
+      <span class="ct-modal-title">BOOK CIRCUIT SLOT</span>
+      <button class="ct-modal-close" onclick="closeBookModal()">✕</button>
+    </div>
+    <div class="ct-modal-body">
+      <div class="ct-field">
+        <label class="ct-label">LANE</label>
+        <div class="ct-radio-row">
+          <label class="ct-radio-opt"><input type="radio" name="bookLane" value="CCT1" checked> CCT 1</label>
+          <label class="ct-radio-opt"><input type="radio" name="bookLane" value="CCT2"> CCT 2</label>
+          <label class="ct-radio-opt"><input type="radio" name="bookLane" value="ARR"> ARR</label>
+        </div>
+      </div>
+      <div class="ct-field-row">
+        <div class="ct-field">
+          <label class="ct-label">START TIME (UTC)</label>
+          <input class="ct-input" id="bookStart" type="text" placeholder="09:00" maxlength="5">
+        </div>
+        <div class="ct-field">
+          <label class="ct-label">END TIME (UTC)</label>
+          <input class="ct-input" id="bookEnd" type="text" placeholder="10:00" maxlength="5">
+        </div>
+      </div>
+      <div class="ct-field">
+        <label class="ct-label">AIRCRAFT</label>
+        <div class="ct-radio-row" id="bookAcList"></div>
+      </div>
+      <div class="ct-field">
+        <label class="ct-label">INSTRUCTOR / PILOT NAME</label>
+        <input class="ct-input" id="bookName" type="text" placeholder="e.g. Smith">
+      </div>
+      <div class="ct-field">
+        <label class="ct-label">NOTES (OPTIONAL)</label>
+        <input class="ct-input" id="bookNotes" type="text" placeholder="Any additional info for ATC">
+      </div>
+      <div class="ct-modal-err" id="bookErr"></div>
+    </div>
+    <div class="ct-modal-foot">
+      <button class="ct-modal-cancel-btn" onclick="closeBookModal()">CANCEL</button>
+      <button class="ct-modal-submit-btn" onclick="submitBookSlot()">SEND REQUEST TO ATC →</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ CANCEL SLOT MODAL ════════════════════════════ -->
+<div class="ct-modal-overlay" id="cancelModalOverlay" onclick="closeCancelModal(event)">
+  <div class="ct-modal">
+    <div class="ct-modal-head">
+      <span class="ct-modal-title">CANCEL CIRCUIT SLOT</span>
+      <button class="ct-modal-close" onclick="closeCancelModal()">✕</button>
+    </div>
+    <div class="ct-modal-body">
+      <div class="ct-field">
+        <label class="ct-label">LANE</label>
+        <div class="ct-radio-row">
+          <label class="ct-radio-opt"><input type="radio" name="cancelLane" value="CCT1" checked> CCT 1</label>
+          <label class="ct-radio-opt"><input type="radio" name="cancelLane" value="CCT2"> CCT 2</label>
+          <label class="ct-radio-opt"><input type="radio" name="cancelLane" value="ARR"> ARR</label>
+        </div>
+      </div>
+      <div class="ct-field-row">
+        <div class="ct-field">
+          <label class="ct-label">SLOT START TIME (UTC)</label>
+          <input class="ct-input" id="cancelStart" type="text" placeholder="09:00" maxlength="5">
+        </div>
+        <div class="ct-field">
+          <label class="ct-label">SLOT END TIME (UTC)</label>
+          <input class="ct-input" id="cancelEnd" type="text" placeholder="10:00" maxlength="5">
+        </div>
+      </div>
+      <div class="ct-field">
+        <label class="ct-label">AIRCRAFT REGISTRATION</label>
+        <input class="ct-input" id="cancelReg" type="text" placeholder="e.g. G-BCGJ">
+      </div>
+      <div class="ct-field">
+        <label class="ct-label">YOUR NAME (logged with cancellation)</label>
+        <input class="ct-input" id="cancelName" type="text" placeholder="e.g. Smith">
+      </div>
+      <div class="ct-field">
+        <label class="ct-label">REASON (OPTIONAL)</label>
+        <input class="ct-input" id="cancelReason" type="text" placeholder="e.g. Aircraft unserviceable">
+      </div>
+      <div class="ct-modal-err" id="cancelErr"></div>
+    </div>
+    <div class="ct-modal-foot">
+      <button class="ct-modal-cancel-btn" onclick="closeCancelModal()">BACK</button>
+      <button class="ct-modal-submit-btn ct-modal-cancel-submit" onclick="submitCancelSlot()">NOTIFY ATC OF CANCELLATION →</button>
+    </div>
   </div>
 </div>
 
@@ -873,7 +1109,7 @@ function closeConfirm() {
 // ══ CIRCUITS SLOTS ═════════════════════════════════
 const SHEET_ID  = '1fnMYghrTIi8EdHDN6JxFrAdqqFMuRbnB4Oj8041Y5ZY';
 const SHEET_GID = '818960255';
-let slotsFullDay = false;
+let slotsFullDay = true; // always full day
 let slotsAutoRefresh = null;
 
 const LOAD_WORDS = ['calm','light','moderate','busy','heavy'];
@@ -1044,12 +1280,10 @@ function renderSlotsGrid(json) {
 
   const { bookings, loadMap } = parseSheetSlots(json);
   const nowMins = nowUTCMins();
+  const winStart = 6*60;   // always full day 06:30–22:00
+  const winEnd   = 22*60;
 
-  // Window
-  const winStart = slotsFullDay ? 6*60 : Math.max(6*60, Math.floor(nowMins/15)*15 - 15);
-  const winEnd   = slotsFullDay ? 22*60 : winStart + 3*60;
-
-  // Current load
+  // Current load bar
   const nowSlot = toHHMM(Math.floor(nowMins/15)*15);
   const curLoad = loadMap[nowSlot] || '';
   const curLoadLabel = getLoadLabel(curLoad);
@@ -1065,72 +1299,71 @@ function renderSlotsGrid(json) {
     loadBar.style.display = 'none';
   }
 
-  // Build slot lookup: "HH:MM|LANE" -> booking
-  const slotLookup = {};
+  // Pre-pass: startMap + occupied set (same reliable pattern as mockup)
+  const startMap = {};
+  const occupied = new Set();
   bookings.forEach(b => {
-    let t = toMins(b.start);
-    while(t < toMins(b.end)) {
-      slotLookup[toHHMM(t)+'|'+b.lane] = b;
-      t += 15;
-    }
+    const vs = Math.max(toMins(b.start), winStart);
+    const ve = Math.min(toMins(b.end),   winEnd);
+    if(ve <= vs) return;
+    const span = Math.round((ve - vs) / 15);
+    const key  = vs + '|' + b.lane;
+    startMap[key] = { b, span };
+    for(let t=vs+15; t<ve; t+=15) occupied.add(t+'|'+b.lane);
   });
 
-  // ── DESKTOP TABLE ──────────────────────────────────
-  let html = '<table class="ct-table"><thead><tr>';
+  function bkClass(lane, isFleet) {
+    if(!isFleet) return 'bk-ext';
+    return lane==='CCT1'?'bk-cct1':lane==='CCT2'?'bk-cct2':'bk-arr';
+  }
+  function fmtReg(r) { return r.replace(/^([A-Z])([A-Z])/,'$1-$2'); }
+
+  // ── DESKTOP TABLE ──────────────────────────────────────────────
+  let html = '<table class="ct-table">';
+  html += '<colgroup><col class="col-time"><col class="col-lane"><col class="col-lane"><col class="col-lane"><col class="col-load"></colgroup>';
+  html += '<thead><tr>';
   html += '<th class="th-time">UTC</th>';
   html += '<th class="th-cct1">CCT 1</th>';
   html += '<th class="th-cct2">CCT 2</th>';
   html += '<th class="th-arr">ARR / APPROACH</th>';
-  html += '<th class="th-load">TRAFFIC LOAD</th>';
+  html += '<th class="th-load">LOAD</th>';
   html += '</tr></thead><tbody>';
 
-  let firstNowDone = false;
-
-  // Pre-calculate rowspan for each booking at each time slot
-  // For each lane, track which slots are "start" rows (render with rowspan)
-  // and which are "continuation" rows (skip that cell)
-  function getRowspan(bk, winStart, winEnd) {
-    const s = Math.max(toMins(bk.start), winStart);
-    const e = Math.min(toMins(bk.end),   winEnd);
-    return Math.max(1, Math.ceil((e - s) / 15));
-  }
+  let firstNow = false;
+  let rowIdx   = 0;
 
   for(let t=winStart; t<winEnd; t+=15) {
     const tStr   = toHHMM(t);
-    const isPast = t + 15 <= nowMins;
+    const isPast = (t+15) <= nowMins;
     const isNow  = t <= nowMins && nowMins < t+15;
-    const rowClass = isPast ? 'row-past' : (isNow ? 'row-now' : (Math.floor((t-winStart)/15)%2===0?'row-even':'row-odd'));
-    const rowIdAttr = (isNow && !firstNowDone) ? 'id="ctNowRow"' : '';
-    if(isNow) firstNowDone = true;
+    const rc     = isPast ? 'row-past' : isNow ? 'row-now' : (rowIdx%2===0?'row-even':'row-odd');
+    const nowId  = (isNow && !firstNow) ? 'id="ctNowRow"' : '';
+    if(isNow) firstNow = true;
 
-    html += `<tr class="${rowClass}" ${rowIdAttr}>`;
+    html += `<tr class="${rc}" ${nowId}>`;
 
     // time cell
-    html += `<td class="tc-time${isNow?' is-now':''}">${tStr}${isNow?'<span class="now-pip">▶ NOW</span>':''}</td>`;
+    html += `<td class="td-time"><div class="tc-time${isNow?' is-now':''}">`;
+    html += tStr;
+    if(isNow) html += '<span class="now-pip">▶ NOW</span>';
+    html += '</div></td>';
 
-    // CCT1, CCT2, ARR
+    // lane cells
     for(const lane of ['CCT1','CCT2','ARR']) {
-      const key = tStr+'|'+lane;
-      const bk  = slotLookup[key];
+      const k = t+'|'+lane;
+      if(occupied.has(k)) continue; // covered by rowspan
 
-      if(bk) {
-        const isStart = tStr === toHHMM(Math.max(toMins(bk.start), winStart));
-        if(isStart) {
-          const span = getRowspan(bk, winStart, winEnd);
-          const cls = bk.isFleet
-            ? (lane==='CCT1'?'slot-cct1-lsa':lane==='CCT2'?'slot-cct2-lsa':'slot-arr-lsa')
-            : 'slot-cell-ext';
-          const cellCls = bk.isFleet ? 'slot-cell-lsa' : 'slot-cell-ext';
-          const reg = bk.reg.replace(/^([A-Z])([A-Z])/, '$1-$2'); // re-add hyphen G-XXXX
-          html += `<td rowspan="${span}" style="vertical-align:middle;padding:4px 6px;">`;
-          html += `<div class="${cellCls} ${cls}" style="height:100%;justify-content:center;display:flex;flex-direction:column;">`;
-          html += `<span class="sr">${reg}</span>`;
-          html += `<span class="sd">${bk.start}→${bk.end}</span>`;
-          html += `</div></td>`;
-        }
-        // continuation rows: cell already covered by rowspan — emit nothing
+      if(startMap[k]) {
+        const { b, span } = startMap[k];
+        // height = span rows × 44px row height - 6px for margins
+        const bkH = (span * 44 - 6) + 'px';
+        html += `<td rowspan="${span}" style="padding:0;vertical-align:top;">`;
+        html += `<div class="slot-bk ${bkClass(lane, b.isFleet)}" style="height:${bkH}">`;
+        html += `<span class="s-reg">${fmtReg(b.reg)}</span>`;
+        html += `<span class="s-dur">${b.start} → ${b.end}</span>`;
+        html += `</div></td>`;
       } else {
-        html += `<td><div class="slot-empty-cell">—</div></td>`;
+        html += `<td><div class="slot-avbl">AVBL</div></td>`;
       }
     }
 
@@ -1141,62 +1374,68 @@ function renderSlotsGrid(json) {
     html += `<td>${ll ? `<span class="lc ${lc}">${ll}</span>` : ''}</td>`;
 
     html += '</tr>';
+    rowIdx++;
   }
 
   html += '</tbody></table>';
   document.getElementById('ctContent').innerHTML = html;
 
-  // scroll now row into view
+  // scroll now into view
   setTimeout(() => {
     const nr = document.getElementById('ctNowRow');
     if(nr) nr.scrollIntoView({ block:'center', behavior:'smooth' });
-  }, 100);
+  }, 150);
 
-  // ── MOBILE STACKED ─────────────────────────────────
+  // ── MOBILE STACKED ─────────────────────────────────────────────
   let mhtml = '';
   for(const lane of ['CCT1','CCT2','ARR']) {
     const laneTitle = lane==='CCT1'?'CCT 1':lane==='CCT2'?'CCT 2':'ARR / APPROACH';
     const titleCls  = lane==='CCT1'?'tl-cct1':lane==='CCT2'?'tl-cct2':'tl-arr';
-    mhtml += `<div class="mob-lane">
-      <div class="mob-lane-title ${titleCls}">${laneTitle}</div>
-      <table class="mob-table">`;
 
+    // Per-lane startMap/occupied
+    const lStartMap = {};
+    const lOccupied = new Set();
+    bookings.forEach(b => {
+      if(b.lane !== lane) return;
+      const vs = Math.max(toMins(b.start), winStart);
+      const ve = Math.min(toMins(b.end),   winEnd);
+      if(ve <= vs) return;
+      const span = Math.round((ve-vs)/15);
+      lStartMap[vs] = { b, span };
+      for(let t=vs+15; t<ve; t+=15) lOccupied.add(t);
+    });
+
+    mhtml += `<div class="mob-lane"><div class="mob-lane-title ${titleCls}">${laneTitle}</div>`;
+    mhtml += `<table class="mob-table"><colgroup><col style="width:60px"><col></colgroup><tbody>`;
+
+    let mRowIdx = 0;
     for(let t=winStart; t<winEnd; t+=15) {
       const tStr   = toHHMM(t);
-      const isPast = t+15 <= nowMins;
+      const isPast = (t+15) <= nowMins;
       const isNow  = t <= nowMins && nowMins < t+15;
       const rc     = isPast?'row-past':isNow?'row-now':'';
-      const key    = tStr+'|'+lane;
-      const bk     = slotLookup[key];
 
       mhtml += `<tr class="${rc}">`;
-      mhtml += `<td class="mob-time${isNow?' is-now':''}">${tStr}${isNow?'▶':''}</td>`;
+      mhtml += `<td class="mob-time-cell"><div class="mob-tc${isNow?' is-now':''}">${tStr}${isNow?'▶':''}</div></td>`;
 
-      if(bk) {
-        const isStart = tStr === toHHMM(Math.max(toMins(bk.start), winStart));
-        if(isStart) {
-          const span = Math.max(1, Math.ceil((Math.min(toMins(bk.end),winEnd) - Math.max(toMins(bk.start),winStart)) / 15));
-          const cls = bk.isFleet
-            ? (lane==='CCT1'?'slot-cct1-lsa':lane==='CCT2'?'slot-cct2-lsa':'slot-arr-lsa')
-            : 'slot-cell-ext';
-          const reg = bk.reg.replace(/^([A-Z])([A-Z])/, '$1-$2');
-          mhtml += `<td rowspan="${span}" style="vertical-align:middle;">`;
-          mhtml += `<div class="slot-cell-lsa ${cls}" style="padding:4px 8px;">`;
-          mhtml += `<span class="sr">${reg}</span><span class="sd">${bk.start}→${bk.end}</span>`;
-          mhtml += `</div></td>`;
-        }
-        // continuation: covered by rowspan
+      if(lOccupied.has(t)) {
+        // spanned — no td
+      } else if(lStartMap[t]) {
+        const { b, span } = lStartMap[t];
+        const bkH = (span * 40 - 6) + 'px';
+        mhtml += `<td rowspan="${span}" style="padding:0;vertical-align:top;">`;
+        mhtml += `<div class="slot-bk ${bkClass(lane, b.isFleet)}" style="height:${bkH}">`;
+        mhtml += `<span class="s-reg">${fmtReg(b.reg)}</span>`;
+        mhtml += `<span class="s-dur">${b.start} → ${b.end}</span>`;
+        mhtml += `</div></td>`;
       } else {
-        mhtml += `<td class="slot-empty-cell">—</td>`;
+        mhtml += `<td><div class="slot-avbl">AVBL</div></td>`;
       }
 
-      const lv = loadMap[tStr]||'';
-      const ll = getLoadLabel(lv);
-      const lc = getLoadClass(lv);
-      mhtml += `<td>${ll?`<span class="lc ${lc}" style="font-size:8px;">${ll}</span>`:''}</td>`;
       mhtml += '</tr>';
+      mRowIdx++;
     }
-    mhtml += '</table></div>';
+    mhtml += '</tbody></table></div>';
   }
   document.getElementById('ctMobileContent').innerHTML = mhtml;
 }
@@ -1260,6 +1499,237 @@ function saveSettings() {
   flash.style.opacity = '1';
   setTimeout(()=>flash.style.opacity='0', 2500);
 }
+
+// ══ CIRCUIT SLOT BOOKING & CANCELLATION ════════════════════════
+
+// PHP endpoint — replace with your GoDaddy URL once hosting confirmed
+const PHP_EMAIL_URL = 'https://YOUR-GODADDY-DOMAIN.com/send-email.php';
+
+// In-memory cancellation log (persists this session only — backend TBD)
+const cancelLog = [];
+
+// ── Book modal ──────────────────────────────────────────────────
+function openBookModal() {
+  // Pre-fill aircraft radio buttons from fleet
+  const acList = document.getElementById('bookAcList');
+  acList.innerHTML = '';
+  ST.ac.forEach(reg => {
+    const lbl = document.createElement('label');
+    lbl.className = 'ct-radio-opt';
+    lbl.innerHTML = `<input type="radio" name="bookAc" value="${reg}"> ${reg}`;
+    acList.appendChild(lbl);
+  });
+  // Pre-fill start time to next 15-min boundary
+  const d = new Date();
+  const mins = d.getUTCHours()*60 + d.getUTCMinutes();
+  const next = Math.ceil(mins/15)*15;
+  const hh = String(Math.floor(next/60)%24).padStart(2,'0');
+  const mm = String(next%60).padStart(2,'0');
+  document.getElementById('bookStart').value = hh+':'+mm;
+  const end = next + 60;
+  document.getElementById('bookEnd').value = String(Math.floor(end/60)%24).padStart(2,'0')+':'+String(end%60).padStart(2,'0');
+  document.getElementById('bookName').value = '';
+  document.getElementById('bookNotes').value = '';
+  document.getElementById('bookErr').textContent = '';
+  document.getElementById('bookModalOverlay').classList.add('open');
+}
+
+function closeBookModal(e) {
+  if(e && e.target !== document.getElementById('bookModalOverlay')) return;
+  document.getElementById('bookModalOverlay').classList.remove('open');
+}
+
+function submitBookSlot() {
+  const lane  = document.querySelector('input[name="bookLane"]:checked')?.value || '';
+  const ac    = document.querySelector('input[name="bookAc"]:checked')?.value || '';
+  const start = document.getElementById('bookStart').value.trim();
+  const end   = document.getElementById('bookEnd').value.trim();
+  const name  = document.getElementById('bookName').value.trim();
+  const notes = document.getElementById('bookNotes').value.trim();
+  const err   = document.getElementById('bookErr');
+
+  if(!ac)    { err.textContent = 'Please select an aircraft.'; return; }
+  if(!start || !/^\d{2}:\d{2}$/.test(start)) { err.textContent = 'Enter a valid start time (HH:MM).'; return; }
+  if(!end   || !/^\d{2}:\d{2}$/.test(end))   { err.textContent = 'Enter a valid end time (HH:MM).'; return; }
+  if(!name)  { err.textContent = 'Please enter your name.'; return; }
+  err.textContent = '';
+
+  const subject = `CIRCUIT SLOT REQUEST — ${ac} ${lane} ${start}–${end} UTC`;
+  const body =
+    `CIRCUIT SLOT REQUEST
+` +
+    `─────────────────────────────
+` +
+    `Lane:      ${lane}
+` +
+    `Aircraft:  ${ac}
+` +
+    `Time:      ${start} – ${end} UTC
+` +
+    `Requested by: ${name}
+` +
+    (notes ? `Notes:     ${notes}
+` : '') +
+    `─────────────────────────────
+` +
+    `Sent from LS Airmotive Bookings App`;
+
+  sendEmail({
+    to: ST.atcEmail || 'atc1@londonoxfordairport.com',
+    cc: ST.fromEmail || 'ops@limasierra.org',
+    from: ST.fromEmail || 'ops@limasierra.org',
+    subject,
+    body,
+    onSuccess: () => {
+      document.getElementById('bookModalOverlay').classList.remove('open');
+      showSlotsToast(`✓ Slot request sent — ${ac} ${lane} ${start}–${end}`);
+      loadSlots();
+    },
+    onError: (msg) => { err.textContent = msg; }
+  });
+}
+
+// ── Cancel modal ────────────────────────────────────────────────
+function openCancelModal() {
+  document.getElementById('cancelStart').value = '';
+  document.getElementById('cancelEnd').value = '';
+  document.getElementById('cancelReg').value = '';
+  document.getElementById('cancelName').value = '';
+  document.getElementById('cancelReason').value = '';
+  document.getElementById('cancelErr').textContent = '';
+  document.getElementById('cancelModalOverlay').classList.add('open');
+}
+
+function closeCancelModal(e) {
+  if(e && e.target !== document.getElementById('cancelModalOverlay')) return;
+  document.getElementById('cancelModalOverlay').classList.remove('open');
+}
+
+function submitCancelSlot() {
+  const lane   = document.querySelector('input[name="cancelLane"]:checked')?.value || '';
+  const start  = document.getElementById('cancelStart').value.trim();
+  const end    = document.getElementById('cancelEnd').value.trim();
+  const reg    = document.getElementById('cancelReg').value.trim().toUpperCase();
+  const name   = document.getElementById('cancelName').value.trim();
+  const reason = document.getElementById('cancelReason').value.trim();
+  const err    = document.getElementById('cancelErr');
+
+  if(!start || !/^\d{2}:\d{2}$/.test(start)) { err.textContent = 'Enter a valid start time (HH:MM).'; return; }
+  if(!end   || !/^\d{2}:\d{2}$/.test(end))   { err.textContent = 'Enter a valid end time (HH:MM).'; return; }
+  if(!reg)   { err.textContent = 'Enter the aircraft registration.'; return; }
+  if(!name)  { err.textContent = 'Enter your name for the log.'; return; }
+  err.textContent = '';
+
+  const now = new Date();
+  const loggedAt = now.getUTCHours().toString().padStart(2,'0')+':'+now.getUTCMinutes().toString().padStart(2,'0')+'Z';
+
+  const subject = `CIRCUIT SLOT CANCELLATION — ${reg} ${lane} ${start}–${end} UTC`;
+  const body =
+    `CIRCUIT SLOT CANCELLATION
+` +
+    `─────────────────────────────
+` +
+    `Lane:       ${lane}
+` +
+    `Aircraft:   ${reg}
+` +
+    `Time:       ${start} – ${end} UTC
+` +
+    `Cancelled by: ${name}
+` +
+    (reason ? `Reason:     ${reason}
+` : '') +
+    `Logged at:  ${loggedAt}
+` +
+    `─────────────────────────────
+` +
+    `Sent from LS Airmotive Bookings App`;
+
+  sendEmail({
+    to: ST.atcEmail || 'atc1@londonoxfordairport.com',
+    cc: ST.fromEmail || 'ops@limasierra.org',
+    from: ST.fromEmail || 'ops@limasierra.org',
+    subject,
+    body,
+    onSuccess: () => {
+      // Add to in-memory log
+      cancelLog.unshift({ at: loggedAt, lane, reg, start, end, name, reason });
+      renderCancelLog();
+      document.getElementById('cancelModalOverlay').classList.remove('open');
+      showSlotsToast(`✓ Cancellation sent — ${reg} ${lane} ${start}–${end}`);
+      loadSlots();
+    },
+    onError: (msg) => { err.textContent = msg; }
+  });
+}
+
+function renderCancelLog() {
+  const el = document.getElementById('ctCancelLog');
+  if(!cancelLog.length) { el.style.display='none'; return; }
+  el.style.display = 'block';
+  el.innerHTML = '<div class="ct-cancel-log">' +
+    '<div class="ct-cancel-log-title">⚠ CANCELLATIONS THIS SESSION (' + cancelLog.length + ')</div>' +
+    cancelLog.map(c =>
+      '<div class="ct-cancel-log-row">' +
+        '<span class="cl-time">' + c.at + '</span>' +
+        '<span class="cl-slot">' + c.reg + ' · ' + c.lane + ' · ' + c.start + '–' + c.end + '</span>' +
+        '<span class="cl-who">by ' + c.name + '</span>' +
+        (c.reason ? '<span class="cl-reason">' + c.reason + '</span>' : '') +
+      '</div>'
+    ).join('') +
+  '</div>';
+}
+
+// ── Email sender (PHP backend) ──────────────────────────────────
+function sendEmail({to, cc, from, subject, body, onSuccess, onError}) {
+  // ── TODO: Replace PHP_EMAIL_URL with your GoDaddy script URL ──
+  // Until then, falls back to mailto so nothing is blocked.
+  if(!PHP_EMAIL_URL || PHP_EMAIL_URL.includes('YOUR-GODADDY')) {
+    // Fallback: open mail client
+    const mailto = 'mailto:' + to +
+      '?cc=' + encodeURIComponent(cc) +
+      '&subject=' + encodeURIComponent(subject) +
+      '&body=' + encodeURIComponent(body);
+    window.open(mailto);
+    onSuccess && onSuccess();
+    return;
+  }
+
+  fetch(PHP_EMAIL_URL, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ to, cc, from, subject, body })
+  })
+  .then(r => {
+    if(!r.ok) throw new Error('Server error ' + r.status);
+    return r.json();
+  })
+  .then(data => {
+    if(data.ok) { onSuccess && onSuccess(); }
+    else { onError && onError(data.error || 'Send failed'); }
+  })
+  .catch(e => { onError && onError('Could not reach email server: ' + e.message); });
+}
+
+// ── Toast notification ──────────────────────────────────────────
+function showSlotsToast(msg) {
+  let t = document.getElementById('slotsToast');
+  if(!t) {
+    t = document.createElement('div');
+    t.id = 'slotsToast';
+    t.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);' +
+      'background:#0d1a2d;border:1px solid rgba(0,170,255,.4);color:var(--accent);' +
+      'font-family:var(--mono);font-size:11px;letter-spacing:.08em;' +
+      'padding:10px 20px;border-radius:8px;z-index:9999;transition:opacity .4s;' +
+      'box-shadow:0 4px 20px rgba(0,0,0,.5);';
+    document.body.appendChild(t);
+  }
+  t.textContent = msg;
+  t.style.opacity = '1';
+  clearTimeout(t._to);
+  t._to = setTimeout(() => t.style.opacity = '0', 3500);
+}
+
 </script>
 </body>
 </html>
