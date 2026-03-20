@@ -1097,6 +1097,9 @@ function showConfirm(d, eta) {
 function closeConfirm() {
   document.getElementById('confirmOverlay').classList.remove('active');
   buildForm();
+  showScreen('s-pin');
+  document.getElementById('pinInput').value = '';
+  document.getElementById('pinErr').textContent = '';
 }
 
 // ══ CIRCUITS SLOTS ═════════════════════════════════
