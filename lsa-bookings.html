@@ -575,6 +575,7 @@ textarea.form-input{resize:vertical;min-height:90px;}
       <div class="ct-actionbar">
         <button class="ct-action-btn ct-book-btn" onclick="openBookModal()">＋ BOOK SLOT</button>
         <button class="ct-action-btn ct-cancel-btn" onclick="openCancelModal()">✕ CANCEL SLOT</button>
+        <a class="ct-action-btn" href="https://docs.google.com/spreadsheets/d/1fnMYghrTIi8EdHDN6JxFrAdqqFMuRbnB4Oj8041Y5ZY/edit?gid=818960255" target="_blank" style="background:rgba(58,85,112,.15);color:var(--dim);border:1px solid var(--border);text-decoration:none;">↗ ATC SHEET</a>
         <div style="display:flex;align-items:center;gap:8px;margin-left:auto;">
           <div class="ct-status-dot" id="ctDot"></div>
           <span class="ct-status-lbl" id="ctLbl">LOADING…</span>
@@ -1120,8 +1121,9 @@ async function loadSlots() {
     const dot = document.getElementById('ctDot');
     if(dot) dot.className='ct-status-dot error';
     const lbl = document.getElementById('ctLbl');
-    if(lbl) lbl.textContent = 'FETCH FAILED';
-    document.getElementById('ctWrap').innerHTML = '<div class="ct-loading" style="color:var(--red)">⚠ Could not load circuits data. Check connection.</div>';
+    if(lbl) lbl.textContent = 'ERROR: ' + e.message;
+    document.getElementById('ctWrap').innerHTML = '<div class="ct-loading" style="color:var(--red)">⚠ ' + e.message + '</div>';
+    console.error('loadSlots error:', e);
   }
 }
 
