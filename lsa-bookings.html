@@ -1126,35 +1126,41 @@ async function loadSlots() {
 }
 
 function parseRawGrid(json) {
-  // Returns a map: "HH:MM|LANE" -> { reg, bgcolor }
-  // Lanes: DEP, ARR, CCT1, CCT2, LOAD
+  // The sheet has 6-column repeating sections: UTC|DEP|ARR|CCT1|CCT2|LOAD
+  // Times come as datetime objects — use the 'f' (formatted) field e.g. "06:30"
   const rows = json.table.rows;
-  const grid = rows.map(row => (row.c||[]).map(cell => {
-    if(!cell) return {v:'', bg:''};
-    const v = cell.f ? cell.f.toString().trim() : (cell.v!=null ? cell.v.toString().trim() : '');
-    const bg = (cell.p && cell.p.style && cell.p.style.backgroundColor) ? cell.p.style.backgroundColor : '';
-    return {v, bg};
-  }));
+  const SECTION = 6;
+  const result  = {}; // "HH:MM|LANE" -> string value
 
-  const timeRx = /^\d{1,2}:\d{2}$/;
-  const SECTION = 6; // UTC|DEP|ARR|CCT1|CCT2|LOAD
-  const maxCols = grid.reduce((m,r)=>Math.max(m,r.length),0);
-  const result  = {}; // "HH:MM|LANE" -> {v, bg}
+  for(const row of rows) {
+    if(!row || !row.c) continue;
+    const cells = row.c;
+    const maxCols = cells.length;
 
-  for(const row of grid) {
     for(let c=0; c<maxCols; c+=SECTION) {
-      const rawT = (row[c]||{v:''}).v.trim();
-      if(!timeRx.test(rawT)) continue;
-      // normalise to HH:MM
-      const parts = rawT.split(':');
-      const tStr  = parts[0].padStart(2,'0')+':'+parts[1].padStart(2,'0');
+      const timeCell = cells[c];
+      if(!timeCell) continue;
 
+      // Extract formatted time string e.g. "06:30"
+      let tStr = '';
+      if(timeCell.f) {
+        tStr = timeCell.f.toString().trim();
+      } else if(timeCell.v && typeof timeCell.v === 'string' && timeCell.v.includes('Date(')) {
+        // Parse Date(1899,11,30,6,30,0) -> "06:30"
+        const m = timeCell.v.match(/Date\(\d+,\d+,\d+,(\d+),(\d+)/);
+        if(m) tStr = m[1].padStart(2,'0')+':'+m[2].padStart(2,'0');
+      }
+      if(!tStr || !/^\d{2}:\d{2}$/.test(tStr)) continue;
+
+      // Read each lane column
       const lanes = ['DEP','ARR','CCT1','CCT2','LOAD'];
       lanes.forEach((lane, i) => {
-        const cell = row[c+1+i] || {v:'',bg:''};
-        if(cell.v || cell.bg) {
-          result[tStr+'|'+lane] = {v: cell.v, bg: cell.bg};
-        }
+        const cell = cells[c+1+i];
+        if(!cell) return;
+        const v = cell.f ? cell.f.toString().trim()
+                : cell.v != null ? cell.v.toString().trim()
+                : '';
+        if(v) result[tStr+'|'+lane] = v;
       });
     }
   }
