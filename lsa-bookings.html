@@ -1338,7 +1338,8 @@ function renderSlotsGrid(json) {
     + '</div>';
 
   document.getElementById('ctBands').innerHTML = bandsHTML;
-  document.getElementById('ctOuter').insertAdjacentHTML('afterend', footer);
+  const oldFooter = document.getElementById('ctFooter');
+  if(oldFooter) oldFooter.remove();
 
   // Update status
   const dot = document.getElementById('ctDot');
