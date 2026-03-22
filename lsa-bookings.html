@@ -329,8 +329,8 @@ textarea.form-input{resize:vertical;min-height:90px;}
   width:100%;
 }
 
-/* Empty / closed */
-.cb-closed{background:#050b14;border:1px solid #0d1a2a;}
+/* Closed / blocked by ATC */
+.cb-closed{background:#2a0808;border:1px solid #6a1010;color:#cc2222;font-size:14px;font-weight:900;}
 
 /* AVBL — green */
 .cb-avbl{background:#062a14;border:1px solid #0d4422;color:#00d45a;font-size:11px;letter-spacing:.08em;}
@@ -338,8 +338,8 @@ textarea.form-input{resize:vertical;min-height:90px;}
 /* Private — orange */
 .cb-private{background:#3a1200;border:1px solid #662200;color:#ff8040;font-size:11px;}
 
-/* LSA fleet — strong blue accent */
-.cb-lsa{background:#0a2a4a;border:1px solid #1a5080;color:#60c0ff;font-size:13px;}
+/* LSA fleet — bright, high contrast */
+.cb-lsa{background:#003870;border:2px solid #00aaff;color:#ffffff;font-size:13px;font-weight:900;text-shadow:0 0 8px rgba(0,170,255,.6);}
 
 /* External aircraft — grey-blue */
 .cb-ext{background:#0d1e2e;border:1px solid #1a3040;color:#70a0b8;font-size:13px;}
@@ -1247,7 +1247,8 @@ function renderSlotsGrid(json) {
   }
 
   function bLabel(lane, v) {
-    if(!v || v==='X') return '';
+    if(!v) return '';
+    if(v==='X') return '✕';
     const vUp = v.toUpperCase().replace(/[\s-]/g,'');
     if(vUp==='AVBL') return 'AVBL';
     if(v.toLowerCase().includes('private')) return 'Private';
