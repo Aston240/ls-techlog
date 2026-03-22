@@ -1169,6 +1169,17 @@ function parseRawGrid(json) {
   return result;
 }
 
+function nowUTCMins() {
+  const d = new Date();
+  return d.getUTCHours()*60 + d.getUTCMinutes();
+}
+function toHHMM(mins) {
+  return String(Math.floor(mins/60)%24).padStart(2,'0')+':'+String(mins%60).padStart(2,'0');
+}
+function toMins(t) {
+  const [h,m] = t.split(':').map(Number); return h*60+m;
+}
+
 function renderSlotsGrid(json) {
   const fleet   = new Set(ST.ac.map(r=>r.replace(/[\s-]/g,'').toUpperCase()));
   const nowMins = nowUTCMins();
