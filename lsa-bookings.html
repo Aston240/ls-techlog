@@ -71,6 +71,8 @@ body::before{
 /* ── TAB CONTENT ── */
 .tab-pane{display:none;padding:24px;}
 .tab-pane.active{display:block;}
+.tab-pane.iframe-pane{padding:0;}
+.tab-pane.iframe-pane.active{display:flex;flex-direction:column;}
 
 /* ── BOOKING FORM — card layout ── */
 .form-col{max-width:680px;margin:0 auto;display:flex;flex-direction:column;gap:12px;padding-bottom:32px;}
@@ -543,6 +545,8 @@ textarea.form-input{resize:vertical;min-height:90px;}
     <div class="tabs">
       <button class="tab-btn active" onclick="switchTab('booking', this)">📋 FLIGHT NOTIFICATION</button>
       <button class="tab-btn" onclick="switchTab('circuits', this)">🔄 CIRCUITS SLOTS</button>
+      <button class="tab-btn" onclick="switchTab('trialmember', this)">📝 TRIAL MEMBER</button>
+      <button class="tab-btn" onclick="switchTab('passenger', this)">👤 PASSENGER</button>
       <button class="tab-btn" onclick="showSettingsPin()" style="margin-left:auto;">⚙ SETTINGS</button>
     </div>
 
@@ -691,6 +695,26 @@ textarea.form-input{resize:vertical;min-height:90px;}
       </div>
 
     </div>
+    <!-- TRIAL MEMBER TAB -->
+    <div class="tab-pane iframe-pane" id="tab-trialmember">
+      <iframe
+        src="https://forms.office.com/e/sn4WNr7KZi?embed=true"
+        frameborder="0" marginwidth="0" marginheight="0"
+        style="border:none;width:100%;height:calc(100vh - 120px);display:block;"
+        allowfullscreen webkitallowfullscreen mozallowfullscreen msallowfullscreen>
+      </iframe>
+    </div>
+
+    <!-- PASSENGER TAB -->
+    <div class="tab-pane iframe-pane" id="tab-passenger">
+      <iframe
+        src="https://forms.office.com/e/Hc1cycsgGg?embed=true"
+        frameborder="0" marginwidth="0" marginheight="0"
+        style="border:none;width:100%;height:calc(100vh - 120px);display:block;"
+        allowfullscreen webkitallowfullscreen mozallowfullscreen msallowfullscreen>
+      </iframe>
+    </div>
+
     </div><!-- /app-body -->
   </div>
 </div>
