@@ -235,8 +235,8 @@ textarea.form-input{resize:vertical;min-height:90px;}
 
 /* Column widths — match the sheet proportions */
 .ct-grid col.cg-time{width:56px;}
-.ct-grid col.cg-lane{} /* equal share */
-.ct-grid col.cg-load{width:62px;}
+.ct-grid col.cg-lane{width:60px;}
+.ct-grid col.cg-load{width:52px;}
 
 /* ── HEADER ROWS ── */
 /* Section header: IFR MOVEMENT / VFR MOVEMENT / LOAD */
@@ -1250,7 +1250,7 @@ function renderSlotsGrid(json) {
     return v;
   }
 
-  let html = '<table class="ct-grid"><colgroup>';
+  html += '<table class="ct-grid"><colgroup>';
   html += '<col class="cg-time"><col class="cg-lane"><col class="cg-lane"><col class="cg-lane"><col class="cg-lane"><col class="cg-load">';
   html += '</colgroup><thead>';
   html += '<tr class="hdr-section">';
