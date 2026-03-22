@@ -359,6 +359,38 @@ textarea.form-input{resize:vertical;min-height:90px;}
   border-radius:4px;padding:5px 12px;}
 .ct-sheet-link:hover{color:var(--accent);border-color:var(--accent);}
 
+
+/* ── SLOT SELECTION ── */
+.ct-sel-label{font-family:var(--mono);font-size:11px;color:var(--accent);letter-spacing:.06em;font-weight:700;}
+.cb.cb-selected-avbl{background:#004a20!important;border:2px solid #00e676!important;color:#00e676!important;box-shadow:0 0 8px rgba(0,230,118,.4);}
+.cb.cb-selected-lsa {background:#001a40!important;border:2px solid #00aaff!important;color:#00aaff!important;box-shadow:0 0 8px rgba(0,170,255,.4);}
+
+/* Amend modal aircraft list */
+.amend-ac-list{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;}
+.amend-ac-opt{font-family:var(--mono);font-size:12px;font-weight:700;
+  background:#07111e;border:1px solid var(--border);border-radius:5px;
+  padding:7px 14px;cursor:pointer;color:var(--text);transition:all .2s;}
+.amend-ac-opt:hover{border-color:var(--accent);color:var(--accent);}
+.amend-ac-opt.selected{background:#0a2a4a;border-color:var(--accent);color:#fff;}
+
+
+/* ── CLICKABLE GRID BLOCKS ── */
+.cb-avbl{cursor:pointer;transition:background .15s,border-color .15s,transform .1s;}
+.cb-avbl:hover{background:#0a4020;border-color:#00ff66;transform:scale(1.03);}
+.cb-avbl.selected{background:#00aa44;border:2px solid #00ff66;color:#fff;box-shadow:0 0 8px rgba(0,255,100,.4);}
+
+.cb-lsa{cursor:pointer;transition:background .15s,border-color .15s,transform .1s;}
+.cb-lsa:hover{background:#004a90;border-color:#00ddff;transform:scale(1.03);}
+.cb-lsa.selected{background:#0060aa;border:2px solid #00ddff;color:#fff;box-shadow:0 0 8px rgba(0,180,255,.4);}
+
+/* Selection label */
+.ct-sel-label{
+  font-family:var(--mono);font-size:11px;font-weight:700;
+  color:var(--accent);letter-spacing:.06em;
+  background:rgba(0,170,255,.1);border:1px solid rgba(0,170,255,.3);
+  border-radius:4px;padding:4px 12px;
+}
+
 /* ── CIRCUIT BOOK / CANCEL BUTTONS ── */
 .ct-action-btn{font-family:var(--mono);font-size:10px;letter-spacing:.08em;
   border:none;border-radius:4px;padding:4px 12px;cursor:pointer;font-weight:700;}
@@ -609,15 +641,32 @@ textarea.form-input{resize:vertical;min-height:90px;}
     <div class="tab-pane" id="tab-circuits">
 
       <!-- Action bar -->
-      <div class="ct-actionbar">
-        <button class="ct-action-btn ct-book-btn" onclick="openBookModal()">＋ BOOK SLOT</button>
-        <button class="ct-action-btn ct-cancel-btn" onclick="openCancelModal()">✕ CANCEL SLOT</button>
-        <a class="ct-action-btn" href="https://docs.google.com/spreadsheets/d/1fnMYghrTIi8EdHDN6JxFrAdqqFMuRbnB4Oj8041Y5ZY/edit?gid=818960255" target="_blank" style="background:rgba(58,85,112,.15);color:var(--dim);border:1px solid var(--border);text-decoration:none;">↗ ATC SHEET</a>
-        <div style="display:flex;align-items:center;gap:8px;margin-left:auto;">
-          <div class="ct-status-dot" id="ctDot"></div>
-          <span class="ct-status-lbl" id="ctLbl">LOADING…</span>
-          <span class="ct-status-lbl" id="ctUpdated" style="color:var(--dim)"></span>
-          <button class="ct-refresh-btn" onclick="loadSlots()">↺</button>
+      <div class="ct-actionbar" id="ctActionbar">
+        <!-- Default buttons -->
+        <div id="ctDefaultBtns" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;width:100%;">
+          <button class="ct-action-btn ct-book-btn" onclick="openBookModal()">＋ BOOK SLOT</button>
+          <button class="ct-action-btn ct-cancel-btn" onclick="openCancelModal()">✕ CANCEL SLOT</button>
+          <a class="ct-action-btn" href="https://docs.google.com/spreadsheets/d/1fnMYghrTIi8EdHDN6JxFrAdqqFMuRbnB4Oj8041Y5ZY/edit?gid=818960255" target="_blank" style="background:rgba(58,85,112,.15);color:var(--dim);border:1px solid var(--border);text-decoration:none;">↗ ATC SHEET</a>
+          <div style="display:flex;align-items:center;gap:8px;margin-left:auto;">
+            <div class="ct-status-dot" id="ctDot"></div>
+            <span class="ct-status-lbl" id="ctLbl">LOADING…</span>
+            <span class="ct-status-lbl" id="ctUpdated" style="color:var(--dim)"></span>
+            <button class="ct-refresh-btn" onclick="loadSlots()">↺</button>
+          </div>
+        </div>
+        <!-- Selection action bar — shown when slots selected -->
+        <div id="ctSelBar" style="display:none;width:100%;align-items:center;gap:8px;flex-wrap:wrap;">
+          <span class="ct-sel-label" id="ctSelLabel"></span>
+          <div style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap;">
+            <div id="ctSelAvblBtns" style="display:none;gap:8px;">
+              <button class="ct-action-btn ct-book-btn" onclick="bookFromSelection()">＋ BOOK THIS SLOT →</button>
+            </div>
+            <div id="ctSelLsaBtns" style="display:none;gap:8px;">
+              <button class="ct-action-btn ct-cancel-btn" onclick="cancelFromSelection()">✕ CANCEL SLOT</button>
+              <button class="ct-action-btn" style="background:rgba(255,171,0,.15);color:#ffab00;border:1px solid rgba(255,171,0,.4);" onclick="amendFromSelection()">✎ AMEND AIRCRAFT</button>
+            </div>
+            <button class="ct-action-btn" style="background:none;color:var(--dim);border:1px solid var(--border);" onclick="clearSelection()">✕ CLEAR</button>
+          </div>
         </div>
       </div>
 
@@ -684,6 +733,32 @@ textarea.form-input{resize:vertical;min-height:90px;}
   </div>
 </div>
 
+
+<!-- ══ AMEND SLOT MODAL ════════════════════════════ -->
+<div class="ct-modal-overlay" id="amendModalOverlay" onclick="closeAmendModal(event)">
+  <div class="ct-modal">
+    <div class="ct-modal-head">
+      <span class="ct-modal-title">AMEND AIRCRAFT</span>
+      <button class="ct-modal-close" onclick="closeAmendModal()">✕</button>
+    </div>
+    <div class="ct-modal-body">
+      <div class="ct-field">
+        <label class="ct-label">CURRENT SLOT</label>
+        <div id="amendSlotInfo" style="font-family:var(--mono);font-size:13px;color:var(--accent);padding:8px 0;"></div>
+      </div>
+      <div class="ct-field">
+        <label class="ct-label">SELECT REPLACEMENT AIRCRAFT</label>
+        <div class="amend-ac-list" id="amendAcList"></div>
+      </div>
+      <div class="ct-modal-err" id="amendErr"></div>
+    </div>
+    <div class="ct-modal-foot">
+      <button class="ct-modal-cancel-btn" onclick="closeAmendModal()">BACK</button>
+      <button class="ct-modal-submit-btn" onclick="submitAmendSlot()">SEND AMENDMENT TO ATC →</button>
+    </div>
+  </div>
+</div>
+
 <!-- ══ CANCEL SLOT MODAL ════════════════════════════ -->
 <div class="ct-modal-overlay" id="cancelModalOverlay" onclick="closeCancelModal(event)">
   <div class="ct-modal">
@@ -727,6 +802,32 @@ textarea.form-input{resize:vertical;min-height:90px;}
     <div class="ct-modal-foot">
       <button class="ct-modal-cancel-btn" onclick="closeCancelModal()">BACK</button>
       <button class="ct-modal-submit-btn ct-modal-cancel-submit" onclick="submitCancelSlot()">NOTIFY ATC OF CANCELLATION →</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- ══ AMEND AIRCRAFT MODAL ════════════════════════════ -->
+<div class="ct-modal-overlay" id="amendModalOverlay" onclick="closeAmendModal(event)">
+  <div class="ct-modal">
+    <div class="ct-modal-head">
+      <span class="ct-modal-title">AMEND AIRCRAFT</span>
+      <button class="ct-modal-close" onclick="closeAmendModal()">✕</button>
+    </div>
+    <div class="ct-modal-body">
+      <div class="ct-field">
+        <label class="ct-label">CURRENT SLOT</label>
+        <div id="amendSlotInfo" style="font-family:var(--mono);font-size:13px;color:var(--accent);padding:6px 0;"></div>
+      </div>
+      <div class="ct-field">
+        <label class="ct-label">SELECT REPLACEMENT AIRCRAFT</label>
+        <div class="ct-radio-row" id="amendAcList" style="flex-wrap:wrap;gap:6px;"></div>
+      </div>
+      <div class="ct-modal-err" id="amendErr"></div>
+    </div>
+    <div class="ct-modal-foot">
+      <button class="ct-modal-cancel-btn" onclick="closeAmendModal()">BACK</button>
+      <button class="ct-modal-submit-btn" onclick="submitAmend()">SEND AMENDMENT TO ATC →</button>
     </div>
   </div>
 </div>
@@ -1318,7 +1419,14 @@ function renderSlotsGrid(json) {
         const v   = blocks[tStr+'|'+lane] || '';
         const cls = bClass(lane, v);
         const lbl = bLabel(lane, v);
-        h += `<td class="cg-lane-td"><div class="cb ${cls}">${lbl}</div></td>`;
+        const vUp = v.toUpperCase().replace(/[\s-]/g,'');
+        const isAvbl = vUp === 'AVBL';
+        const isLsa  = !isAvbl && cls === 'cb-lsa';
+        const clickable = isAvbl || isLsa;
+        const clickAttr = clickable
+          ? `onclick="onBlockClick(${t},'${lane}','${isAvbl?'avbl':'lsa'}','${v}')" style="cursor:pointer;"`
+          : '';
+        h += `<td class="cg-lane-td"><div class="cb ${cls}" data-t="${t}" data-lane="${lane}" ${clickAttr}>${lbl}</div></td>`;
       });
 
       const lv = blocks[tStr+'|LOAD'] || '';
@@ -1432,7 +1540,7 @@ const PHP_EMAIL_URL = 'https://script.google.com/macros/s/AKfycbwg4sqiX6kwdioXW7
 const cancelLog = [];
 
 // ── Book modal ──────────────────────────────────────────────────
-function openBookModal() {
+function openBookModal(prefillLane, prefillStart, prefillEnd) {
   // Pre-fill aircraft radio buttons from fleet
   const acList = document.getElementById('bookAcList');
   acList.innerHTML = '';
@@ -1448,9 +1556,13 @@ function openBookModal() {
   const next = Math.ceil(mins/15)*15;
   const hh = String(Math.floor(next/60)%24).padStart(2,'0');
   const mm = String(next%60).padStart(2,'0');
-  document.getElementById('bookStart').value = hh+':'+mm;
+  document.getElementById('bookStart').value = prefillStart || (hh+':'+mm);
   const end = next + 60;
-  document.getElementById('bookEnd').value = String(Math.floor(end/60)%24).padStart(2,'0')+':'+String(end%60).padStart(2,'0');
+  document.getElementById('bookEnd').value = prefillEnd || (String(Math.floor(end/60)%24).padStart(2,'0')+':'+String(end%60).padStart(2,'0'));
+  if(prefillLane) {
+    const laneInput = document.querySelector(`input[name="bookLane"][value="${prefillLane}"]`);
+    if(laneInput) laneInput.checked = true;
+  }
   document.getElementById('bookName').value = '';
   document.getElementById('bookNotes').value = '';
   document.getElementById('bookErr').textContent = '';
@@ -1513,10 +1625,14 @@ function submitBookSlot() {
 }
 
 // ── Cancel modal ────────────────────────────────────────────────
-function openCancelModal() {
-  document.getElementById('cancelStart').value = '';
-  document.getElementById('cancelEnd').value = '';
-  document.getElementById('cancelReg').value = '';
+function openCancelModal(prefillLane, prefillStart, prefillEnd, prefillReg) {
+  document.getElementById('cancelStart').value = prefillStart || '';
+  document.getElementById('cancelEnd').value = prefillEnd || '';
+  document.getElementById('cancelReg').value = prefillReg || '';
+  if(prefillLane) {
+    const laneInput = document.querySelector(`input[name="cancelLane"][value="${prefillLane}"]`);
+    if(laneInput) laneInput.checked = true;
+  }
   document.getElementById('cancelName').value = '';
   document.getElementById('cancelReason').value = '';
   document.getElementById('cancelErr').textContent = '';
@@ -1649,6 +1765,453 @@ function showSlotsToast(msg) {
   t.style.opacity = '1';
   clearTimeout(t._to);
   t._to = setTimeout(() => t.style.opacity = '0', 3500);
+}
+
+
+// ══ SLOT SELECTION ════════════════════════════════════════════════
+
+let ctSelection = []; // [{t (mins), lane, type:'avbl'|'lsa', reg, tStr}]
+
+function clearSelection() {
+  ctSelection = [];
+  // Remove highlight classes from all blocks
+  document.querySelectorAll('.cb-selected-avbl, .cb-selected-lsa').forEach(el => {
+    el.classList.remove('cb-selected-avbl','cb-selected-lsa');
+  });
+  document.getElementById('ctSelBar').style.display = 'none';
+  document.getElementById('ctDefaultBtns').style.display = 'flex';
+}
+
+function onBlockClick(tMins, lane, type, reg) {
+  const fleet = new Set(ST.ac.map(r=>r.replace(/[\s-]/g,'').toUpperCase()));
+
+  // Only allow selecting AVBL or LSA fleet blocks
+  if(type !== 'avbl' && type !== 'lsa') return;
+
+  // If existing selection is different lane or different type — clear and start fresh
+  if(ctSelection.length > 0) {
+    const firstSel = ctSelection[0];
+    if(firstSel.lane !== lane || firstSel.type !== type) {
+      clearSelection();
+    }
+  }
+
+  // Check if already selected — if so deselect
+  const existIdx = ctSelection.findIndex(s => s.t === tMins);
+  if(existIdx !== -1) {
+    clearSelection();
+    return;
+  }
+
+  // Check max 4 (60 mins)
+  if(ctSelection.length >= 4) {
+    clearSelection();
+  }
+
+  // Check consecutive — new slot must be adjacent to last selected
+  if(ctSelection.length > 0) {
+    const lastT = ctSelection[ctSelection.length-1].t;
+    if(tMins !== lastT + 15) {
+      // Not consecutive — clear and start fresh from this block
+      clearSelection();
+    }
+  }
+
+  // Add to selection
+  ctSelection.push({t: tMins, lane, type, reg, tStr: toHHMM(tMins)});
+
+  // Highlight the block
+  const blockEl = document.querySelector(`[data-t="${tMins}"][data-lane="${lane}"]`);
+  if(blockEl) {
+    blockEl.classList.add(type==='avbl' ? 'cb-selected-avbl' : 'cb-selected-lsa');
+  }
+
+  // Update action bar
+  updateSelectionBar();
+}
+
+function updateSelectionBar() {
+  if(!ctSelection.length) { clearSelection(); return; }
+
+  const first = ctSelection[0];
+  const last  = ctSelection[ctSelection.length-1];
+  const startStr = first.tStr;
+  const endMins  = last.t + 15;
+  const endStr   = toHHMM(endMins);
+  const durMins  = ctSelection.length * 15;
+  const durLabel = durMins >= 60 ? '60 min' : durMins + ' min';
+
+  document.getElementById('ctDefaultBtns').style.display = 'none';
+  document.getElementById('ctSelBar').style.display = 'flex';
+
+  document.getElementById('ctSelLabel').textContent =
+    first.lane + ' · ' + startStr + ' → ' + endStr + ' (' + durLabel + ')' +
+    (first.type === 'lsa' ? ' · ' + first.reg : '');
+
+  const avblBtns = document.getElementById('ctSelAvblBtns');
+  const lsaBtns  = document.getElementById('ctSelLsaBtns');
+
+  if(first.type === 'avbl') {
+    avblBtns.style.display = 'flex';
+    lsaBtns.style.display  = 'none';
+  } else {
+    avblBtns.style.display = 'none';
+    lsaBtns.style.display  = 'flex';
+  }
+}
+
+function bookFromSelection() {
+  if(!ctSelection.length) return;
+  const first  = ctSelection[0];
+  const last   = ctSelection[ctSelection.length-1];
+  const endStr = toHHMM(last.t + 15);
+
+  // Pre-fill book modal
+  document.querySelector('input[name="bookLane"][value="'+first.lane+'"]').checked = true;
+  document.getElementById('bookStart').value = first.tStr;
+  document.getElementById('bookEnd').value   = endStr;
+  document.getElementById('bookName').value  = '';
+  document.getElementById('bookNotes').value = '';
+  document.getElementById('bookErr').textContent = '';
+
+  // Rebuild aircraft list
+  const acList = document.getElementById('bookAcList');
+  acList.innerHTML = '';
+  ST.ac.forEach(reg => {
+    const lbl = document.createElement('label');
+    lbl.className = 'ct-radio-opt';
+    lbl.innerHTML = `<input type="radio" name="bookAc" value="${reg}"> ${reg}`;
+    acList.appendChild(lbl);
+  });
+
+  clearSelection();
+  document.getElementById('bookModalOverlay').classList.add('open');
+}
+
+function cancelFromSelection() {
+  if(!ctSelection.length) return;
+  const first  = ctSelection[0];
+  const last   = ctSelection[ctSelection.length-1];
+  const endStr = toHHMM(last.t + 15);
+
+  // Pre-fill cancel modal
+  document.querySelector('input[name="cancelLane"][value="'+first.lane+'"]').checked = true;
+  document.getElementById('cancelStart').value = first.tStr;
+  document.getElementById('cancelEnd').value   = endStr;
+  document.getElementById('cancelReg').value   = first.reg || '';
+  document.getElementById('cancelName').value  = '';
+  document.getElementById('cancelReason').value = '';
+  document.getElementById('cancelErr').textContent = '';
+
+  clearSelection();
+  document.getElementById('cancelModalOverlay').classList.add('open');
+}
+
+function amendFromSelection() {
+  if(!ctSelection.length) return;
+  const first  = ctSelection[0];
+  const last   = ctSelection[ctSelection.length-1];
+  const endStr = toHHMM(last.t + 15);
+
+  document.getElementById('amendSlotInfo').textContent =
+    first.lane + ' · ' + first.tStr + ' → ' + endStr + ' · ' + (first.reg || '');
+
+  // Build aircraft list
+  const acList = document.getElementById('amendAcList');
+  acList.innerHTML = '';
+  let selectedAmendReg = '';
+  ST.ac.forEach(reg => {
+    const btn = document.createElement('div');
+    btn.className = 'amend-ac-opt' + (reg === first.reg ? ' selected' : '');
+    btn.textContent = reg;
+    btn.onclick = () => {
+      acList.querySelectorAll('.amend-ac-opt').forEach(b => b.classList.remove('selected'));
+      btn.classList.add('selected');
+      selectedAmendReg = reg;
+    };
+    acList.appendChild(btn);
+    if(reg === first.reg) selectedAmendReg = reg;
+  });
+  acList._getSelected = () => acList.querySelector('.amend-ac-opt.selected')?.textContent || '';
+  document.getElementById('amendErr').textContent = '';
+
+  // Store selection info for submit
+  acList.dataset.lane  = first.lane;
+  acList.dataset.start = first.tStr;
+  acList.dataset.end   = endStr;
+  acList.dataset.oldReg = first.reg || '';
+
+  clearSelection();
+  document.getElementById('amendModalOverlay').classList.add('open');
+}
+
+function closeAmendModal(e) {
+  if(e && e.target !== document.getElementById('amendModalOverlay')) return;
+  document.getElementById('amendModalOverlay').classList.remove('open');
+}
+
+function submitAmendSlot() {
+  const acList = document.getElementById('amendAcList');
+  const newReg = acList._getSelected();
+  const lane   = acList.dataset.lane;
+  const start  = acList.dataset.start;
+  const end    = acList.dataset.end;
+  const oldReg = acList.dataset.oldReg;
+  const err    = document.getElementById('amendErr');
+
+  if(!newReg) { err.textContent = 'Please select a replacement aircraft.'; return; }
+  if(newReg === oldReg) { err.textContent = 'That is the same aircraft — please select a different one.'; return; }
+  err.textContent = '';
+
+  const subject = `CIRCUIT SLOT AMENDMENT — ${oldReg} → ${newReg} · ${lane} · ${start}–${end} UTC`;
+  const body =
+`CIRCUIT SLOT AMENDMENT — LS AIRMOTIVE
+======================================
+Lane:          ${lane}
+Time:          ${start} – ${end} UTC
+Original Reg:  ${oldReg}
+New Reg:       ${newReg}
+======================================
+Sent from LSA Bookings App`;
+
+  sendEmail({
+    to: ST.atcEmail || 'atc1@londonoxfordairport.com',
+    cc: 'LSAOPS814@gmail.com',
+    from: 'LSAOPS814@gmail.com',
+    subject, body,
+    onSuccess: () => {
+      document.getElementById('amendModalOverlay').classList.remove('open');
+      showSlotsToast('✓ Amendment sent — ' + oldReg + ' → ' + newReg + ' · ' + lane + ' ' + start + '–' + end);
+      loadSlots();
+    },
+    onError: (msg) => { err.textContent = msg; }
+  });
+}
+
+
+// ══ GRID SELECTION STATE ══════════════════════════════════════
+let ctSelection = {
+  mode: null,      // 'avbl' or 'lsa'
+  lane: null,
+  slots: [],       // array of {t (mins), tStr}
+  reg: null,       // for lsa mode
+};
+
+function clearSelection() {
+  // Remove selected class from all blocks
+  document.querySelectorAll('.cb.selected').forEach(el => el.classList.remove('selected'));
+  ctSelection = { mode:null, lane:null, slots:[], reg:null };
+  updateSelectionBar();
+}
+
+function updateSelectionBar() {
+  const def = document.getElementById('ctDefaultBtns');
+  const sel = document.getElementById('ctSelBar');
+  const lbl = document.getElementById('ctSelLabel');
+  const avblBtns = document.getElementById('ctSelAvblBtns');
+  const lsaBtns  = document.getElementById('ctSelLsaBtns');
+
+  if(!ctSelection.mode || !ctSelection.slots.length) {
+    def.style.display = 'flex';
+    sel.style.display = 'none';
+    return;
+  }
+
+  def.style.display = 'none';
+  sel.style.display = 'flex';
+
+  const sorted = [...ctSelection.slots].sort((a,b)=>a.t-b.t);
+  const startStr = sorted[0].tStr;
+  const endMins  = sorted[sorted.length-1].t + 15;
+  const endStr   = toHHMM(endMins);
+
+  if(ctSelection.mode === 'avbl') {
+    lbl.textContent = ctSelection.lane + ' · ' + startStr + ' → ' + endStr;
+    avblBtns.style.display = 'flex';
+    lsaBtns.style.display  = 'none';
+  } else {
+    lbl.textContent = ctSelection.reg + ' · ' + ctSelection.lane + ' · ' + startStr + ' → ' + endStr;
+    avblBtns.style.display = 'none';
+    lsaBtns.style.display  = 'flex';
+  }
+}
+
+function onAvblClick(el, tStr, lane) {
+  const t = toMins(tStr);
+
+  // ARR lane — max 1 slot
+  if(lane === 'ARR') {
+    clearSelection();
+    ctSelection.mode = 'avbl';
+    ctSelection.lane = lane;
+    ctSelection.slots = [{t, tStr}];
+    el.classList.add('selected');
+    updateSelectionBar();
+    return;
+  }
+
+  // Different lane — start fresh
+  if(ctSelection.mode !== 'avbl' || ctSelection.lane !== lane) {
+    clearSelection();
+    ctSelection.mode = 'avbl';
+    ctSelection.lane = lane;
+    ctSelection.slots = [{t, tStr}];
+    el.classList.add('selected');
+    updateSelectionBar();
+    return;
+  }
+
+  // Already selected — deselect
+  const existing = ctSelection.slots.findIndex(s => s.t === t);
+  if(existing !== -1) {
+    el.classList.remove('selected');
+    ctSelection.slots.splice(existing, 1);
+    if(!ctSelection.slots.length) clearSelection();
+    else updateSelectionBar();
+    return;
+  }
+
+  // Check consecutive — must be adjacent to existing selection
+  const sorted = [...ctSelection.slots].sort((a,b)=>a.t-b.t);
+  const minT = sorted[0].t;
+  const maxT = sorted[sorted.length-1].t;
+  if(t !== minT - 15 && t !== maxT + 15) {
+    // Not adjacent — start fresh from this slot
+    clearSelection();
+    ctSelection.mode = 'avbl';
+    ctSelection.lane = lane;
+    ctSelection.slots = [{t, tStr}];
+    el.classList.add('selected');
+    updateSelectionBar();
+    return;
+  }
+
+  // Max 4 slots (60 mins)
+  if(ctSelection.slots.length >= 4) {
+    clearSelection();
+    ctSelection.mode = 'avbl';
+    ctSelection.lane = lane;
+    ctSelection.slots = [{t, tStr}];
+    el.classList.add('selected');
+    updateSelectionBar();
+    return;
+  }
+
+  // Add to selection
+  ctSelection.slots.push({t, tStr});
+  el.classList.add('selected');
+  updateSelectionBar();
+}
+
+function onLsaClick(el, tStr, lane, reg) {
+  // Clear any existing selection first
+  clearSelection();
+  const t = toMins(tStr);
+  ctSelection.mode = 'lsa';
+  ctSelection.lane = lane;
+  ctSelection.reg  = reg;
+  ctSelection.slots = [{t, tStr}];
+  el.classList.add('selected');
+  updateSelectionBar();
+}
+
+function bookFromSelection() {
+  if(!ctSelection.slots.length) return;
+  const sorted = [...ctSelection.slots].sort((a,b)=>a.t-b.t);
+  const startStr = sorted[0].tStr;
+  const endMins  = sorted[sorted.length-1].t + 15;
+  const endStr   = toHHMM(endMins);
+  // Pre-fill and open book modal
+  clearSelection();
+  openBookModal(ctSelection.lane, startStr, endStr);
+}
+
+function cancelFromSelection() {
+  if(!ctSelection.slots.length) return;
+  const sorted = [...ctSelection.slots].sort((a,b)=>a.t-b.t);
+  const startStr = sorted[0].tStr;
+  const endMins  = sorted[sorted.length-1].t + 15;
+  const endStr   = toHHMM(endMins);
+  const lane = ctSelection.lane;
+  const reg  = ctSelection.reg;
+  clearSelection();
+  // Pre-fill cancel modal
+  openCancelModal(lane, startStr, endStr, reg);
+}
+
+function amendFromSelection() {
+  if(!ctSelection.slots.length) return;
+  const sorted = [...ctSelection.slots].sort((a,b)=>a.t-b.t);
+  const startStr = sorted[0].tStr;
+  const endMins  = sorted[sorted.length-1].t + 15;
+  const endStr   = toHHMM(endMins);
+  const lane = ctSelection.lane;
+  const reg  = ctSelection.reg;
+  clearSelection();
+  openAmendModal(lane, startStr, endStr, reg);
+}
+
+// ── Amend modal ──────────────────────────────────────────────────
+function openAmendModal(lane, start, end, currentReg) {
+  document.getElementById('amendSlotInfo').textContent = lane + ' · ' + start + ' → ' + end + ' · Currently: ' + currentReg;
+  document.getElementById('amendErr').textContent = '';
+
+  // Build aircraft list excluding current reg
+  const acList = document.getElementById('amendAcList');
+  acList.innerHTML = '';
+  ST.ac.forEach(reg => {
+    const lbl = document.createElement('label');
+    lbl.className = 'ct-radio-opt';
+    lbl.innerHTML = `<input type="radio" name="amendAc" value="${reg}"${reg===currentReg?' checked':''}> ${reg}`;
+    acList.appendChild(lbl);
+  });
+
+  // Store context on the modal for submitAmend to read
+  document.getElementById('amendModalOverlay').dataset.lane  = lane;
+  document.getElementById('amendModalOverlay').dataset.start = start;
+  document.getElementById('amendModalOverlay').dataset.end   = end;
+  document.getElementById('amendModalOverlay').dataset.oldReg = currentReg;
+  document.getElementById('amendModalOverlay').classList.add('open');
+}
+
+function closeAmendModal(e) {
+  if(e && e.target !== document.getElementById('amendModalOverlay')) return;
+  document.getElementById('amendModalOverlay').classList.remove('open');
+}
+
+function submitAmend() {
+  const newReg = document.querySelector('input[name="amendAc"]:checked')?.value || '';
+  const err    = document.getElementById('amendErr');
+  const overlay = document.getElementById('amendModalOverlay');
+  const { lane, start, end, oldReg } = overlay.dataset;
+
+  if(!newReg)          { err.textContent = 'Please select an aircraft.'; return; }
+  if(newReg === oldReg){ err.textContent = 'That is already the booked aircraft.'; return; }
+  err.textContent = '';
+
+  const subject = `CIRCUIT SLOT AMENDMENT — ${lane} ${start}–${end} UTC`;
+  const body =
+`CIRCUIT SLOT AMENDMENT
+─────────────────────────────
+Lane:        ${lane}
+Time:        ${start} – ${end} UTC
+Previous:    ${oldReg}
+Amendment:   ${newReg}
+─────────────────────────────
+Sent from LS Airmotive Bookings App`;
+
+  sendEmail({
+    to: ST.atcEmail || 'atc1@londonoxfordairport.com',
+    cc: 'LSAOPS814@gmail.com',
+    from: 'LSAOPS814@gmail.com',
+    subject, body,
+    onSuccess: () => {
+      closeAmendModal();
+      showSlotsToast('✓ Amendment sent — ' + oldReg + ' → ' + newReg + ' · ' + lane + ' ' + start + '–' + end);
+      loadSlots();
+    },
+    onError: (msg) => { err.textContent = msg; }
+  });
 }
 
 </script>
