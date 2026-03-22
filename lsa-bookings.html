@@ -206,120 +206,162 @@ textarea.form-input{resize:vertical;min-height:90px;}
 
 /* ── CIRCUITS GRID ── */
 .ct-actionbar{display:flex;align-items:center;gap:8px;padding:10px 0 12px;flex-wrap:wrap;}
-.ct-status-dot{width:7px;height:7px;border-radius:50%;background:var(--green);flex-shrink:0;}
-.ct-status-dot.loading{background:var(--amber);}
-.ct-status-dot.error{background:var(--red);}
-.ct-status-lbl{font-family:var(--mono);font-size:10px;color:var(--accent);letter-spacing:.06em;}
-.ct-refresh-btn{font-family:var(--mono);font-size:11px;color:var(--accent);background:none;
-  border:1px solid var(--border);border-radius:4px;padding:3px 9px;cursor:pointer;}
+.ct-status-dot{width:8px;height:8px;border-radius:50%;background:var(--green);flex-shrink:0;animation:pulse 2s infinite;}
+.ct-status-dot.error{background:var(--red);animation:none;}
+.ct-status-lbl{font-family:var(--mono);font-size:11px;color:var(--accent);letter-spacing:.06em;}
+.ct-refresh-btn{font-family:var(--mono);font-size:13px;color:var(--accent);background:none;
+  border:1px solid var(--border);border-radius:4px;padding:3px 10px;cursor:pointer;}
 .ct-refresh-btn:hover{border-color:var(--accent);}
-.ct-loading{font-family:var(--mono);font-size:12px;color:var(--dim);
-  display:flex;align-items:center;gap:10px;padding:40px 0;}
+.ct-loading{font-family:var(--mono);font-size:13px;color:var(--dim);
+  display:flex;align-items:center;gap:10px;padding:40px 20px;}
 
-.ct-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:8px;
-  background:#060c14;}
-
-/* The grid table — mirrors ATC sheet layout */
-.ct-grid{border-collapse:collapse;width:100%;font-family:var(--mono);font-size:11px;
-  table-layout:fixed;}
-
-/* Column widths */
-.ct-grid col.cg-time{width:46px;}
-.ct-grid col.cg-dep {width:58px;}
-.ct-grid col.cg-arr {width:58px;}
-.ct-grid col.cg-c1  {width:62px;}
-.ct-grid col.cg-c2  {width:62px;}
-.ct-grid col.cg-load{width:54px;}
-
-/* Section header row */
-.ct-grid .hdr-section td{
-  font-size:9px;letter-spacing:.14em;font-weight:700;text-transform:uppercase;
-  padding:5px 0 5px 6px;border-bottom:1px solid #1a2840;
-  background:#07111e;color:var(--dim);white-space:nowrap;
+/* Outer wrapper */
+.ct-wrap{
+  overflow-x:auto;
+  border:1px solid #1a3060;
+  border-radius:6px;
+  background:#050b14;
 }
-.ct-grid .hdr-section .hdr-ifr{color:var(--accent);}
-.ct-grid .hdr-section .hdr-vfr{color:#aaff00;}
-.ct-grid .hdr-section .hdr-load{color:var(--dim);}
 
-/* Column label row */
-.ct-grid .hdr-cols td{
-  font-size:9px;letter-spacing:.1em;font-weight:700;
-  padding:4px 0 5px 6px;
-  background:#07111e;border-bottom:2px solid #1a3060;
-  white-space:nowrap;position:sticky;top:0;z-index:3;
+/* ── MAIN GRID TABLE ── */
+.ct-grid{
+  border-collapse:collapse;
+  font-family:'Share Tech Mono',monospace;
+  font-size:13px;
+  table-layout:fixed;
+  min-width:400px;
+  width:100%;
 }
-.ct-grid .hdr-cols .cl-time{color:var(--dim);}
-.ct-grid .hdr-cols .cl-dep {color:#60b0ff;}
-.ct-grid .hdr-cols .cl-arr {color:#60b0ff;}
-.ct-grid .hdr-cols .cl-c1  {color:#aaff00;}
-.ct-grid .hdr-cols .cl-c2  {color:#aaff00;}
-.ct-grid .hdr-cols .cl-load{color:var(--dim);}
 
-/* Data rows */
-.ct-grid td{
+/* Column widths — match the sheet proportions */
+.ct-grid col.cg-time{width:58px;}
+.ct-grid col.cg-dep {width:80px;}
+.ct-grid col.cg-arr {width:80px;}
+.ct-grid col.cg-c1  {width:88px;}
+.ct-grid col.cg-c2  {width:88px;}
+.ct-grid col.cg-load{width:68px;}
+
+/* ── HEADER ROWS ── */
+/* Section header: IFR MOVEMENT / VFR MOVEMENT / LOAD */
+.ct-grid thead tr.hdr-section td{
+  font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;
+  padding:7px 6px;
+  background:#071220;
+  border-bottom:1px solid #1a3060;
+  border-right:1px solid #0d1e36;
+  white-space:nowrap;
+  text-align:center;
+}
+.hdr-ifr{color:#60a0e0;}
+.hdr-vfr{color:#80cc40;}
+.hdr-load{color:#7090b0;}
+
+/* Column label row: UTC / DEP / ARR / CCT1 / CCT2 / LOAD% */
+.ct-grid thead tr.hdr-cols td{
+  font-size:12px;font-weight:700;letter-spacing:.1em;
+  padding:6px 4px;
+  background:#071220;
+  border-bottom:2px solid #1a4080;
+  border-right:1px solid #0d1e36;
+  white-space:nowrap;
+  text-align:center;
+  position:sticky;top:0;z-index:3;
+}
+.cl-time{color:#6090b0;text-align:left!important;padding-left:8px!important;}
+.cl-dep {color:#60a0e0;}
+.cl-arr {color:#60a0e0;}
+.cl-c1  {color:#80cc40;}
+.cl-c2  {color:#80cc40;}
+.cl-load{color:#7090b0;}
+
+/* ── DATA ROWS ── */
+.ct-grid tbody td{
   padding:0;
-  border-bottom:1px solid rgba(20,36,60,.8);
-  border-right:1px solid rgba(20,36,60,.6);
+  border-bottom:1px solid #0e1e32;
+  border-right:1px solid #0d1e36;
   vertical-align:middle;
+  height:28px;
 }
-.ct-grid tr.rw-even td{background:#070d18;}
-.ct-grid tr.rw-odd  td{background:#060b15;}
-.ct-grid tr.rw-now  td{background:rgba(0,120,255,.1)!important;}
+/* Alternating rows — subtle like the sheet */
+.ct-grid tr.rw-even td{background:#060d1a;}
+.ct-grid tr.rw-odd  td{background:#070f1e;}
+/* NOW row */
+.ct-grid tr.rw-now  td{background:#0a1f3a!important;}
 .ct-grid tr.rw-now  td.cg-time-cell{border-left:3px solid var(--accent);}
-.ct-grid tr.rw-past td{opacity:.3;}
+/* Past rows */
+.ct-grid tr.rw-past{opacity:.35;}
+/* Hour boundary — stronger line like the sheet */
+.ct-grid tr.rw-hour td{border-top:1px solid #1a3a60;}
 
-/* Hour separator */
-.ct-grid tr.rw-hour td{border-top:1px solid #1a3060;}
-
-/* TIME cell */
-.cg-time-cell{border-right:2px solid #1a3060!important;}
+/* ── TIME CELL ── */
+.cg-time-cell{
+  border-right:2px solid #1a3060!important;
+  text-align:left;
+}
 .cg-tc{
-  font-size:11px;font-weight:600;color:#7aaad0;
-  padding:3px 4px 3px 6px;white-space:nowrap;
-  display:flex;flex-direction:column;justify-content:center;
-  min-height:20px;
+  font-size:13px;font-weight:600;
+  color:#8ab8d8;
+  padding:0 6px 0 8px;
+  white-space:nowrap;
+  line-height:28px;
 }
 .cg-tc.is-now{color:var(--accent);font-weight:700;}
-.cg-tc.is-hour{color:#a0c8e8;font-size:12px;font-weight:700;}
-.cg-now-pip{font-size:7px;color:var(--accent);letter-spacing:.04em;margin-top:1px;}
+.cg-tc.is-hour{color:#b0d4f0;font-weight:700;}
+.cg-now-pip{
+  display:block;font-size:8px;color:var(--accent);
+  letter-spacing:.04em;line-height:1;margin-top:-4px;
+}
 
-/* Cell content wrapper */
+/* ── CELL CONTENT ── */
 .cg-cell{
   display:flex;align-items:center;justify-content:center;
-  height:100%;min-height:20px;padding:1px 3px;
-  font-size:11px;font-weight:700;letter-spacing:.04em;
+  height:28px;
+  font-size:13px;font-weight:600;
+  letter-spacing:.03em;
   text-align:center;
 }
 
-/* AVBL — green like the sheet */
-.cg-avbl{color:#00c853;font-size:10px;font-weight:600;letter-spacing:.08em;}
+/* AVBL — green, matches sheet */
+.cg-avbl{
+  color:#00c853;
+  font-size:12px;font-weight:700;
+  letter-spacing:.06em;
+}
 
-/* Private — orange like the sheet */
-.cg-private{background:#e65100;color:#fff;border-radius:2px;
-  padding:1px 4px;font-size:10px;}
+/* X — closed period, dark */
+.cg-closed{background:#040a12;}
 
-/* LSA fleet reg */
-.cg-lsa{color:#e4f2ff;font-size:11px;font-weight:700;}
+/* Private — orange pill like the sheet */
+.cg-private{
+  background:#bf4000;color:#fff;
+  border-radius:3px;padding:2px 7px;
+  font-size:11px;font-weight:700;
+  letter-spacing:.04em;
+}
 
-/* External reg */
-.cg-ext{color:#5a8aaa;font-size:11px;}
+/* LSA fleet — bright white, stands out */
+.cg-lsa{color:#d8eeff;font-weight:700;font-size:13px;}
 
-/* Closed/grey cell */
-.cg-closed{background:#0a1220;}
+/* External aircraft — clearly readable, slightly muted */
+.cg-ext{color:#7aaabb;font-size:13px;}
 
-/* Load cell */
-.cg-load-cell{font-size:9px;letter-spacing:.06em;text-align:center;}
+/* Load % column */
+.cg-load-cell{
+  font-size:11px;font-weight:600;letter-spacing:.05em;
+  display:flex;align-items:center;justify-content:center;
+  height:28px;
+}
 .cg-load-calm    {color:#00c853;}
-.cg-load-light   {color:#aaff00;}
-.cg-load-moderate{color:#ffab00;}
-.cg-load-busy    {color:#ff7020;}
-.cg-load-heavy   {color:#ff3d3d;}
+.cg-load-light   {color:#aadd00;}
+.cg-load-moderate{color:#ffaa00;}
+.cg-load-busy    {color:#ff6600;}
+.cg-load-heavy   {color:#ff3333;}
 
 /* footer */
 .ct-footer{display:flex;align-items:center;gap:12px;padding-top:14px;flex-wrap:wrap;}
-.ct-sheet-link{font-family:var(--mono);font-size:10px;letter-spacing:.08em;
+.ct-sheet-link{font-family:var(--mono);font-size:11px;letter-spacing:.06em;
   color:var(--dim);text-decoration:none;border:1px solid var(--border);
-  border-radius:4px;padding:4px 10px;}
+  border-radius:4px;padding:5px 12px;}
 .ct-sheet-link:hover{color:var(--accent);border-color:var(--accent);}
 
 /* ── CIRCUIT BOOK / CANCEL BUTTONS ── */
