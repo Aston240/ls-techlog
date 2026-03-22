@@ -234,12 +234,9 @@ textarea.form-input{resize:vertical;min-height:90px;}
 }
 
 /* Column widths — match the sheet proportions */
-.ct-grid col.cg-time{width:58px;}
-.ct-grid col.cg-dep {width:80px;}
-.ct-grid col.cg-arr {width:80px;}
-.ct-grid col.cg-c1  {width:88px;}
-.ct-grid col.cg-c2  {width:88px;}
-.ct-grid col.cg-load{width:68px;}
+.ct-grid col.cg-time{width:56px;}
+.ct-grid col.cg-lane{} /* equal share */
+.ct-grid col.cg-load{width:62px;}
 
 /* ── HEADER ROWS ── */
 /* Section header: IFR MOVEMENT / VFR MOVEMENT / LOAD */
@@ -275,87 +272,58 @@ textarea.form-input{resize:vertical;min-height:90px;}
 .cl-load{color:#7090b0;}
 
 /* ── DATA ROWS ── */
-.ct-grid tbody td{
-  padding:0;
-  border-bottom:1px solid #0e1e32;
-  border-right:1px solid #0d1e36;
-  vertical-align:middle;
-  height:28px;
-}
-/* Alternating rows — subtle like the sheet */
-.ct-grid tr.rw-even td{background:#060d1a;}
-.ct-grid tr.rw-odd  td{background:#070f1e;}
-/* NOW row */
-.ct-grid tr.rw-now  td{background:#0a1f3a!important;}
-.ct-grid tr.rw-now  td.cg-time-cell{border-left:3px solid var(--accent);}
-/* Past rows */
-.ct-grid tr.rw-past{opacity:.35;}
-/* Hour boundary — stronger line like the sheet */
-.ct-grid tr.rw-hour td{border-top:1px solid #1a3a60;}
+.ct-grid tbody td{padding:3px 3px;border-bottom:none;border-right:none;vertical-align:top;}
+.ct-grid tr.rw-even{background:#060d1a;}
+.ct-grid tr.rw-odd {background:#070f1e;}
+.ct-grid tr.rw-now {background:#091828!important;}
+.ct-grid tr.rw-now td.cg-time-cell{border-left:3px solid var(--accent);}
+.ct-grid tr.rw-past{opacity:.32;}
+.ct-grid tr.rw-hour td{padding-top:6px;}
 
-/* ── TIME CELL ── */
-.cg-time-cell{
-  border-right:2px solid #1a3060!important;
-  text-align:left;
-}
-.cg-tc{
-  font-size:13px;font-weight:600;
-  color:#8ab8d8;
-  padding:0 6px 0 8px;
-  white-space:nowrap;
-  line-height:28px;
-}
+/* TIME CELL */
+.cg-time-cell{border-right:2px solid #1a3060;padding:3px 6px 3px 8px!important;vertical-align:middle!important;}
+.cg-tc{font-family:var(--mono);font-size:13px;font-weight:600;color:#8ab8d8;white-space:nowrap;line-height:1.4;}
 .cg-tc.is-now{color:var(--accent);font-weight:700;}
-.cg-tc.is-hour{color:#b0d4f0;font-weight:700;}
-.cg-now-pip{
-  display:block;font-size:8px;color:var(--accent);
-  letter-spacing:.04em;line-height:1;margin-top:-4px;
-}
+.cg-tc.is-hour{color:#b0d4f0;font-weight:700;font-size:14px;}
+.cg-now-pip{display:block;font-size:8px;color:var(--accent);letter-spacing:.04em;}
 
-/* ── CELL CONTENT ── */
-.cg-cell{
+/* LANE / LOAD cells */
+.cg-lane-td{padding:3px 3px!important;}
+.cg-load-td{padding:3px 3px!important;vertical-align:middle!important;}
+
+/* ── ROUNDED BLOCKS ── */
+.cb{
+  border-radius:6px;
+  height:36px;
   display:flex;align-items:center;justify-content:center;
-  height:28px;
-  font-size:13px;font-weight:600;
-  letter-spacing:.03em;
-  text-align:center;
+  font-family:var(--mono);font-size:12px;font-weight:700;
+  letter-spacing:.04em;text-align:center;
+  padding:0 4px;
+  width:100%;
 }
 
-/* AVBL — green, matches sheet */
-.cg-avbl{
-  color:#00c853;
-  font-size:12px;font-weight:700;
-  letter-spacing:.06em;
-}
+/* Empty / closed */
+.cb-closed{background:#050b14;border:1px solid #0d1a2a;}
 
-/* X — closed period, dark */
-.cg-closed{background:#040a12;}
+/* AVBL — green */
+.cb-avbl{background:#062a14;border:1px solid #0d4422;color:#00d45a;font-size:11px;letter-spacing:.08em;}
 
-/* Private — orange pill like the sheet */
-.cg-private{
-  background:#bf4000;color:#fff;
-  border-radius:3px;padding:2px 7px;
-  font-size:11px;font-weight:700;
-  letter-spacing:.04em;
-}
+/* Private — orange */
+.cb-private{background:#3a1200;border:1px solid #662200;color:#ff8040;font-size:11px;}
 
-/* LSA fleet — bright white, stands out */
-.cg-lsa{color:#d8eeff;font-weight:700;font-size:13px;}
+/* LSA fleet — strong blue accent */
+.cb-lsa{background:#0a2a4a;border:1px solid #1a5080;color:#60c0ff;font-size:13px;}
 
-/* External aircraft — clearly readable, slightly muted */
-.cg-ext{color:#7aaabb;font-size:13px;}
+/* External aircraft — grey-blue */
+.cb-ext{background:#0d1e2e;border:1px solid #1a3040;color:#70a0b8;font-size:13px;}
 
-/* Load % column */
-.cg-load-cell{
-  font-size:11px;font-weight:600;letter-spacing:.05em;
-  display:flex;align-items:center;justify-content:center;
-  height:28px;
-}
-.cg-load-calm    {color:#00c853;}
-.cg-load-light   {color:#aadd00;}
-.cg-load-moderate{color:#ffaa00;}
-.cg-load-busy    {color:#ff6600;}
-.cg-load-heavy   {color:#ff3333;}
+/* Load column */
+.cb-load-wrap{background:transparent;border:none;font-size:11px;font-weight:600;}
+.cb-lc-calm    {color:#00d45a;}
+.cb-lc-light   {color:#aaee00;}
+.cb-lc-mod     {color:#ffaa00;}
+.cb-lc-busy    {color:#ff6600;}
+.cb-lc-heavy   {color:#ff3333;}
 
 /* footer */
 .ct-footer{display:flex;align-items:center;gap:12px;padding-top:14px;flex-wrap:wrap;}
@@ -1227,116 +1195,140 @@ function renderSlotsGrid(json) {
   const nowMins = nowUTCMins();
   const rawGrid = parseRawGrid(json);
 
-  // Build time slots 06:30 to 23:55 in 5-min steps
-  const slots = [];
-  for(let t=6*60+30; t<24*60; t+=5) slots.push(t);
+  // Collapse 5-min rows into 15-min blocks by taking first non-empty value in each 15-min window
+  // For each lane, build a map of "HH:MM" (15-min boundary) -> value
+  const lanes = ['DEP','ARR','CCT1','CCT2','LOAD'];
+  const blocks = {}; // "HH:MM|LANE" -> value at that 15-min slot
 
-  function toHH(m){ return String(Math.floor(m/60)%24).padStart(2,'0')+':'+String(m%60).padStart(2,'0'); }
-
-  function cellHTML(tStr, lane) {
-    const v = (rawGrid[tStr+'|'+lane] || '').trim();
-    if(!v) return '<div class="cg-cell cg-closed"></div>';
-    const vUp = v.toUpperCase().replace(/[\s-]/g,'');
-    if(v === 'X') return '<div class="cg-cell cg-closed"></div>';
-    if(vUp === 'AVBL') return '<div class="cg-cell cg-avbl">AVBL</div>';
-    if(v.toLowerCase().includes('private')) return '<div class="cg-cell"><span class="cg-private">Private</span></div>';
-    if(lane === 'LOAD') {
-      const lw = v.toLowerCase();
-      const lc = lw.includes('calm')?'cg-load-calm':
-                 lw.includes('light')?'cg-load-light':
-                 lw.includes('mod')?'cg-load-moderate':
-                 lw.includes('busy')?'cg-load-busy':
-                 lw.includes('heavy')?'cg-load-heavy':'';
-      return `<div class="cg-cell cg-load-cell ${lc}">${v}</div>`;
-    }
-    const cls = fleet.has(vUp) ? 'cg-lsa' : 'cg-ext';
-    return `<div class="cg-cell"><span class="${cls}">${v}</span></div>`;
+  for(let t=6*60+30; t<24*60; t+=15) {
+    const hhmm = toHHMM(t);
+    lanes.forEach(lane => {
+      // Check the three 5-min rows within this 15-min block
+      for(let d=0; d<15; d+=5) {
+        const tStr = toHHMM(t+d);
+        const v = rawGrid[tStr+'|'+lane];
+        if(v && v.trim()) {
+          blocks[hhmm+'|'+lane] = v.trim();
+          break;
+        }
+      }
+      // If nothing found, leave undefined (empty/AVBL decision made at render time)
+    });
   }
 
-  let html = '<table class="ct-grid">';
-  html += '<colgroup>';
-  html += '<col class="cg-time"><col class="cg-dep"><col class="cg-arr"><col class="cg-c1"><col class="cg-c2"><col class="cg-load">';
-  html += '</colgroup>';
+  // Build the LOAD map separately — take first non-empty per 15-min block
+  const loadMap = {};
+  for(let t=6*60+30; t<24*60; t+=15) {
+    const hhmm = toHHMM(t);
+    const v = blocks[hhmm+'|LOAD'];
+    if(v) loadMap[hhmm] = v;
+  }
 
-  // Header rows
-  html += '<thead>';
+  function blockClass(lane, v) {
+    const vUp = v.toUpperCase().replace(/[\s-]/g,'');
+    if(v === 'X' || !v) return 'cb-closed';
+    if(vUp === 'AVBL') return 'cb-avbl';
+    if(v.toLowerCase().includes('private')) return 'cb-private';
+    if(lane === 'LOAD') return 'cb-load';
+    return fleet.has(vUp) ? 'cb-lsa' : 'cb-ext';
+  }
+
+  function blockLabel(lane, v) {
+    if(!v || v === 'X') return '';
+    const vUp = v.toUpperCase().replace(/[\s-]/g,'');
+    if(vUp === 'AVBL') return 'AVBL';
+    if(v.toLowerCase().includes('private')) return 'Private';
+    if(lane === 'LOAD') {
+      const lw = v.toLowerCase();
+      const lc = lw.includes('calm')?'cb-lc-calm':
+                 lw.includes('light')?'cb-lc-light':
+                 lw.includes('mod')?'cb-lc-mod':
+                 lw.includes('busy')?'cb-lc-busy':
+                 lw.includes('heavy')?'cb-lc-heavy':'';
+      return `<span class="${lc}">${v}</span>`;
+    }
+    return v;
+  }
+
+  let html = '<table class="ct-grid"><colgroup>';
+  html += '<col class="cg-time"><col class="cg-lane"><col class="cg-lane"><col class="cg-lane"><col class="cg-lane"><col class="cg-load">';
+  html += '</colgroup><thead>';
   html += '<tr class="hdr-section">';
-  html += '<td></td>';
-  html += '<td colspan="2" class="hdr-ifr">IFR MOVEMENT</td>';
+  html += '<td></td><td colspan="2" class="hdr-ifr">IFR MOVEMENT</td>';
   html += '<td colspan="2" class="hdr-vfr">VFR MOVEMENT</td>';
-  html += '<td class="hdr-load">LOAD</td>';
-  html += '</tr>';
+  html += '<td class="hdr-load">LOAD</td></tr>';
   html += '<tr class="hdr-cols">';
   html += '<td class="cl-time">UTC</td>';
-  html += '<td class="cl-dep">DEP</td>';
-  html += '<td class="cl-arr">ARR</td>';
-  html += '<td class="cl-c1">CCT 1</td>';
-  html += '<td class="cl-c2">CCT 2</td>';
-  html += '<td class="cl-load">LOAD %</td>';
-  html += '</tr>';
+  html += '<td class="cl-dep">DEP</td><td class="cl-arr">ARR</td>';
+  html += '<td class="cl-c1">CCT 1</td><td class="cl-c2">CCT 2</td>';
+  html += '<td class="cl-load">LOAD %</td></tr>';
   html += '</thead><tbody>';
 
   let firstNow = false;
-  let rowIdx   = 0;
-  let nowRowId = '';
 
-  for(const t of slots) {
-    const tStr   = toHH(t);
-    const isPast = (t + 5) <= nowMins;
-    const isNow  = t <= nowMins && nowMins < t+5;
+  for(let t=6*60+30; t<24*60; t+=15) {
+    const tStr   = toHHMM(t);
+    const isPast = (t+15) <= nowMins;
+    const isNow  = t <= nowMins && nowMins < t+15;
     const isHour = t % 60 === 0;
-    const isNowFirst = isNow && !firstNow;
+    const idAttr = (isNow && !firstNow) ? 'id="ctNowRow"' : '';
     if(isNow) firstNow = true;
 
-    let rc = isPast ? 'rw-past' : isNow ? 'rw-now' : (rowIdx%2===0?'rw-even':'rw-odd');
-    if(isHour) rc += ' rw-hour';
-    const idAttr = isNowFirst ? 'id="ctNowRow"' : '';
+    const rc = isPast?'rw-past':isNow?'rw-now':((t/15)%2===0?'rw-even':'rw-odd');
+    const hourCls = isHour ? ' rw-hour' : '';
 
-    html += `<tr class="${rc}" ${idAttr}>`;
+    html += `<tr class="${rc}${hourCls}" ${idAttr}>`;
 
     // Time cell
-    html += `<td class="cg-time-cell">`;
-    html += `<div class="cg-tc${isNow?' is-now':''}${isHour?' is-hour':''}">`;
+    html += `<td class="cg-time-cell"><div class="cg-tc${isNow?' is-now':''}${isHour?' is-hour':''}">`;
     html += tStr;
     if(isNow) html += '<span class="cg-now-pip">▶NOW</span>';
     html += '</div></td>';
 
-    // Lane cells
-    for(const lane of ['DEP','ARR','CCT1','CCT2','LOAD']) {
-      html += `<td>${cellHTML(tStr, lane)}</td>`;
-    }
+    // Lane cells — each gets a rounded block
+    ['DEP','ARR','CCT1','CCT2'].forEach(lane => {
+      const v   = blocks[tStr+'|'+lane] || '';
+      const cls = blockClass(lane, v);
+      const lbl = blockLabel(lane, v);
+
+      if(!v || v==='X' || cls==='cb-closed') {
+        html += `<td class="cg-lane-td"><div class="cb cb-closed"></div></td>`;
+      } else {
+        html += `<td class="cg-lane-td"><div class="cb ${cls}">${lbl}</div></td>`;
+      }
+    });
+
+    // Load cell
+    const lv  = loadMap[tStr] || '';
+    const lbl = lv ? blockLabel('LOAD', lv) : '';
+    html += `<td class="cg-load-td"><div class="cb cb-load-wrap">${lbl}</div></td>`;
 
     html += '</tr>';
-    rowIdx++;
   }
 
   html += '</tbody></table>';
-
-  // Footer
-  html += '<div class="ct-footer">';
-  html += '<span style="font-family:var(--mono);font-size:10px;color:var(--dim);">SOURCE: ATC CIRCUITS SHEET</span>';
-  html += '<a class="ct-sheet-link" href="https://docs.google.com/spreadsheets/d/1fnMYghrTIi8EdHDN6JxFrAdqqFMuRbnB4Oj8041Y5ZY/edit?gid=818960255" target="_blank">↗ OPEN FULL SHEET</a>';
-  html += '</div>';
+  html += '<div class="ct-footer"><span style="font-family:var(--mono);font-size:10px;color:var(--dim);">SOURCE: ATC CIRCUITS SHEET · AUTO-REFRESHES EVERY 2 MIN</span>';
+  html += '<a class="ct-sheet-link" href="https://docs.google.com/spreadsheets/d/1fnMYghrTIi8EdHDN6JxFrAdqqFMuRbnB4Oj8041Y5ZY/edit?gid=818960255" target="_blank">↗ OPEN FULL SHEET</a></div>';
 
   document.getElementById('ctWrap').innerHTML = html;
 
   // Update status
   const dot = document.getElementById('ctDot');
-  if(dot) { dot.className='ct-status-dot'; }
-  const lbl = document.getElementById('ctLbl');
-  if(lbl) lbl.textContent = 'LIVE';
+  if(dot) dot.className = 'ct-status-dot';
+  const lbl2 = document.getElementById('ctLbl');
+  if(lbl2) lbl2.textContent = 'LIVE';
   const upd = document.getElementById('ctUpdated');
   if(upd) {
     const n = new Date();
     upd.textContent = '· '+n.getUTCHours().toString().padStart(2,'0')+':'+n.getUTCMinutes().toString().padStart(2,'0')+'Z';
   }
 
-  // Scroll now into view
   setTimeout(() => {
     const nr = document.getElementById('ctNowRow');
-    if(nr) nr.scrollIntoView({ block:'center', behavior:'smooth' });
+    if(nr) nr.scrollIntoView({block:'center', behavior:'smooth'});
   }, 150);
 }
+
 
 // ══ SETTINGS UI ════════════════════════════════════
 function loadSettingsUI() {
