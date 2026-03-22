@@ -224,12 +224,12 @@ textarea.form-input{resize:vertical;min-height:90px;}
   table-layout:fixed;}
 
 /* Column widths */
-.ct-grid col.cg-time{width:54px;}
-.ct-grid col.cg-dep {width:72px;}
-.ct-grid col.cg-arr {width:72px;}
-.ct-grid col.cg-c1  {width:80px;}
-.ct-grid col.cg-c2  {width:80px;}
-.ct-grid col.cg-load{width:66px;}
+.ct-grid col.cg-time{width:46px;}
+.ct-grid col.cg-dep {width:58px;}
+.ct-grid col.cg-arr {width:58px;}
+.ct-grid col.cg-c1  {width:62px;}
+.ct-grid col.cg-c2  {width:62px;}
+.ct-grid col.cg-load{width:54px;}
 
 /* Section header row */
 .ct-grid .hdr-section td{
@@ -274,19 +274,19 @@ textarea.form-input{resize:vertical;min-height:90px;}
 /* TIME cell */
 .cg-time-cell{border-right:2px solid #1a3060!important;}
 .cg-tc{
-  font-size:11px;font-weight:700;color:#3a6090;
-  padding:3px 4px 3px 8px;white-space:nowrap;
+  font-size:11px;font-weight:600;color:#7aaad0;
+  padding:3px 4px 3px 6px;white-space:nowrap;
   display:flex;flex-direction:column;justify-content:center;
-  min-height:22px;
+  min-height:20px;
 }
-.cg-tc.is-now{color:var(--accent);}
-.cg-tc.is-hour{color:#6090c0;font-size:12px;}
+.cg-tc.is-now{color:var(--accent);font-weight:700;}
+.cg-tc.is-hour{color:#a0c8e8;font-size:12px;font-weight:700;}
 .cg-now-pip{font-size:7px;color:var(--accent);letter-spacing:.04em;margin-top:1px;}
 
 /* Cell content wrapper */
 .cg-cell{
   display:flex;align-items:center;justify-content:center;
-  height:100%;min-height:22px;padding:2px 4px;
+  height:100%;min-height:20px;padding:1px 3px;
   font-size:11px;font-weight:700;letter-spacing:.04em;
   text-align:center;
 }
@@ -1187,28 +1187,17 @@ function renderSlotsGrid(json) {
 
   // Build time slots 06:30 to 23:55 in 5-min steps
   const slots = [];
-  for(let t=6*60+0; t<24*60; t+=5) slots.push(t);
+  for(let t=6*60+30; t<24*60; t+=5) slots.push(t);
 
   function toHH(m){ return String(Math.floor(m/60)%24).padStart(2,'0')+':'+String(m%60).padStart(2,'0'); }
 
   function cellHTML(tStr, lane) {
-    const key  = tStr+'|'+lane;
-    const cell = rawGrid[key];
-    if(!cell || (!cell.v && !cell.bg)) {
-      // empty — show grey closed look
-      return '<div class="cg-cell cg-closed"></div>';
-    }
-    const v   = cell.v.trim();
-    const vUp = v.toUpperCase().replace(/[\s-]/g,'');
-
+    const v = (rawGrid[tStr+'|'+lane] || '').trim();
     if(!v) return '<div class="cg-cell cg-closed"></div>';
-
-    if(v.toUpperCase() === 'AVBL') {
-      return '<div class="cg-cell cg-avbl">AVBL</div>';
-    }
-    if(v.toLowerCase().includes('private')) {
-      return '<div class="cg-cell"><span class="cg-private">Private</span></div>';
-    }
+    const vUp = v.toUpperCase().replace(/[\s-]/g,'');
+    if(v === 'X') return '<div class="cg-cell cg-closed"></div>';
+    if(vUp === 'AVBL') return '<div class="cg-cell cg-avbl">AVBL</div>';
+    if(v.toLowerCase().includes('private')) return '<div class="cg-cell"><span class="cg-private">Private</span></div>';
     if(lane === 'LOAD') {
       const lw = v.toLowerCase();
       const lc = lw.includes('calm')?'cg-load-calm':
@@ -1218,7 +1207,6 @@ function renderSlotsGrid(json) {
                  lw.includes('heavy')?'cg-load-heavy':'';
       return `<div class="cg-cell cg-load-cell ${lc}">${v}</div>`;
     }
-    // Aircraft reg
     const cls = fleet.has(vUp) ? 'cg-lsa' : 'cg-ext';
     return `<div class="cg-cell"><span class="${cls}">${v}</span></div>`;
   }
