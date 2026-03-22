@@ -204,152 +204,123 @@ textarea.form-input{resize:vertical;min-height:90px;}
 .load-busy    {background:rgba(255,112,32,.15);color:#ff7020;border:1px solid rgba(255,112,32,.3);}
 .load-heavy   {background:rgba(255,61,61,.15); color:#ff3d3d;border:1px solid rgba(255,61,61,.3);}
 
-/* ── CIRCUITS TIMETABLE ── */
-.ct-grid-wrap{margin-bottom:20px;}
-.ct-desktop{}
-.ct-mobile{display:none;}
+/* ── CIRCUITS GRID ── */
+.ct-actionbar{display:flex;align-items:center;gap:8px;padding:10px 0 12px;flex-wrap:wrap;}
+.ct-status-dot{width:7px;height:7px;border-radius:50%;background:var(--green);flex-shrink:0;}
+.ct-status-dot.loading{background:var(--amber);}
+.ct-status-dot.error{background:var(--red);}
+.ct-status-lbl{font-family:var(--mono);font-size:10px;color:var(--accent);letter-spacing:.06em;}
+.ct-refresh-btn{font-family:var(--mono);font-size:11px;color:var(--accent);background:none;
+  border:1px solid var(--border);border-radius:4px;padding:3px 9px;cursor:pointer;}
+.ct-refresh-btn:hover{border-color:var(--accent);}
+.ct-loading{font-family:var(--mono);font-size:12px;color:var(--dim);
+  display:flex;align-items:center;gap:10px;padding:40px 0;}
 
-/* Outer table wrapper — border around whole grid */
-.ct-table-wrap{border:1px solid var(--border);border-radius:8px;overflow:hidden;}
+.ct-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:8px;
+  background:#060c14;}
 
-.ct-table{width:100%;border-collapse:collapse;table-layout:fixed;}
-.ct-table col.col-time{width:70px;}
-.ct-table col.col-lane{} /* equal share */
-.ct-table col.col-load{width:96px;}
+/* The grid table — mirrors ATC sheet layout */
+.ct-grid{border-collapse:collapse;width:100%;font-family:var(--mono);font-size:11px;
+  table-layout:fixed;}
 
-/* sticky header */
-.ct-table thead th{
-  font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.14em;
-  padding:11px 0 11px 14px;text-align:left;
-  background:#07111e;border-bottom:2px solid var(--border);
-  white-space:nowrap;position:sticky;top:0;z-index:2;
+/* Column widths */
+.ct-grid col.cg-time{width:54px;}
+.ct-grid col.cg-dep {width:72px;}
+.ct-grid col.cg-arr {width:72px;}
+.ct-grid col.cg-c1  {width:80px;}
+.ct-grid col.cg-c2  {width:80px;}
+.ct-grid col.cg-load{width:66px;}
+
+/* Section header row */
+.ct-grid .hdr-section td{
+  font-size:9px;letter-spacing:.14em;font-weight:700;text-transform:uppercase;
+  padding:5px 0 5px 6px;border-bottom:1px solid #1a2840;
+  background:#07111e;color:var(--dim);white-space:nowrap;
 }
-.ct-table th.th-time{color:var(--dim);}
-.ct-table th.th-cct1{color:var(--accent);}
-.ct-table th.th-cct2{color:#aaff00;}
-.ct-table th.th-arr {color:#ffab00;}
-.ct-table th.th-load{color:var(--dim);font-size:10px;}
+.ct-grid .hdr-section .hdr-ifr{color:var(--accent);}
+.ct-grid .hdr-section .hdr-vfr{color:#aaff00;}
+.ct-grid .hdr-section .hdr-load{color:var(--dim);}
 
-/* every cell strips padding — inner divs own it */
-.ct-table td{padding:0;border-bottom:1px solid rgba(26,40,64,.5);vertical-align:top;}
+/* Column label row */
+.ct-grid .hdr-cols td{
+  font-size:9px;letter-spacing:.1em;font-weight:700;
+  padding:4px 0 5px 6px;
+  background:#07111e;border-bottom:2px solid #1a3060;
+  white-space:nowrap;position:sticky;top:0;z-index:3;
+}
+.ct-grid .hdr-cols .cl-time{color:var(--dim);}
+.ct-grid .hdr-cols .cl-dep {color:#60b0ff;}
+.ct-grid .hdr-cols .cl-arr {color:#60b0ff;}
+.ct-grid .hdr-cols .cl-c1  {color:#aaff00;}
+.ct-grid .hdr-cols .cl-c2  {color:#aaff00;}
+.ct-grid .hdr-cols .cl-load{color:var(--dim);}
 
-/* row banding */
-.ct-table tr.row-odd  td{background:#07101a;}
-.ct-table tr.row-even td{background:#090f1c;}
-.ct-table tr.row-now  td{background:rgba(0,170,255,.07)!important;}
-.ct-table tr.row-now  td.td-time{border-left:3px solid var(--accent);}
-.ct-table tr.row-past{opacity:.35;}
+/* Data rows */
+.ct-grid td{
+  padding:0;
+  border-bottom:1px solid rgba(20,36,60,.8);
+  border-right:1px solid rgba(20,36,60,.6);
+  vertical-align:middle;
+}
+.ct-grid tr.rw-even td{background:#070d18;}
+.ct-grid tr.rw-odd  td{background:#060b15;}
+.ct-grid tr.rw-now  td{background:rgba(0,120,255,.1)!important;}
+.ct-grid tr.rw-now  td.cg-time-cell{border-left:3px solid var(--accent);}
+.ct-grid tr.rw-past td{opacity:.3;}
 
-/* ── TIME CELL ── */
-.td-time{border-right:2px solid var(--border);}
-.tc-time{
-  font-family:var(--mono);font-size:13px;font-weight:700;
-  color:var(--dim);padding:10px 8px 10px 14px;
-  white-space:nowrap;line-height:1;
+/* Hour separator */
+.ct-grid tr.rw-hour td{border-top:1px solid #1a3060;}
+
+/* TIME cell */
+.cg-time-cell{border-right:2px solid #1a3060!important;}
+.cg-tc{
+  font-size:11px;font-weight:700;color:#3a6090;
+  padding:3px 4px 3px 8px;white-space:nowrap;
   display:flex;flex-direction:column;justify-content:center;
-  min-height:44px;
+  min-height:22px;
 }
-.tc-time.is-now{color:var(--accent);}
-.now-pip{
-  display:inline-block;font-size:8px;color:var(--accent);
-  letter-spacing:.06em;margin-top:3px;
-}
+.cg-tc.is-now{color:var(--accent);}
+.cg-tc.is-hour{color:#6090c0;font-size:12px;}
+.cg-now-pip{font-size:7px;color:var(--accent);letter-spacing:.04em;margin-top:1px;}
 
-/* ── BOOKED SLOT BUBBLE ── */
-/* td has rowspan; inner div is the visible card */
-.slot-bk{
-  padding:10px 14px;
-  font-family:var(--mono);font-weight:700;
-  letter-spacing:.05em;line-height:1.3;
-  display:flex;flex-direction:column;justify-content:center;
-  width:100%;height:100%;
-  box-sizing:border-box;
-}
-.slot-bk .s-reg{font-size:15px;font-weight:900;}
-.slot-bk .s-dur{font-size:10px;opacity:.9;font-weight:400;margin-top:4px;}
-
-/* LSA fleet — coloured bubbles */
-.bk-cct1{background:#0d4a7a;border-left:4px solid #00aaff;color:#40c8ff;}
-.bk-cct2{background:#1e4a08;border-left:4px solid #aaff00;color:#ccff44;}
-.bk-arr {background:#4a3200;border-left:4px solid #ffab00;color:#ffd060;}
-/* External aircraft — clearly visible but distinct from fleet */
-.bk-ext {background:#1a2535;border-left:4px solid #4a6a8a;color:#8ab4d0;}
-
-/* ── AVBL CELL ── */
-.slot-avbl{
-  font-family:var(--mono);font-size:10px;font-weight:400;
-  letter-spacing:.10em;
-  color:rgba(58,85,112,.5);
-  padding:10px 14px;
-  min-height:44px;
-  display:flex;align-items:center;
+/* Cell content wrapper */
+.cg-cell{
+  display:flex;align-items:center;justify-content:center;
+  height:100%;min-height:22px;padding:2px 4px;
+  font-size:11px;font-weight:700;letter-spacing:.04em;
+  text-align:center;
 }
 
-/* ── LOAD CELL ── */
-.lc{font-family:var(--mono);font-size:9px;letter-spacing:.08em;
-  padding:3px 8px;border-radius:3px;white-space:nowrap;display:inline-block;
-  margin:12px 8px;}
-.load-calm    {background:rgba(0,230,118,.15);color:#00e676;border:1px solid rgba(0,230,118,.3);}
-.load-light   {background:rgba(170,255,0,.1); color:#aaff00;border:1px solid rgba(170,255,0,.25);}
-.load-moderate{background:rgba(255,171,0,.15);color:#ffab00;border:1px solid rgba(255,171,0,.3);}
-.load-busy    {background:rgba(255,112,32,.15);color:#ff7020;border:1px solid rgba(255,112,32,.3);}
-.load-heavy   {background:rgba(255,61,61,.15); color:#ff3d3d;border:1px solid rgba(255,61,61,.3);}
+/* AVBL — green like the sheet */
+.cg-avbl{color:#00c853;font-size:10px;font-weight:600;letter-spacing:.08em;}
 
-/* mobile stacked */
-@media(max-width:600px){
-  .ct-desktop{display:none;}
-  .ct-mobile{display:block!important;}
-}
-.mob-lane{margin-bottom:18px;border:1px solid var(--border);border-radius:8px;overflow:hidden;}
-.mob-lane-title{font-family:var(--mono);font-size:11px;letter-spacing:.18em;font-weight:700;
-  padding:9px 14px;background:#07111e;border-bottom:2px solid var(--border);}
-.mob-lane-title.tl-cct1{color:var(--accent);}
-.mob-lane-title.tl-cct2{color:#aaff00;}
-.mob-lane-title.tl-arr {color:#ffab00;}
-.mob-table{width:100%;border-collapse:collapse;}
-.mob-table td{padding:0;border-bottom:1px solid rgba(26,40,64,.4);}
-.mob-table tr.row-now td{background:rgba(0,170,255,.07)!important;}
-.mob-table tr.row-past{opacity:.35;}
-.mob-time-cell{border-right:2px solid var(--border);}
-.mob-tc{font-family:var(--mono);font-size:12px;font-weight:700;color:var(--dim);
-  padding:9px 8px 9px 12px;min-height:40px;display:flex;align-items:center;}
-.mob-tc.is-now{color:var(--accent);}
+/* Private — orange like the sheet */
+.cg-private{background:#e65100;color:#fff;border-radius:2px;
+  padding:1px 4px;font-size:10px;}
+
+/* LSA fleet reg */
+.cg-lsa{color:#e4f2ff;font-size:11px;font-weight:700;}
+
+/* External reg */
+.cg-ext{color:#5a8aaa;font-size:11px;}
+
+/* Closed/grey cell */
+.cg-closed{background:#0a1220;}
+
+/* Load cell */
+.cg-load-cell{font-size:9px;letter-spacing:.06em;text-align:center;}
+.cg-load-calm    {color:#00c853;}
+.cg-load-light   {color:#aaff00;}
+.cg-load-moderate{color:#ffab00;}
+.cg-load-busy    {color:#ff7020;}
+.cg-load-heavy   {color:#ff3d3d;}
 
 /* footer */
-.ct-footer{display:flex;align-items:center;gap:12px;padding-top:16px;border-top:1px solid var(--border);flex-wrap:wrap;}
-
-
-
-/* ── CIRCUITS EMBED ── */
-.ct-actionbar{
-  display:flex;align-items:center;gap:10px;
-  padding:12px 0 14px;flex-wrap:wrap;
-}
-.ct-sheet-link{
-  margin-left:auto;
-  font-family:var(--mono);font-size:10px;letter-spacing:.08em;
-  color:var(--dim);text-decoration:none;
-  border:1px solid var(--border);border-radius:4px;
-  padding:5px 12px;transition:all .2s;
-}
+.ct-footer{display:flex;align-items:center;gap:12px;padding-top:14px;flex-wrap:wrap;}
+.ct-sheet-link{font-family:var(--mono);font-size:10px;letter-spacing:.08em;
+  color:var(--dim);text-decoration:none;border:1px solid var(--border);
+  border-radius:4px;padding:4px 10px;}
 .ct-sheet-link:hover{color:var(--accent);border-color:var(--accent);}
-.ct-embed-wrap{
-  position:relative;
-  width:100%;
-  /* fill remaining screen height */
-  height:calc(100vh - 220px);
-  min-height:500px;
-  border:1px solid var(--border);
-  border-radius:8px;
-  overflow:hidden;
-  background:#fff;
-}
-.ct-embed{
-  width:100%;
-  height:100%;
-  border:none;
-  display:block;
-}
 
 /* ── CIRCUIT BOOK / CANCEL BUTTONS ── */
 .ct-action-btn{font-family:var(--mono);font-size:10px;letter-spacing:.08em;
@@ -604,21 +575,20 @@ textarea.form-input{resize:vertical;min-height:90px;}
       <div class="ct-actionbar">
         <button class="ct-action-btn ct-book-btn" onclick="openBookModal()">＋ BOOK SLOT</button>
         <button class="ct-action-btn ct-cancel-btn" onclick="openCancelModal()">✕ CANCEL SLOT</button>
-        <a class="ct-sheet-link" href="https://docs.google.com/spreadsheets/d/1fnMYghrTIi8EdHDN6JxFrAdqqFMuRbnB4Oj8041Y5ZY/edit?gid=818960255" target="_blank">↗ OPEN IN GOOGLE SHEETS</a>
+        <div style="display:flex;align-items:center;gap:8px;margin-left:auto;">
+          <div class="ct-status-dot" id="ctDot"></div>
+          <span class="ct-status-lbl" id="ctLbl">LOADING…</span>
+          <span class="ct-status-lbl" id="ctUpdated" style="color:var(--dim)"></span>
+          <button class="ct-refresh-btn" onclick="loadSlots()">↺</button>
+        </div>
       </div>
 
       <!-- Cancel log -->
       <div id="ctCancelLog" style="display:none;"></div>
 
-      <!-- Embedded sheet -->
-      <div class="ct-embed-wrap">
-        <iframe
-          class="ct-embed"
-          src="https://docs.google.com/spreadsheets/d/1fnMYghrTIi8EdHDN6JxFrAdqqFMuRbnB4Oj8041Y5ZY/edit?gid=818960255&rm=minimal&single=true"
-          frameborder="0"
-          allowfullscreen
-          loading="lazy">
-        </iframe>
+      <!-- Grid -->
+      <div class="ct-wrap" id="ctWrap">
+        <div class="ct-loading"><div class="spinner"></div> FETCHING CIRCUITS DATA…</div>
       </div>
 
     </div>
@@ -1147,287 +1117,176 @@ async function loadSlots() {
     clearInterval(slotsAutoRefresh);
     slotsAutoRefresh = setInterval(loadSlots, 120000);
   } catch(e) {
-    setSlotsStatus('error','FETCH FAILED');
+    const dot = document.getElementById('ctDot');
+    if(dot) dot.className='ct-status-dot error';
+    const lbl = document.getElementById('ctLbl');
+    if(lbl) lbl.textContent = 'FETCH FAILED';
+    document.getElementById('ctWrap').innerHTML = '<div class="ct-loading" style="color:var(--red)">⚠ Could not load circuits data. Check connection.</div>';
   }
 }
 
-function parseSheetSlots(json) {
+function parseRawGrid(json) {
+  // Returns a map: "HH:MM|LANE" -> { reg, bgcolor }
+  // Lanes: DEP, ARR, CCT1, CCT2, LOAD
   const rows = json.table.rows;
-  const grid = rows.map(row=>(row.c||[]).map(cell=>{
-    if(!cell) return '';
-    if(cell.f) return cell.f.toString().trim();
-    if(cell.v!=null) return cell.v.toString().trim();
-    return '';
+  const grid = rows.map(row => (row.c||[]).map(cell => {
+    if(!cell) return {v:'', bg:''};
+    const v = cell.f ? cell.f.toString().trim() : (cell.v!=null ? cell.v.toString().trim() : '');
+    const bg = (cell.p && cell.p.style && cell.p.style.backgroundColor) ? cell.p.style.backgroundColor : '';
+    return {v, bg};
   }));
 
-  const timeRx = /^\d{2}:\d{2}$/;
-  const fleet = new Set(ST.ac.map(r=>r.replace(/[\s-]/g,'').toUpperCase()));
-  const SECTION_WIDTH = 6;
+  const timeRx = /^\d{1,2}:\d{2}$/;
+  const SECTION = 6; // UTC|DEP|ARR|CCT1|CCT2|LOAD
   const maxCols = grid.reduce((m,r)=>Math.max(m,r.length),0);
-
-  // slot offsets within section: 1=DEP,2=ARR,3=CCT1,4=CCT2  load=5
-  const OFFSETS = [{o:1,l:'DEP'},{o:2,l:'ARR'},{o:3,l:'CCT1'},{o:4,l:'CCT2'}];
-
-  // raw entries keyed by time+lane
-  const raw = {}; // key: "HH:MM|LANE" -> { reg, isFleet, time, lane }
-  const loadMap = {}; // "HH:MM" -> load string
-
-  function roundDown15(t) {
-    const [h,m] = t.split(':').map(Number);
-    return String(h).padStart(2,'0')+':'+String(Math.floor(m/15)*15).padStart(2,'0');
-  }
+  const result  = {}; // "HH:MM|LANE" -> {v, bg}
 
   for(const row of grid) {
-    for(let c=0; c<maxCols; c+=SECTION_WIDTH) {
-      const rawTime = (row[c]||'').trim();
-      if(!timeRx.test(rawTime)) continue;
-      const slotTime = roundDown15(rawTime);
+    for(let c=0; c<maxCols; c+=SECTION) {
+      const rawT = (row[c]||{v:''}).v.trim();
+      if(!timeRx.test(rawT)) continue;
+      // normalise to HH:MM
+      const parts = rawT.split(':');
+      const tStr  = parts[0].padStart(2,'0')+':'+parts[1].padStart(2,'0');
 
-      // load
-      const loadVal = (row[c+5]||'').trim().toLowerCase();
-      if(loadVal && !loadMap[slotTime]) loadMap[slotTime] = loadVal;
-
-      for(const {o,l} of OFFSETS) {
-        const val = (row[c+o]||'').trim().toUpperCase().replace(/[\s-]/g,'');
-        if(!val) continue;
-        const key = slotTime+'|'+l;
-        if(!raw[key]) raw[key] = { reg: val, isFleet: fleet.has(val), time: slotTime, lane: l };
-      }
+      const lanes = ['DEP','ARR','CCT1','CCT2','LOAD'];
+      lanes.forEach((lane, i) => {
+        const cell = row[c+1+i] || {v:'',bg:''};
+        if(cell.v || cell.bg) {
+          result[tStr+'|'+lane] = {v: cell.v, bg: cell.bg};
+        }
+      });
     }
   }
-
-  // Build list of unique 15-min slots
-  const slotList = Object.values(raw).map(s => ({...s}));
-
-  // Group into bookings: consecutive 15-min blocks of same reg in same lane
-  const byLaneReg = {};
-  slotList.forEach(s => {
-    const k = s.lane+'|'+s.reg;
-    if(!byLaneReg[k]) byLaneReg[k] = [];
-    byLaneReg[k].push(s.time);
-  });
-
-  const bookings = [];
-  Object.entries(byLaneReg).forEach(([k, times]) => {
-    times.sort();
-    const [lane, reg] = k.split('|');
-    const isFleet = fleet.has(reg);
-    let start = times[0], prev = times[0];
-    for(let i=1; i<=times.length; i++) {
-      const cur = times[i];
-      const prevMins = parseInt(prev.split(':')[0])*60 + parseInt(prev.split(':')[1]);
-      const curMins  = cur ? parseInt(cur.split(':')[0])*60 + parseInt(cur.split(':')[1]) : -1;
-      if(curMins !== prevMins + 15) {
-        // end of run
-        const endMins = prevMins + 15;
-        const endH = Math.floor(endMins/60)%24, endM = endMins%60;
-        const endStr = String(endH).padStart(2,'0')+':'+String(endM).padStart(2,'0');
-        bookings.push({ lane, reg, isFleet, start, end: endStr });
-        start = cur;
-      }
-      prev = cur;
-    }
-  });
-
-  return { bookings, loadMap };
-}
-
-function nowUTCMins() {
-  const d = new Date();
-  return d.getUTCHours()*60 + d.getUTCMinutes();
-}
-function toMins(t) {
-  const [h,m] = t.split(':').map(Number); return h*60+m;
-}
-function toHHMM(mins) {
-  return String(Math.floor(mins/60)%24).padStart(2,'0')+':'+String(mins%60).padStart(2,'0');
-}
-
-function getLoadClass(l) {
-  if(!l) return '';
-  const w = l.toLowerCase();
-  if(w.includes('calm'))     return 'load-calm';
-  if(w.includes('light'))    return 'load-light';
-  if(w.includes('moderate')) return 'load-moderate';
-  if(w.includes('busy'))     return 'load-busy';
-  if(w.includes('heavy'))    return 'load-heavy';
-  return '';
-}
-function getLoadLabel(l) {
-  if(!l) return '';
-  const w = l.toLowerCase();
-  if(w.includes('calm'))     return 'Calm';
-  if(w.includes('light'))    return 'Light';
-  if(w.includes('moderate')) return 'Moderate';
-  if(w.includes('busy'))     return 'Busy';
-  if(w.includes('heavy'))    return 'Heavy';
-  return l;
+  return result;
 }
 
 function renderSlotsGrid(json) {
-  if(!json||!json.table||!json.table.rows||!json.table.rows.length) {
-    document.getElementById('ctContent').innerHTML = '<div class="slots-err">No data in sheet.</div>';
-    return;
-  }
-
-  const { bookings, loadMap } = parseSheetSlots(json);
+  const fleet   = new Set(ST.ac.map(r=>r.replace(/[\s-]/g,'').toUpperCase()));
   const nowMins = nowUTCMins();
-  const winStart = 6*60;   // always full day 06:30–22:00
-  const winEnd   = 22*60;
+  const rawGrid = parseRawGrid(json);
 
-  // Current load bar
-  const nowSlot = toHHMM(Math.floor(nowMins/15)*15);
-  const curLoad = loadMap[nowSlot] || '';
-  const curLoadLabel = getLoadLabel(curLoad);
-  const curLoadClass = getLoadClass(curLoad);
-  const loadBar = document.getElementById('ctLoadBar');
-  if(curLoadLabel) {
-    loadBar.style.display = 'flex';
-    const badge = document.getElementById('ctLoadBadge');
-    badge.textContent = curLoadLabel.toUpperCase();
-    badge.className = 'ct-load-badge ' + curLoadClass;
-    document.getElementById('ctLoadHint').textContent = LOAD_HINTS[curLoadLabel.toLowerCase()] || '';
-  } else {
-    loadBar.style.display = 'none';
+  // Build time slots 06:30 to 23:55 in 5-min steps
+  const slots = [];
+  for(let t=6*60+0; t<24*60; t+=5) slots.push(t);
+
+  function toHH(m){ return String(Math.floor(m/60)%24).padStart(2,'0')+':'+String(m%60).padStart(2,'0'); }
+
+  function cellHTML(tStr, lane) {
+    const key  = tStr+'|'+lane;
+    const cell = rawGrid[key];
+    if(!cell || (!cell.v && !cell.bg)) {
+      // empty — show grey closed look
+      return '<div class="cg-cell cg-closed"></div>';
+    }
+    const v   = cell.v.trim();
+    const vUp = v.toUpperCase().replace(/[\s-]/g,'');
+
+    if(!v) return '<div class="cg-cell cg-closed"></div>';
+
+    if(v.toUpperCase() === 'AVBL') {
+      return '<div class="cg-cell cg-avbl">AVBL</div>';
+    }
+    if(v.toLowerCase().includes('private')) {
+      return '<div class="cg-cell"><span class="cg-private">Private</span></div>';
+    }
+    if(lane === 'LOAD') {
+      const lw = v.toLowerCase();
+      const lc = lw.includes('calm')?'cg-load-calm':
+                 lw.includes('light')?'cg-load-light':
+                 lw.includes('mod')?'cg-load-moderate':
+                 lw.includes('busy')?'cg-load-busy':
+                 lw.includes('heavy')?'cg-load-heavy':'';
+      return `<div class="cg-cell cg-load-cell ${lc}">${v}</div>`;
+    }
+    // Aircraft reg
+    const cls = fleet.has(vUp) ? 'cg-lsa' : 'cg-ext';
+    return `<div class="cg-cell"><span class="${cls}">${v}</span></div>`;
   }
 
-  // Pre-pass: startMap + occupied set (same reliable pattern as mockup)
-  const startMap = {};
-  const occupied = new Set();
-  bookings.forEach(b => {
-    const vs = Math.max(toMins(b.start), winStart);
-    const ve = Math.min(toMins(b.end),   winEnd);
-    if(ve <= vs) return;
-    const span = Math.round((ve - vs) / 15);
-    const key  = vs + '|' + b.lane;
-    startMap[key] = { b, span };
-    for(let t=vs+15; t<ve; t+=15) occupied.add(t+'|'+b.lane);
-  });
+  let html = '<table class="ct-grid">';
+  html += '<colgroup>';
+  html += '<col class="cg-time"><col class="cg-dep"><col class="cg-arr"><col class="cg-c1"><col class="cg-c2"><col class="cg-load">';
+  html += '</colgroup>';
 
-  function bkClass(lane, isFleet) {
-    if(!isFleet) return 'bk-ext';
-    return lane==='CCT1'?'bk-cct1':lane==='CCT2'?'bk-cct2':'bk-arr';
-  }
-  function fmtReg(r) { return r.replace(/^([A-Z])([A-Z])/,'$1-$2'); }
-
-  // ── DESKTOP TABLE ──────────────────────────────────────────────
-  let html = '<table class="ct-table">';
-  html += '<colgroup><col class="col-time"><col class="col-lane"><col class="col-lane"><col class="col-lane"><col class="col-load"></colgroup>';
-  html += '<thead><tr>';
-  html += '<th class="th-time">UTC</th>';
-  html += '<th class="th-cct1">CCT 1</th>';
-  html += '<th class="th-cct2">CCT 2</th>';
-  html += '<th class="th-arr">ARR / APPROACH</th>';
-  html += '<th class="th-load">LOAD</th>';
-  html += '</tr></thead><tbody>';
+  // Header rows
+  html += '<thead>';
+  html += '<tr class="hdr-section">';
+  html += '<td></td>';
+  html += '<td colspan="2" class="hdr-ifr">IFR MOVEMENT</td>';
+  html += '<td colspan="2" class="hdr-vfr">VFR MOVEMENT</td>';
+  html += '<td class="hdr-load">LOAD</td>';
+  html += '</tr>';
+  html += '<tr class="hdr-cols">';
+  html += '<td class="cl-time">UTC</td>';
+  html += '<td class="cl-dep">DEP</td>';
+  html += '<td class="cl-arr">ARR</td>';
+  html += '<td class="cl-c1">CCT 1</td>';
+  html += '<td class="cl-c2">CCT 2</td>';
+  html += '<td class="cl-load">LOAD %</td>';
+  html += '</tr>';
+  html += '</thead><tbody>';
 
   let firstNow = false;
   let rowIdx   = 0;
+  let nowRowId = '';
 
-  for(let t=winStart; t<winEnd; t+=15) {
-    const tStr   = toHHMM(t);
-    const isPast = (t+15) <= nowMins;
-    const isNow  = t <= nowMins && nowMins < t+15;
-    const rc     = isPast ? 'row-past' : isNow ? 'row-now' : (rowIdx%2===0?'row-even':'row-odd');
-    const nowId  = (isNow && !firstNow) ? 'id="ctNowRow"' : '';
+  for(const t of slots) {
+    const tStr   = toHH(t);
+    const isPast = (t + 5) <= nowMins;
+    const isNow  = t <= nowMins && nowMins < t+5;
+    const isHour = t % 60 === 0;
+    const isNowFirst = isNow && !firstNow;
     if(isNow) firstNow = true;
 
-    html += `<tr class="${rc}" ${nowId}>`;
+    let rc = isPast ? 'rw-past' : isNow ? 'rw-now' : (rowIdx%2===0?'rw-even':'rw-odd');
+    if(isHour) rc += ' rw-hour';
+    const idAttr = isNowFirst ? 'id="ctNowRow"' : '';
 
-    // time cell
-    html += `<td class="td-time"><div class="tc-time${isNow?' is-now':''}">`;
+    html += `<tr class="${rc}" ${idAttr}>`;
+
+    // Time cell
+    html += `<td class="cg-time-cell">`;
+    html += `<div class="cg-tc${isNow?' is-now':''}${isHour?' is-hour':''}">`;
     html += tStr;
-    if(isNow) html += '<span class="now-pip">▶ NOW</span>';
+    if(isNow) html += '<span class="cg-now-pip">▶NOW</span>';
     html += '</div></td>';
 
-    // lane cells
-    for(const lane of ['CCT1','CCT2','ARR']) {
-      const k = t+'|'+lane;
-      if(occupied.has(k)) continue; // covered by rowspan
-
-      if(startMap[k]) {
-        const { b, span } = startMap[k];
-        // height = span rows × 44px row height - 6px for margins
-        html += `<td rowspan="${span}" style="padding:0;vertical-align:top;height:1px;">`;
-        html += `<div class="slot-bk ${bkClass(lane, b.isFleet)}" style="min-height:100%;">`;
-        html += `<span class="s-reg">${fmtReg(b.reg)}</span>`;
-        html += `<span class="s-dur">${b.start} → ${b.end}</span>`;
-        html += `</div></td>`;
-      } else {
-        html += `<td style="padding:0;"><div class="slot-avbl">AVBL</div></td>`;
-      }
+    // Lane cells
+    for(const lane of ['DEP','ARR','CCT1','CCT2','LOAD']) {
+      html += `<td>${cellHTML(tStr, lane)}</td>`;
     }
-
-    // load cell
-    const lv = loadMap[tStr] || '';
-    const ll = getLoadLabel(lv);
-    const lc = getLoadClass(lv);
-    html += `<td>${ll ? `<span class="lc ${lc}">${ll}</span>` : ''}</td>`;
 
     html += '</tr>';
     rowIdx++;
   }
 
   html += '</tbody></table>';
-  document.getElementById('ctContent').innerHTML = html;
 
-  // scroll now into view
+  // Footer
+  html += '<div class="ct-footer">';
+  html += '<span style="font-family:var(--mono);font-size:10px;color:var(--dim);">SOURCE: ATC CIRCUITS SHEET</span>';
+  html += '<a class="ct-sheet-link" href="https://docs.google.com/spreadsheets/d/1fnMYghrTIi8EdHDN6JxFrAdqqFMuRbnB4Oj8041Y5ZY/edit?gid=818960255" target="_blank">↗ OPEN FULL SHEET</a>';
+  html += '</div>';
+
+  document.getElementById('ctWrap').innerHTML = html;
+
+  // Update status
+  const dot = document.getElementById('ctDot');
+  if(dot) { dot.className='ct-status-dot'; }
+  const lbl = document.getElementById('ctLbl');
+  if(lbl) lbl.textContent = 'LIVE';
+  const upd = document.getElementById('ctUpdated');
+  if(upd) {
+    const n = new Date();
+    upd.textContent = '· '+n.getUTCHours().toString().padStart(2,'0')+':'+n.getUTCMinutes().toString().padStart(2,'0')+'Z';
+  }
+
+  // Scroll now into view
   setTimeout(() => {
     const nr = document.getElementById('ctNowRow');
     if(nr) nr.scrollIntoView({ block:'center', behavior:'smooth' });
   }, 150);
-
-  // ── MOBILE STACKED ─────────────────────────────────────────────
-  let mhtml = '';
-  for(const lane of ['CCT1','CCT2','ARR']) {
-    const laneTitle = lane==='CCT1'?'CCT 1':lane==='CCT2'?'CCT 2':'ARR / APPROACH';
-    const titleCls  = lane==='CCT1'?'tl-cct1':lane==='CCT2'?'tl-cct2':'tl-arr';
-
-    // Per-lane startMap/occupied
-    const lStartMap = {};
-    const lOccupied = new Set();
-    bookings.forEach(b => {
-      if(b.lane !== lane) return;
-      const vs = Math.max(toMins(b.start), winStart);
-      const ve = Math.min(toMins(b.end),   winEnd);
-      if(ve <= vs) return;
-      const span = Math.round((ve-vs)/15);
-      lStartMap[vs] = { b, span };
-      for(let t=vs+15; t<ve; t+=15) lOccupied.add(t);
-    });
-
-    mhtml += `<div class="mob-lane"><div class="mob-lane-title ${titleCls}">${laneTitle}</div>`;
-    mhtml += `<table class="mob-table"><colgroup><col style="width:60px"><col></colgroup><tbody>`;
-
-    let mRowIdx = 0;
-    for(let t=winStart; t<winEnd; t+=15) {
-      const tStr   = toHHMM(t);
-      const isPast = (t+15) <= nowMins;
-      const isNow  = t <= nowMins && nowMins < t+15;
-      const rc     = isPast?'row-past':isNow?'row-now':'';
-
-      mhtml += `<tr class="${rc}">`;
-      mhtml += `<td class="mob-time-cell"><div class="mob-tc${isNow?' is-now':''}">${tStr}${isNow?'▶':''}</div></td>`;
-
-      if(lOccupied.has(t)) {
-        // spanned — no td
-      } else if(lStartMap[t]) {
-        const { b, span } = lStartMap[t];
-        mhtml += `<td rowspan="${span}" style="padding:0;vertical-align:top;height:1px;">`;
-        mhtml += `<div class="slot-bk ${bkClass(lane, b.isFleet)}" style="min-height:100%;">`;
-        mhtml += `<span class="s-reg">${fmtReg(b.reg)}</span>`;
-        mhtml += `<span class="s-dur">${b.start} → ${b.end}</span>`;
-        mhtml += `</div></td>`;
-      } else {
-        mhtml += `<td><div class="slot-avbl">AVBL</div></td>`;
-      }
-
-      mhtml += '</tr>';
-      mRowIdx++;
-    }
-    mhtml += '</tbody></table></div>';
-  }
-  document.getElementById('ctMobileContent').innerHTML = mhtml;
 }
 
 // ══ SETTINGS UI ════════════════════════════════════
