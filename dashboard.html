@@ -677,7 +677,7 @@ async function fetchNotices() {
     const cutoff  = new Date(now.getTime() - 4 * 24 * 60 * 60 * 1000); // 4 days ago
 
     const defects = rows
-      .slice(1) // skip header row
+      .slice(0) // gviz returns cols separately; no header row to skip
       .map(r => {
         const cell = (i) => r.c?.[i]?.v ?? '';
         return {
