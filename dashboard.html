@@ -280,16 +280,17 @@
   .loading-state { display:flex; align-items:center; justify-content:center; gap:10px; padding:24px 0; font-family:var(--mono); font-size:13.5px; color:var(--dim); letter-spacing:0.15em; }
   .spinner { width:20px; height:20px; border:2px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin 1s linear infinite; }
 
-  /* ── NOTICES ── */
-  .notice-item { display:flex; gap:10px; padding:9px 0; border-bottom:1px solid var(--border); animation:fadeUp 0.4s ease both; }
-  .notice-item:last-child { border-bottom:none; padding-bottom:0; }
-  .notice-item:first-child { padding-top:0; }
-  .ntag { font-family:var(--mono); font-size:11px; letter-spacing:0.1em; text-transform:uppercase; padding:2px 6px; border-radius:2px; height:fit-content; flex-shrink:0; margin-top:2px; }
-  .ntag.info { background:rgba(0,170,255,0.12); color:var(--accent); border:1px solid rgba(0,170,255,0.25); }
-  .ntag.warn { background:rgba(255,171,0,0.12); color:var(--amber); border:1px solid rgba(255,171,0,0.25); }
-  .ntag.ops  { background:rgba(0,230,118,0.12); color:var(--green); border:1px solid rgba(0,230,118,0.25); }
-  .ntext { font-size:16px; color:var(--text); line-height:1.45; }
-  .ndate { font-family:var(--mono); font-size:12px; color:var(--dim); margin-top:3px; }
+  /* ── DEFECTS ── */
+  .defect-item { display:flex; flex-direction:column; gap:4px; padding:9px 0; border-bottom:1px solid var(--border); animation:fadeUp 0.4s ease both; }
+  .defect-item:last-child { border-bottom:none; padding-bottom:0; }
+  .defect-item:first-child { padding-top:0; }
+  .defect-item.grounded { background:rgba(255,40,40,0.10); border-left:3px solid #ff2828; margin:0 -10px; padding:8px 10px; border-radius:3px; border-bottom:1px solid rgba(255,40,40,0.2); }
+  .defect-item.grounded:last-child { border-bottom:none; }
+  .defect-header { display:flex; align-items:center; gap:8px; }
+  .defect-reg { font-family:var(--mono); font-size:13px; font-weight:700; color:var(--text); letter-spacing:0.08em; }
+  .defect-grounded-tag { font-family:var(--mono); font-size:11px; letter-spacing:0.1em; padding:2px 6px; border-radius:2px; background:rgba(255,40,40,0.2); color:#ff6060; border:1px solid rgba(255,40,40,0.4); flex-shrink:0; }
+  .defect-desc { font-size:15px; color:var(--text); line-height:1.45; }
+  .defect-meta { font-family:var(--mono); font-size:11px; color:var(--dim); }
 
   /* ── FOOTER ── */
   .collapse-hint { font-family:var(--mono); font-size:11px; color:var(--dim); text-align:center; letter-spacing:0.1em; opacity:0.5; padding:2px 0 0; }
@@ -416,11 +417,11 @@
     </div>
   </div>
 
-  <!-- ═══ SCHOOL NOTICES ═══ -->
+  <!-- ═══ DEFECTS ═══ -->
   <div class="section half-width" data-id="notices">
     <div class="slabel" onclick="toggleSection(this)">
       <span class="drag-handle">⠿</span>
-      <span>📋</span> School Notices
+      <span>🔧</span> Defects
       <button class="width-btn" onclick="toggleWidth(event,this)">⬜ HALF</button>
       <span class="chevron">▼</span>
     </div>
@@ -656,22 +657,49 @@ async function fetchFlights() {
 const JSONBIN_KEY = '$2a$10$wjZldGseV25iurze/grlbOQ1ZxUVCugh.kmmRH3LOo3zEiUF4RKPS';
 const BIN_URL     = `https://api.jsonbin.io/v3/b/69ac06bf43b1c97be9bd5667`;
 
+// ── DEFECTS SHEET CONFIG ──────────────────────────────
+const DEFECTS_SHEET_ID  = '1aoavAzPkpi9bvD8IDNz1flxWYb-5WJeUtPePS1uVgHw';
+const DEFECTS_GID       = '0';                             // ← first tab GID (usually 0)
+// ─────────────────────────────────────────────────────
+
 async function fetchNotices() {
   try {
-    const res  = await fetch(BIN_URL + '/latest', {
-      headers: { 'X-Master-Key': JSONBIN_KEY }
-    });
-    const data = await res.json();
-    const notices = (data.record?.notices || []).filter(n => {
-      if (!n.expiry) return true;
-      return new Date(n.expiry) >= new Date();
-    });
-    window.binNotams = data.record?.notams || [];
-    renderNotices(notices);
-    // Re-render NOTAMs only if AutoRouter isn't providing live data
-    if (!window.liveNotamsActive) renderNotams([]);
+    const url = `https://docs.google.com/spreadsheets/d/${DEFECTS_SHEET_ID}/gviz/tq?tqx=out:json&gid=${DEFECTS_GID}`;
+    const res  = await fetch(url);
+    const text = await res.text();
+    // gviz wraps response in a callback — strip it
+    const json = JSON.parse(text.replace(/^[^(]+\(/, '').replace(/\);?\s*$/, ''));
+    const rows  = json.table?.rows || [];
+    const cols  = json.table?.cols || [];
+
+    // cols: 0=ReceivedAt, 1=Aircraft, 2=Defect, 3=Grounded, 4=LoggedBy, 5=Resolved
+    const now     = new Date();
+    const cutoff  = new Date(now.getTime() - 4 * 24 * 60 * 60 * 1000); // 4 days ago
+
+    const defects = rows
+      .slice(1) // skip header row
+      .map(r => {
+        const cell = (i) => r.c?.[i]?.v ?? '';
+        return {
+          receivedAt : new Date(cell(0)),
+          aircraft   : cell(1),
+          defect     : cell(2),
+          grounded   : String(cell(3)).toUpperCase() === 'TRUE',
+          loggedBy   : cell(4),
+          resolved   : cell(5)
+        };
+      })
+      .filter(d => {
+        if (!d.aircraft) return false;           // skip blank rows
+        if (d.resolved)  return false;           // skip resolved
+        if (d.grounded)  return true;            // grounded = always show until resolved
+        return d.receivedAt >= cutoff;           // normal = 4 day window
+      })
+      .sort((a, b) => b.receivedAt - a.receivedAt); // newest first
+
+    renderNotices(defects);
   } catch(e) {
-    console.warn('Notices fetch failed:', e.message);
+    console.warn('Defects fetch failed:', e.message);
     renderNotices([]);
   }
 }
@@ -1302,19 +1330,31 @@ function showSlotsError(msg) {
 }
 
 // ══════════════════════════════════════════════════════
-//  RENDER NOTICES
+//  RENDER DEFECTS
 // ══════════════════════════════════════════════════════
-function renderNotices(notices) {
+function renderNotices(defects) {
   const wrap = document.getElementById('noticesWrap');
-  if (!notices || !notices.length) {
-    wrap.innerHTML = '<div style="font-family:var(--mono);font-size:10px;color:var(--dim);padding:8px 0;letter-spacing:.1em;text-align:center;">NO DATA</div>';
+  if (!defects || !defects.length) {
+    wrap.innerHTML = '<div style="font-family:var(--mono);font-size:10px;color:var(--dim);padding:8px 0;letter-spacing:.1em;text-align:center;">NO DEFECTS</div>';
     return;
   }
-  wrap.innerHTML = notices.slice().reverse().map((n,i) => `
-    <div class="notice-item" style="animation-delay:${i*0.07}s">
-      <div class="ntag ${n.tag}">${n.tag.toUpperCase()}</div>
-      <div><div class="ntext">${n.text}</div><div class="ndate">${n.date||''}</div></div>
-    </div>`).join('');
+  wrap.innerHTML = defects.map((d, i) => {
+    const dateStr = d.receivedAt instanceof Date && !isNaN(d.receivedAt)
+      ? d.receivedAt.toLocaleDateString('en-GB', { weekday:'short', day:'numeric', month:'short' })
+      : '';
+    const groundedTag = d.grounded
+      ? '<span class="defect-grounded-tag">⛔ GROUNDED</span>'
+      : '';
+    return `
+    <div class="defect-item ${d.grounded ? 'grounded' : ''}" style="animation-delay:${i*0.07}s">
+      <div class="defect-header">
+        <span class="defect-reg">${d.aircraft}</span>
+        ${groundedTag}
+      </div>
+      <div class="defect-desc">${d.defect}</div>
+      <div class="defect-meta">${dateStr}${d.loggedBy ? ' · ' + d.loggedBy : ''}</div>
+    </div>`;
+  }).join('');
 }
 
 // ══════════════════════════════════════════════════════
@@ -1374,7 +1414,7 @@ setInterval(init, 60000);
 setInterval(()=>{ if(cachedSlots) renderSlots(cachedSlots); }, 60000);
 setInterval(fetchWeather,  600000);   // weather every 10 mins
 setInterval(fetchNotams,  1800000);   // NOTAMs every 30 mins
-setInterval(fetchNotices,  300000);   // notices every 5 mins
+setInterval(fetchNotices,  300000);   // defects every 5 mins
 setInterval(fetchFlights,  120000);   // flights every 2 mins
 setInterval(refreshSlots,  120000);   // slots every 2 mins
 </script>
