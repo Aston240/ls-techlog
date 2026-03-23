@@ -291,6 +291,23 @@
   .defect-grounded-tag { font-family:var(--mono); font-size:11px; letter-spacing:0.1em; padding:2px 6px; border-radius:2px; background:rgba(255,40,40,0.2); color:#ff6060; border:1px solid rgba(255,40,40,0.4); flex-shrink:0; }
   .defect-desc { font-size:15px; color:var(--text); line-height:1.45; }
   .defect-meta { font-family:var(--mono); font-size:11px; color:var(--dim); }
+  .defect-footer { display:flex; align-items:center; justify-content:space-between; margin-top:3px; }
+  .resolve-btn { font-family:var(--mono); font-size:10px; letter-spacing:0.08em; padding:2px 8px; border-radius:2px; border:1px solid var(--border); background:transparent; color:var(--dim); cursor:pointer; transition:all 0.15s; }
+  .resolve-btn:hover { border-color:var(--green); color:var(--green); }
+
+  /* ── RESOLVE MODAL ── */
+  #resolveModal { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:999; align-items:center; justify-content:center; }
+  #resolveModal.open { display:flex; }
+  #resolveModalBox { background:var(--card); border:1px solid var(--border); border-radius:6px; padding:24px; min-width:300px; display:flex; flex-direction:column; gap:14px; }
+  #resolveModalBox h3 { font-family:var(--mono); font-size:13px; letter-spacing:0.1em; color:var(--text); margin:0; }
+  #resolveModalBox p { font-family:var(--mono); font-size:11px; color:var(--dim); margin:0; }
+  #resolvePasswordInput { background:var(--bg); border:1px solid var(--border); border-radius:3px; color:var(--text); font-family:var(--mono); font-size:13px; padding:8px 10px; width:100%; box-sizing:border-box; }
+  #resolvePasswordInput:focus { outline:none; border-color:var(--accent); }
+  #resolveModalError { font-family:var(--mono); font-size:11px; color:#ff6060; display:none; }
+  .resolve-modal-btns { display:flex; gap:10px; justify-content:flex-end; }
+  .resolve-modal-btns button { font-family:var(--mono); font-size:11px; letter-spacing:0.08em; padding:6px 14px; border-radius:3px; cursor:pointer; border:1px solid var(--border); background:transparent; color:var(--dim); }
+  .resolve-modal-btns button.confirm { background:var(--green); color:#000; border-color:var(--green); font-weight:700; }
+  .resolve-modal-btns button.confirm:hover { opacity:0.85; }
 
   /* ── FOOTER ── */
   .collapse-hint { font-family:var(--mono); font-size:11px; color:var(--dim); text-align:center; letter-spacing:0.1em; opacity:0.5; padding:2px 0 0; }
@@ -428,6 +445,20 @@
     <div class="section-body">
       <div class="panel amber-top">
         <div id="noticesWrap"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ RESOLVE MODAL ═══ -->
+  <div id="resolveModal">
+    <div id="resolveModalBox">
+      <h3>✅ RESOLVE DEFECT</h3>
+      <p id="resolveModalDesc"></p>
+      <input type="password" id="resolvePasswordInput" placeholder="Enter password…" autocomplete="off" />
+      <div id="resolveModalError">Incorrect password</div>
+      <div class="resolve-modal-btns">
+        <button onclick="closeResolveModal()">CANCEL</button>
+        <button class="confirm" onclick="confirmResolve()">RESOLVE</button>
       </div>
     </div>
   </div>
@@ -659,7 +690,8 @@ const BIN_URL     = `https://api.jsonbin.io/v3/b/69ac06bf43b1c97be9bd5667`;
 
 // ── DEFECTS SHEET CONFIG ──────────────────────────────
 const DEFECTS_SHEET_ID  = '1aoavAzPkpi9bvD8IDNz1flxWYb-5WJeUtPePS1uVgHw';
-const DEFECTS_GID       = '0';                             // ← first tab GID (usually 0)
+const DEFECTS_GID       = '0';
+const DEFECTS_WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbzodrg5OoJ9U5n-wC4on_db2A2-LeyaKJgCPWq0sPEe3tWTji-K0zyOs1gF2KPd2vRx/exec';
 // ─────────────────────────────────────────────────────
 
 async function fetchNotices() {
@@ -678,9 +710,10 @@ async function fetchNotices() {
 
     const defects = rows
       .slice(0) // gviz returns cols separately; no header row to skip
-      .map(r => {
+      .map((r, i) => {
         const cell = (i) => r.c?.[i]?.v ?? '';
         return {
+          rowIndex   : i + 2,              // +2 = skip header row, sheets are 1-indexed
           receivedAt : new Date(cell(0)),
           aircraft   : cell(1),
           defect     : cell(2),
@@ -1352,7 +1385,10 @@ function renderNotices(defects) {
         ${groundedTag}
       </div>
       <div class="defect-desc">${d.defect}</div>
-      <div class="defect-meta">${dateStr}${d.loggedBy ? ' · ' + d.loggedBy : ''}</div>
+      <div class="defect-footer">
+        <span class="defect-meta">${dateStr}${d.loggedBy ? ' · ' + d.loggedBy : ''}</span>
+        <button class="resolve-btn" onclick="openResolveModal(${d.rowIndex}, '${d.aircraft} — ${d.defect.replace(/'/g,"\'")}')">✓ RESOLVE</button>
+      </div>
     </div>`;
   }).join('');
 }
@@ -1402,6 +1438,60 @@ function init() {
 }
 
 init();
+// ══════════════════════════════════════════════════════
+//  RESOLVE DEFECT
+// ══════════════════════════════════════════════════════
+let resolveTargetRow = null;
+
+function openResolveModal(rowIndex, desc) {
+  resolveTargetRow = rowIndex;
+  document.getElementById('resolveModalDesc').textContent = desc;
+  document.getElementById('resolvePasswordInput').value = '';
+  document.getElementById('resolveModalError').style.display = 'none';
+  document.getElementById('resolveModal').classList.add('open');
+  setTimeout(() => document.getElementById('resolvePasswordInput').focus(), 100);
+}
+
+function closeResolveModal() {
+  document.getElementById('resolveModal').classList.remove('open');
+  resolveTargetRow = null;
+}
+
+async function confirmResolve() {
+  const pw = document.getElementById('resolvePasswordInput').value;
+  if (pw !== 'limasierra') {
+    document.getElementById('resolveModalError').style.display = 'block';
+    return;
+  }
+  if (!resolveTargetRow) return;
+
+  const btn = document.querySelector('#resolveModalBox button.confirm');
+  btn.textContent = 'RESOLVING…';
+  btn.disabled = true;
+
+  try {
+    const url = `${DEFECTS_WEBAPP_URL}?row=${resolveTargetRow}`;
+    await fetch(url, { mode: 'no-cors' });
+    closeResolveModal();
+    // Refresh defects after short delay to allow sheet to update
+    setTimeout(fetchNotices, 1500);
+  } catch(e) {
+    console.warn('Resolve failed:', e);
+    btn.textContent = 'RESOLVE';
+    btn.disabled = false;
+  }
+}
+
+// Close modal on backdrop click
+document.getElementById('resolveModal').addEventListener('click', function(e) {
+  if (e.target === this) closeResolveModal();
+});
+
+// Enter key submits
+document.getElementById('resolvePasswordInput').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') confirmResolve();
+});
+
 loadOrder();
 initDrag();
 fetchWeather();
