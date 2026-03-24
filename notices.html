@@ -15,7 +15,6 @@
   *{margin:0;padding:0;box-sizing:border-box;}
   html,body{background:var(--bg);color:var(--text);font-family:var(--body);min-height:100vh;}
   body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(0,170,255,0.025) 1px,transparent 1px),linear-gradient(90deg,rgba(0,170,255,0.025) 1px,transparent 1px);background-size:32px 32px;pointer-events:none;z-index:0;}
-
   .wrap{position:relative;z-index:1;max-width:1100px;margin:0 auto;padding:24px 20px 40px;}
 
   /* ── HEADER ── */
@@ -63,13 +62,17 @@
   .btn-danger:hover{background:rgba(255,61,61,0.2);}
   .btn-edit{background:rgba(0,170,255,0.1);color:var(--accent);border:1px solid rgba(0,170,255,0.2);padding:5px 10px;font-size:10px;width:auto;}
   .btn-edit:hover{background:rgba(0,170,255,0.2);}
+  .btn-unhide{background:rgba(0,230,118,0.1);color:var(--green);border:1px solid rgba(0,230,118,0.2);padding:5px 10px;font-size:10px;width:auto;font-family:var(--head);font-weight:700;letter-spacing:0.1em;border-radius:3px;cursor:pointer;transition:all 0.2s;}
+  .btn-unhide:hover{background:rgba(0,230,118,0.2);}
 
   /* ── PANEL ── */
   .panel{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:18px;margin-bottom:16px;position:relative;overflow:hidden;}
   .panel::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,#0055aa,var(--accent),transparent);}
   .panel.amber::before{background:linear-gradient(90deg,#995500,var(--amber),transparent);}
   .panel.red::before{background:linear-gradient(90deg,#660000,var(--red),transparent);}
+  .panel.green::before{background:linear-gradient(90deg,#005500,var(--green),transparent);}
   .panel-title{font-family:var(--head);font-weight:900;font-size:14px;letter-spacing:0.15em;text-transform:uppercase;color:var(--bright);margin-bottom:14px;}
+  .panel-subtitle{font-family:var(--mono);font-size:9px;color:var(--dim);letter-spacing:0.1em;margin-bottom:14px;margin-top:-10px;}
 
   /* ── NOTICE / NOTAM LIST ── */
   .notice-item{display:flex;gap:12px;align-items:flex-start;padding:10px 0;border-bottom:1px solid var(--border);animation:fadeUp 0.3s ease both;}
@@ -85,6 +88,16 @@
   .notice-meta{font-family:var(--mono);font-size:9px;color:var(--dim);margin-top:3px;}
   .notice-actions{display:flex;gap:6px;margin-top:6px;}
   .empty-state{font-family:var(--mono);font-size:10px;color:var(--dim);letter-spacing:0.12em;text-align:center;padding:20px 0;}
+
+  /* ── LIVE NOTAM ITEMS ── */
+  .lnotam-item{padding:10px 0;border-bottom:1px solid var(--border);animation:fadeUp 0.3s ease both;}
+  .lnotam-item:first-child{padding-top:0;}
+  .lnotam-item:last-child{border-bottom:none;padding-bottom:0;}
+  .lnotam-item.hidden-notam{opacity:0.35;}
+  .lnotam-airfield{font-family:var(--mono);font-size:9px;letter-spacing:0.15em;color:var(--accent);margin-bottom:3px;}
+  .lnotam-text{font-size:12px;color:var(--bright);line-height:1.5;font-family:var(--mono);white-space:pre-wrap;word-break:break-word;}
+  .lnotam-meta{font-family:var(--mono);font-size:9px;color:var(--dim);margin-top:3px;}
+  .lnotam-actions{display:flex;gap:6px;margin-top:6px;}
 
   /* ── STATUS ── */
   .status-bar{font-family:var(--mono);font-size:9px;letter-spacing:0.1em;padding:8px 12px;border-radius:4px;margin-bottom:14px;display:none;}
@@ -198,6 +211,13 @@
 
     </div><!-- /columns -->
 
+    <!-- ══ LIVE NOTAMs FULL WIDTH ══ -->
+    <div class="panel green" style="margin-top:4px;">
+      <div class="panel-title">🛰 LIVE NOTAMs — AUTOROUTER</div>
+      <div class="panel-subtitle">EGTK · EGVN · EGBJ · EGHI · EGBB · 25NM RADIUS · AUTO-REFRESHES EVERY 30 MINS VIA APPS SCRIPT</div>
+      <div id="liveNotamsList"><div class="empty-state"><span class="spinner"></span>LOADING...</div></div>
+    </div>
+
     <div style="text-align:center;font-family:var(--mono);font-size:9px;color:var(--dim);letter-spacing:0.1em;margin-top:8px;">
       <a href="dashboard.html" style="color:var(--accent);text-decoration:none;">← BACK TO DASHBOARD</a>
     </div>
@@ -211,32 +231,26 @@ const JSONBIN_ID  = '69ac06bf43b1c97be9bd5667';
 const JSONBIN_KEY = '$2a$10$wjZldGseV25iurze/grlbOQ1ZxUVCugh.kmmRH3LOo3zEiUF4RKPS';
 const BIN_URL     = `https://api.jsonbin.io/v3/b/${JSONBIN_ID}`;
 
+// ── NOTAM SHEET CONFIG ──
+const NOTAM_SHEET_ID  = '1aoavAzPkpi9bvD8IDNz1flxWYb-5WJeUtPePS1uVgHw';
+const NOTAM_SHEET_GID = '386587258'; // ← paste NOTAMs tab GID after creating it
+const NOTAM_WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbyPKEPMRbfRh-fQtTInqcoqiQ5wZKKLFSC7P_4fYyEL35dnzEvEQKDX6vuW_TAZOtc8/exec'; // ← paste Apps Script web app URL
+
 // ── BACKUP BIN ──
-// Backup bin ID is created automatically on first use and stored in localStorage
 async function getBackupBinId() {
   let id = localStorage.getItem('ls_backup_bin_id');
   if (id) return id;
-  // Create a new bin
   try {
     const res = await fetch('https://api.jsonbin.io/v3/b', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Master-Key': JSONBIN_KEY,
-        'X-Bin-Name': 'ls-notices-backup',
-        'X-Private': 'true'
-      },
+      headers: { 'Content-Type': 'application/json', 'X-Master-Key': JSONBIN_KEY,
+        'X-Bin-Name': 'ls-notices-backup', 'X-Private': 'true' },
       body: JSON.stringify({ notices: [], notams: [] })
     });
     const data = await res.json();
     id = data.metadata && data.metadata.id;
-    if (id) {
-      localStorage.setItem('ls_backup_bin_id', id);
-      console.log('Backup bin created:', id);
-    }
-  } catch(e) {
-    console.warn('Could not create backup bin:', e.message);
-  }
+    if (id) localStorage.setItem('ls_backup_bin_id', id);
+  } catch(e) { console.warn('Could not create backup bin:', e.message); }
   return id;
 }
 
@@ -249,18 +263,14 @@ async function writeBackup(record) {
       headers: { 'Content-Type': 'application/json', 'X-Master-Key': JSONBIN_KEY },
       body: JSON.stringify(record)
     });
-  } catch(e) {
-    console.warn('Backup write failed:', e.message);
-  }
+  } catch(e) { console.warn('Backup write failed:', e.message); }
 }
 
 async function restoreFromBackup() {
   try {
     const id = localStorage.getItem('ls_backup_bin_id');
     if (!id) { showStatus('NO BACKUP BIN FOUND', 'err'); return; }
-    const res = await fetch(`https://api.jsonbin.io/v3/b/${id}/latest`, {
-      headers: { 'X-Master-Key': JSONBIN_KEY }
-    });
+    const res = await fetch(`https://api.jsonbin.io/v3/b/${id}/latest`, { headers: { 'X-Master-Key': JSONBIN_KEY } });
     const data = await res.json();
     const record = data.record || {};
     if (!record.notices && !record.notams) { showStatus('BACKUP IS EMPTY', 'err'); return; }
@@ -270,13 +280,10 @@ async function restoreFromBackup() {
       allData = record;
       if (!allData.notices) allData.notices = [];
       if (!allData.notams)  allData.notams  = [];
-      renderNotices();
-      renderNotams();
+      renderNotices(); renderNotams();
       showStatus('RESTORED FROM BACKUP', 'ok');
     }
-  } catch(e) {
-    showStatus('RESTORE FAILED: ' + e.message, 'err');
-  }
+  } catch(e) { showStatus('RESTORE FAILED: ' + e.message, 'err'); }
 }
 
 // ── AUTH ──
@@ -287,6 +294,7 @@ function doLogin() {
     document.getElementById('loginScreen').style.display = 'none';
     document.getElementById('adminScreen').style.display = 'block';
     loadData();
+    loadLiveNotams();
   } else {
     document.getElementById('loginErr').classList.add('show');
     document.getElementById('pwInput').value = '';
@@ -313,7 +321,7 @@ async function readBin() {
   const res = await fetch(BIN_URL + '/latest', { headers: { 'X-Master-Key': JSONBIN_KEY } });
   if (!res.ok) throw new Error(`JSONBin returned ${res.status}`);
   const data = await res.json();
-  if (!data.record) throw new Error('JSONBin response missing record — possible rate limit or error');
+  if (!data.record) throw new Error('JSONBin response missing record');
   return data.record;
 }
 
@@ -324,7 +332,7 @@ async function writeBin(record) {
     headers: { 'Content-Type': 'application/json', 'X-Master-Key': JSONBIN_KEY },
     body: JSON.stringify(record)
   });
-  if (res.ok) writeBackup(record); // silent backup on every save
+  if (res.ok) writeBackup(record);
   return res.ok;
 }
 
@@ -340,15 +348,90 @@ async function loadData(isAutoRefresh = false) {
     if (!fresh.notams)  fresh.notams  = [];
     allData = fresh;
     dataLoaded = true;
-    renderNotices();
-    renderNotams();
+    renderNotices(); renderNotams();
     if (!isAutoRefresh) document.getElementById('statusBar').classList.remove('show');
-    console.log('[notices] data loaded OK —', fresh.notices.length, 'notices,', fresh.notams.length, 'NOTAMs');
   } catch(e) {
-    // On error, restore dataLoaded so existing in-memory data stays writable
     dataLoaded = true;
-    console.warn('[notices] auto-refresh fetch failed — keeping existing data in memory:', e.message);
     if (!isAutoRefresh) showStatus('ERROR LOADING DATA — ' + e.message, 'err');
+  }
+}
+
+// ══════════════════════════════════════════════
+//  LIVE NOTAMs — read from Google Sheet
+// ══════════════════════════════════════════════
+async function loadLiveNotams() {
+  const wrap = document.getElementById('liveNotamsList');
+  try {
+    const url = `https://docs.google.com/spreadsheets/d/${NOTAM_SHEET_ID}/gviz/tq?tqx=out:json&gid=${NOTAM_SHEET_GID}`;
+    const res  = await fetch(url);
+    const text = await res.text();
+    const json = JSON.parse(text.replace(/^[^(]+\(/, '').replace(/\);?\s*$/, ''));
+    const rows = json.table?.rows || [];
+    const now  = Date.now() / 1000;
+
+    // cols: 0=ID, 1=Airfield, 2=Text, 3=StartValidity(unix), 4=EndValidity(unix), 5=Hidden
+    const notams = rows.map(r => ({
+      id           : r.c?.[0]?.v ?? '',
+      airfield     : r.c?.[1]?.v ?? '',
+      text         : r.c?.[2]?.v ?? '',
+      startValidity: Number(r.c?.[3]?.v ?? 0),
+      endValidity  : Number(r.c?.[4]?.v ?? 9999999999),
+      hidden       : String(r.c?.[5]?.v ?? '').toLowerCase() === 'yes'
+    })).filter(n => n.id && n.endValidity > now);
+
+    if (!notams.length) {
+      wrap.innerHTML = '<div class="empty-state">NO LIVE NOTAMs</div>';
+      return;
+    }
+
+    // Group by airfield
+    const grouped = {};
+    notams.forEach(n => {
+      if (!grouped[n.airfield]) grouped[n.airfield] = [];
+      grouped[n.airfield].push(n);
+    });
+
+    const airfieldOrder = ['EGTK','EGVN','EGBJ','EGHI','EGBB','RADIUS'];
+    const sorted = Object.keys(grouped).sort((a,b) =>
+      (airfieldOrder.indexOf(a) + 1 || 99) - (airfieldOrder.indexOf(b) + 1 || 99)
+    );
+
+    wrap.innerHTML = sorted.map(af => {
+      const items = grouped[af];
+      return `<div style="margin-bottom:14px;">
+        <div class="slabel">${af}</div>
+        ${items.map((n, i) => {
+          const from = n.startValidity ? new Date(n.startValidity*1000).toUTCString().slice(0,16) : '';
+          const to   = n.endValidity && n.endValidity < 9999999999 ? new Date(n.endValidity*1000).toUTCString().slice(0,16) : 'PERM';
+          return `<div class="lnotam-item ${n.hidden ? 'hidden-notam' : ''}" style="animation-delay:${i*0.04}s">
+            <div class="lnotam-text">${n.text}</div>
+            <div class="lnotam-meta">${from} → ${to}${n.hidden ? ' · HIDDEN FROM DASHBOARD' : ''}</div>
+            <div class="lnotam-actions">
+              ${n.hidden
+                ? `<button class="btn-unhide" onclick="toggleNotamHidden('${n.id}', false)">↑ UNHIDE</button>`
+                : `<button class="btn-danger" onclick="toggleNotamHidden('${n.id}', true)">✕ HIDE</button>`
+              }
+            </div>
+          </div>`;
+        }).join('')}
+      </div>`;
+    }).join('');
+
+  } catch(e) {
+    wrap.innerHTML = `<div class="empty-state">FAILED TO LOAD LIVE NOTAMs — ${e.message}</div>`;
+  }
+}
+
+async function toggleNotamHidden(notamId, hide) {
+  const action = hide ? 'hide' : 'unhide';
+  if (!confirm(`${hide ? 'Hide' : 'Unhide'} this NOTAM on the dashboard?`)) return;
+  try {
+    const url = `${NOTAM_WEBAPP_URL}?action=${action}&id=${encodeURIComponent(notamId)}`;
+    await fetch(url, { mode: 'no-cors' });
+    showStatus(`NOTAM ${hide ? 'HIDDEN' : 'UNHIDDEN'} ✓`, 'ok');
+    setTimeout(loadLiveNotams, 1500);
+  } catch(e) {
+    showStatus('ACTION FAILED: ' + e.message, 'err');
   }
 }
 
@@ -383,8 +466,7 @@ async function submitNotice() {
   const editId = document.getElementById('editNoticeId').value;
   if (!text) { showStatus('PLEASE ENTER NOTICE TEXT', 'err'); return; }
   const btn = document.getElementById('noticeSubmitBtn');
-  btn.disabled = true;
-  showStatus('SAVING...', 'load');
+  btn.disabled = true; showStatus('SAVING...', 'load');
   try {
     if (!allData.notices) allData.notices = [];
     if (editId) {
@@ -435,7 +517,7 @@ async function deleteNotice(id) {
 }
 
 // ══════════════════════════════════════════════
-//  NOTAMs
+//  MANUAL NOTAMs
 // ══════════════════════════════════════════════
 function renderNotams() {
   const wrap = document.getElementById('notamsList');
@@ -465,8 +547,7 @@ async function submitNotam() {
   const editId = document.getElementById('editNotamId').value;
   if (!text) { showStatus('PLEASE ENTER NOTAM TEXT', 'err'); return; }
   const btn = document.getElementById('notamSubmitBtn');
-  btn.disabled = true;
-  showStatus('SAVING...', 'load');
+  btn.disabled = true; showStatus('SAVING...', 'load');
   try {
     if (!allData.notams) allData.notams = [];
     if (editId) {
@@ -496,8 +577,8 @@ function editNotam(id) {
   document.getElementById('nmFrom').value  = n.from || '';
   document.getElementById('nmTo').value    = n.to   || '';
   document.getElementById('editNotamId').value = id;
-  document.getElementById('notamFormTitle').textContent  = 'EDIT NOTAM';
-  document.getElementById('notamSubmitBtn').textContent  = 'SAVE CHANGES';
+  document.getElementById('notamFormTitle').textContent = 'EDIT NOTAM';
+  document.getElementById('notamSubmitBtn').textContent = 'SAVE CHANGES';
   document.getElementById('notamFormPanel').scrollIntoView({ behavior:'smooth' });
 }
 
@@ -522,22 +603,17 @@ window.addEventListener('load', () => {
     document.getElementById('loginScreen').style.display = 'none';
     document.getElementById('adminScreen').style.display = 'block';
     loadData();
+    loadLiveNotams();
   }
 });
 
-// Re-fetch data every 2 minutes to prevent stale data overwrites
 setInterval(() => {
   if (sessionStorage.getItem('noticesAuth') === '1' && dataLoaded) {
-    // Only refresh if no unsaved edits in progress
-    const editNoticeId = document.getElementById('editNoticeId');
-    const editNotamId  = document.getElementById('editNotamId');
-    const hasUnsaved   = (editNoticeId && editNoticeId.value) || (editNotamId && editNotamId.value);
-    if (!hasUnsaved) {
-      // NOTE: do NOT set dataLoaded=false here — if fetch fails, we keep existing data safe
-      loadData(true); // isAutoRefresh=true: silent, non-destructive
-    }
+    const hasUnsaved = document.getElementById('editNoticeId').value || document.getElementById('editNotamId').value;
+    if (!hasUnsaved) loadData(true);
+    loadLiveNotams();
   }
-}, 120000); // every 2 minutes
+}, 120000);
 
 function exportBackup() {
   const data = { notices: allData.notices || [], notams: allData.notams || [] };
@@ -565,13 +641,9 @@ function importBackup(event) {
         body: JSON.stringify({ notices: data.notices, notams: data.notams })
       });
       if (!res.ok) throw new Error('Save failed');
-      allData = data;
-      renderNotices();
-      renderNotams();
+      allData = data; renderNotices(); renderNotams();
       showStatus(`Imported ${data.notices.length} notices and ${data.notams.length} NOTAMs`, 'ok');
-    } catch(err) {
-      showStatus('Import failed: ' + err.message, 'error');
-    }
+    } catch(err) { showStatus('Import failed: ' + err.message, 'error'); }
     event.target.value = '';
   };
   reader.readAsText(file);

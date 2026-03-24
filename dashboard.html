@@ -199,16 +199,30 @@
   .af-taf-body.open { display:block; }
 
   /* ── NOTAMs ── */
-  .notam-item { display:flex; gap:10px; padding:9px 0; border-bottom:1px solid var(--border); animation:fadeUp 0.4s ease both; }
+  .notam-item { display:flex; flex-direction:column; gap:3px; padding:9px 0; border-bottom:1px solid var(--border); animation:fadeUp 0.4s ease both; }
   .notam-item:last-child { border-bottom:none; padding-bottom:0; }
   .notam-item:first-child { padding-top:0; }
-  .notam-qcode { font-family:var(--mono); font-size:11px; letter-spacing:0.08em; text-transform:uppercase; padding:2px 6px; border-radius:2px; height:fit-content; flex-shrink:0; margin-top:2px; }
-  .notam-qcode.rwy  { background:rgba(255,171,0,0.1); color:var(--amber); border:1px solid rgba(255,171,0,0.25); }
-  .notam-qcode.nav  { background:rgba(0,170,255,0.1); color:var(--accent); border:1px solid rgba(0,170,255,0.25); }
-  .notam-qcode.obst { background:rgba(255,61,61,0.1); color:var(--red);   border:1px solid rgba(255,61,61,0.25); }
-  .notam-title { font-family:var(--head); font-size:17.5px; font-weight:700; color:var(--bright); letter-spacing:0.04em; }
-  .notam-text  { font-size:15px; color:var(--text); line-height:1.4; margin-top:2px; }
-  .notam-valid { font-family:var(--mono); font-size:12px; color:var(--dim); margin-top:3px; }
+  .notam-header { display:flex; align-items:center; gap:8px; }
+  .notam-airfield { font-family:var(--mono); font-size:11px; letter-spacing:0.1em; color:var(--accent); }
+  .notam-text  { font-size:13px; color:var(--text); line-height:1.4; font-family:var(--mono); white-space:pre-wrap; word-break:break-word; }
+  .notam-valid { font-family:var(--mono); font-size:11px; color:var(--dim); }
+  .notam-footer { display:flex; align-items:center; justify-content:space-between; }
+  .notam-hide-btn { font-family:var(--mono); font-size:10px; letter-spacing:0.08em; padding:2px 8px; border-radius:2px; border:1px solid var(--border); background:transparent; color:var(--dim); cursor:pointer; transition:all 0.15s; }
+  .notam-hide-btn:hover { border-color:var(--red); color:var(--red); }
+
+  /* ── NOTAM HIDE MODAL ── */
+  #notamHideModal { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:999; align-items:center; justify-content:center; }
+  #notamHideModal.open { display:flex; }
+  #notamHideModalBox { background:var(--card); border:1px solid var(--border); border-radius:6px; padding:24px; min-width:300px; display:flex; flex-direction:column; gap:14px; }
+  #notamHideModalBox h3 { font-family:var(--mono); font-size:13px; letter-spacing:0.1em; color:var(--text); margin:0; }
+  #notamHideModalBox p { font-family:var(--mono); font-size:10px; color:var(--dim); margin:0; white-space:pre-wrap; max-height:80px; overflow:hidden; }
+  #notamHidePwInput { background:var(--bg); border:1px solid var(--border); border-radius:3px; color:var(--text); font-family:var(--mono); font-size:13px; padding:8px 10px; width:100%; box-sizing:border-box; }
+  #notamHidePwInput:focus { outline:none; border-color:var(--accent); }
+  #notamHideError { font-family:var(--mono); font-size:11px; color:#ff6060; display:none; }
+  .notam-modal-btns { display:flex; gap:10px; justify-content:flex-end; }
+  .notam-modal-btns button { font-family:var(--mono); font-size:11px; letter-spacing:0.08em; padding:6px 14px; border-radius:3px; cursor:pointer; border:1px solid var(--border); background:transparent; color:var(--dim); }
+  .notam-modal-btns button.confirm { background:var(--red); color:#fff; border-color:var(--red); font-weight:700; }
+  .notam-modal-btns button.confirm:hover { opacity:0.85; }
 
   /* ── FLYING NOW ── */
   .flight-card { background:var(--panel2); border:1px solid var(--border); border-radius:6px; padding:12px 13px; display:flex; flex-direction:column; gap:7px; position:relative; margin-bottom:8px; animation:fadeUp 0.4s ease both; }
@@ -449,6 +463,20 @@
     </div>
   </div>
 
+  <!-- ═══ NOTAM HIDE MODAL ═══ -->
+  <div id="notamHideModal">
+    <div id="notamHideModalBox">
+      <h3>✕ HIDE NOTAM</h3>
+      <p id="notamHideDesc"></p>
+      <input type="password" id="notamHidePwInput" placeholder="Enter password…" autocomplete="off" />
+      <div id="notamHideError">Incorrect password</div>
+      <div class="notam-modal-btns">
+        <button onclick="closeNotamHideModal()">CANCEL</button>
+        <button class="confirm" onclick="confirmNotamHide()">HIDE</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ═══ RESOLVE MODAL ═══ -->
   <div id="resolveModal">
     <div id="resolveModalBox">
@@ -587,55 +615,35 @@ function parseCloud(metar) {
 // ── LIVE WEATHER STATE ──
 let wxData = {};
 
-// NOTAM config
-const AUTOROUTER_USER = 'tnewell2@gmail.com';
-const AUTOROUTER_PASS = 'TN12345!';
-const NOTAM_ICAOS     = ['EGTK', 'EGTT']; // home + London FIR for local area
-
-// Q-codes we care about for a flying school
-// MR=runway, MN=nav aid, OB=obstacle, FA=aerodrome, WU/WZ=UAS/airspace
-const RELEVANT_QCODES = ['MR','MN','OB','FA','LR','LT','XX'];
-
-let notamToken     = null;
-let notamTokenExp  = 0;
-
-async function getNotamToken() {
-  if (notamToken && Date.now() < notamTokenExp) return notamToken;
-  try {
-    const res = await fetch('https://api.autorouter.aero/v1.0/oauth2/token', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: `grant_type=client_credentials&client_id=${encodeURIComponent(AUTOROUTER_USER)}&client_secret=${encodeURIComponent(AUTOROUTER_PASS)}`
-    });
-    const data = await res.json();
-    if (data.access_token) {
-      notamToken    = data.access_token;
-      notamTokenExp = Date.now() + (data.expires_in - 60) * 1000;
-      return notamToken;
-    }
-  } catch(e) {
-    console.warn('AutoRouter auth failed:', e.message);
-  }
-  return null;
-}
+// ── NOTAM SHEET CONFIG ─────────────────────────────────
+const NOTAM_SHEET_ID   = '1aoavAzPkpi9bvD8IDNz1flxWYb-5WJeUtPePS1uVgHw';
+const NOTAM_SHEET_GID  = '386587258';   // ← paste NOTAMs tab GID after creating it
+const NOTAM_WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbyPKEPMRbfRh-fQtTInqcoqiQ5wZKKLFSC7P_4fYyEL35dnzEvEQKDX6vuW_TAZOtc8/exec'; // ← paste Apps Script web app URL
+// ──────────────────────────────────────────────────────
 
 async function fetchNotams() {
-  const token = await getNotamToken();
-  if (!token) { renderNotams([]); return; }
-
   try {
-    const itemas = JSON.stringify(NOTAM_ICAOS);
-    const res = await fetch(
-      `https://api.autorouter.aero/v1.0/notam?itemas=${encodeURIComponent(itemas)}&limit=50`,
-      { headers: { 'Authorization': `Bearer ${token}` } }
-    );
-    const data = await res.json();
-    // AutoRouter returns { total: N, rows: [...] }
-    const notams = data.rows || [];
+    const url  = `https://docs.google.com/spreadsheets/d/${NOTAM_SHEET_ID}/gviz/tq?tqx=out:json&gid=${NOTAM_SHEET_GID}`;
+    const res  = await fetch(url);
+    const text = await res.text();
+    const json = JSON.parse(text.replace(/^[^(]+\(/, '').replace(/\);?\s*$/, ''));
+    const rows = json.table?.rows || [];
+    const now  = Date.now() / 1000;
+
+    // cols: 0=ID, 1=Airfield, 2=Text, 3=StartValidity, 4=EndValidity, 5=Hidden
+    const notams = rows.map(r => ({
+      id           : String(r.c?.[0]?.v ?? ''),
+      airfield     : String(r.c?.[1]?.v ?? ''),
+      text         : String(r.c?.[2]?.v ?? ''),
+      startValidity: Number(r.c?.[3]?.v ?? 0),
+      endValidity  : Number(r.c?.[4]?.v ?? 9999999999),
+      hidden       : String(r.c?.[5]?.v ?? '').toLowerCase() === 'yes'
+    })).filter(n => n.id && n.endValidity > now && !n.hidden);
+
     window.liveNotamsActive = notams.length > 0;
     renderNotams(notams);
   } catch(e) {
-    console.warn('NOTAM fetch failed:', e.message);
+    console.warn('NOTAM sheet fetch failed:', e.message);
     renderNotams([]);
   }
 }
@@ -1042,80 +1050,102 @@ function renderNearby() {
 // ══════════════════════════════════════════════════════
 //  RENDER NOTAMs
 // ══════════════════════════════════════════════════════
-function parseQcode(n) {
-  // AutoRouter uses code23 + code45 fields directly
-  return (n.code23 || 'XX').trim();
-}
-
-function qcodeLabel(qc) {
-  const map = {
-    MR:'RWY', MN:'NAV', OB:'OBST', FA:'AD', LR:'AIRSPACE',
-    LT:'AIRSPACE', WU:'UAS', WZ:'UAS', XX:'INFO'
-  };
-  return map[qc] || qc;
-}
-
-function qcodeType(qc) {
-  if (qc==='MR') return 'rwy';
-  if (qc==='MN') return 'nav';
-  if (['OB','FA'].includes(qc)) return 'obst';
-  return 'nav';
-}
-
-function notamTitle(n) {
-  // AutoRouter uses iteme for the plain text description
-  const text = (n.iteme || '').replace(/\n/g,' ').trim();
-  return text.length > 100 ? text.substring(0, 100) + '…' : text || 'NOTAM';
-}
-
-function notamValid(n) {
-  const fmt = t => {
-    if (!t) return '?';
-    // AutoRouter validity is Unix epoch seconds
-    return new Date(t * 1000).toUTCString().replace(' GMT','Z').substring(0,22);
-  };
-  return `${fmt(n.startvalidity)} → ${fmt(n.endvalidity)}`;
-}
-
-function renderNotams(liveNotams) {
+function renderNotams(notams) {
   const wrap = document.getElementById('notamsWrap');
 
-  // If live data available, use it
-  if (liveNotams && liveNotams.length) {
-    const filtered = liveNotams.filter(n => RELEVANT_QCODES.includes(parseQcode(n)));
-    const display  = filtered.length ? filtered : liveNotams.slice(0, 8);
-    wrap.innerHTML = display.slice(0, 8).map((n, i) => {
-      const qc    = parseQcode(n);
-      const label = qcodeLabel(qc);
-      const type  = qcodeType(qc);
-      const text  = notamTitle(n);
-      const valid = notamValid(n);
-      return `
+  if (!notams || !notams.length) {
+    // Fall back to manual NOTAMs from JSONBin
+    const manualNotams = (window.binNotams || []).filter(n => {
+      if (n.to && new Date(n.to) < new Date()) return false;
+      return true;
+    });
+    if (manualNotams.length) {
+      wrap.innerHTML = manualNotams.map((n, i) => `
         <div class="notam-item" style="animation-delay:${i*0.07}s">
-          <div class="notam-qcode ${type}">${label}</div>
-          <div><div class="notam-text">${text}</div><div class="notam-valid">${valid}</div></div>
-        </div>`;
-    }).join('');
+          <div class="notam-footer">
+            <span class="notam-valid">${n.from||''}${n.to?' → '+n.to:''}</span>
+          </div>
+          <div class="notam-text">${n.text}</div>
+        </div>`).join('');
+      return;
+    }
+    wrap.innerHTML = '<div style="font-family:var(--mono);font-size:10px;color:var(--dim);padding:8px 0;letter-spacing:.1em;text-align:center;">NO NOTAMs</div>';
     return;
   }
 
-  // Fall back to manual NOTAMs from JSONBin
-  const manualNotams = (window.binNotams || []).filter(n => {
-    if (n.to && new Date(n.to) < new Date()) return false;
-    return true;
+  // Group by airfield
+  const grouped = {};
+  const order   = ['EGTK','EGVN','EGBJ','EGHI','EGBB','RADIUS'];
+  notams.forEach(n => {
+    if (!grouped[n.airfield]) grouped[n.airfield] = [];
+    grouped[n.airfield].push(n);
   });
-  if (manualNotams.length) {
-    wrap.innerHTML = manualNotams.map((n, i) => `
-      <div class="notam-item" style="animation-delay:${i*0.07}s">
-        <div class="notam-qcode rwy">NOTAM</div>
-        <div><div class="notam-text">${n.text}</div><div class="notam-valid">${n.from||''}${n.to?' → '+n.to:''}</div></div>
-      </div>`).join('');
+  const sorted = Object.keys(grouped).sort((a,b) =>
+    (order.indexOf(a)+1||99) - (order.indexOf(b)+1||99)
+  );
+
+  const fmt = t => t ? new Date(t*1000).toUTCString().slice(0,16) : '?';
+
+  wrap.innerHTML = sorted.map(af => {
+    const items = grouped[af];
+    return `<div style="margin-bottom:10px;">
+      <div style="font-family:var(--mono);font-size:10px;letter-spacing:0.15em;color:var(--accent);margin-bottom:4px;padding-bottom:3px;border-bottom:1px solid var(--border);">${af}</div>
+      ${items.map((n, i) => `
+        <div class="notam-item" style="animation-delay:${i*0.06}s">
+          <div class="notam-text">${n.text}</div>
+          <div class="notam-footer">
+            <span class="notam-valid">${fmt(n.startValidity)} → ${fmt(n.endValidity)}</span>
+            <button class="notam-hide-btn" onclick="openNotamHideModal('${n.id}', ${JSON.stringify(n.text.substring(0,80)).replace(/'/g,"\'")})">✕ HIDE</button>
+          </div>
+        </div>`).join('')}
+    </div>`;
+  }).join('');
+}
+
+// ── NOTAM HIDE MODAL ──────────────────────────────────
+let notamHideTargetId = null;
+
+function openNotamHideModal(id, preview) {
+  notamHideTargetId = id;
+  document.getElementById('notamHideDesc').textContent = preview + '…';
+  document.getElementById('notamHidePwInput').value = '';
+  document.getElementById('notamHideError').style.display = 'none';
+  document.getElementById('notamHideModal').classList.add('open');
+  setTimeout(() => document.getElementById('notamHidePwInput').focus(), 100);
+}
+
+function closeNotamHideModal() {
+  document.getElementById('notamHideModal').classList.remove('open');
+  notamHideTargetId = null;
+}
+
+async function confirmNotamHide() {
+  const pw = document.getElementById('notamHidePwInput').value;
+  if (pw !== 'limasierra') {
+    document.getElementById('notamHideError').style.display = 'block';
     return;
   }
-
-  // Nothing at all
-  wrap.innerHTML = '<div style="font-family:var(--mono);font-size:10px;color:var(--dim);padding:8px 0;letter-spacing:.1em;">NO DATA</div>';
+  if (!notamHideTargetId) return;
+  const btn = document.querySelector('#notamHideModalBox button.confirm');
+  btn.textContent = 'HIDING…';
+  btn.disabled = true;
+  try {
+    await fetch(`${NOTAM_WEBAPP_URL}?action=hide&id=${encodeURIComponent(notamHideTargetId)}`, { mode: 'no-cors' });
+    closeNotamHideModal();
+    setTimeout(fetchNotams, 1500);
+  } catch(e) {
+    console.warn('NOTAM hide failed:', e);
+    btn.textContent = 'HIDE';
+    btn.disabled = false;
+  }
 }
+
+document.addEventListener('DOMContentLoaded', () => {
+  const m = document.getElementById('notamHideModal');
+  if (m) m.addEventListener('click', e => { if (e.target === m) closeNotamHideModal(); });
+  const p = document.getElementById('notamHidePwInput');
+  if (p) p.addEventListener('keydown', e => { if (e.key === 'Enter') confirmNotamHide(); });
+});
 
 // ══════════════════════════════════════════════════════
 //  RENDER FLIGHTS
