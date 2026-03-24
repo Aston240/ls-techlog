@@ -1107,7 +1107,7 @@ function renderNotams(notams) {
           <div class="notam-text">${n.text}</div>
           <div class="notam-footer">
             <span class="notam-valid">${fmt(n.startValidity)} → ${fmt(n.endValidity)}</span>
-            <button class="notam-hide-btn" onclick="openNotamHideModal('${n.id}', ${JSON.stringify(n.text.substring(0,80)).replace(/'/g,"\'")})">✕ HIDE</button>
+            <button class="notam-hide-btn" data-notamid="${n.id}" data-preview="${n.text.substring(0,80).replace(/"/g,'&quot;')}" onclick="openNotamHideModal(this.dataset.notamid, this.dataset.preview)">✕ HIDE</button>
           </div>
         </div>`).join('')}
     </div>`;
