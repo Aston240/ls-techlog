@@ -702,6 +702,18 @@ const DEFECTS_GID       = '0';
 const DEFECTS_WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbzodrg5OoJ9U5n-wC4on_db2A2-LeyaKJgCPWq0sPEe3tWTji-K0zyOs1gF2KPd2vRx/exec';
 // ─────────────────────────────────────────────────────
 
+// gviz returns dates as "Date(yyyy,m,d,h,min,s)" — parse that correctly
+function parseGvizDate(cell) {
+  if (!cell || cell.v === null) return new Date(0);
+  const v = cell.v;
+  // Format: Date(2026,2,24,9,46,34) — month is 0-indexed
+  if (typeof v === 'string' && v.startsWith('Date(')) {
+    const parts = v.replace('Date(','').replace(')','').split(',').map(Number);
+    return new Date(Date.UTC(parts[0], parts[1], parts[2], parts[3]||0, parts[4]||0, parts[5]||0));
+  }
+  return new Date(v);
+}
+
 async function fetchNotices() {
   try {
     const url = `https://docs.google.com/spreadsheets/d/${DEFECTS_SHEET_ID}/gviz/tq?tqx=out:json&gid=${DEFECTS_GID}`;
@@ -722,7 +734,7 @@ async function fetchNotices() {
         const cell = (i) => r.c?.[i]?.v ?? '';
         return {
           rowIndex   : i + 2,              // +2 = skip header row, sheets are 1-indexed
-          receivedAt : new Date(cell(0)),
+          receivedAt : parseGvizDate(r.c?.[0]),
           aircraft   : cell(1),
           defect     : cell(2),
           grounded   : String(cell(3)).toUpperCase() === 'TRUE',
