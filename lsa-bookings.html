@@ -982,7 +982,7 @@ function saveSettingsToCache() {
   localStorage.setItem('lsa_settings', JSON.stringify(ST));
 }
 
-// ── Fetch settings from cloud ──────────────────────
+// ── Fetch settings from cloud (GAS GET — works cross-origin) ────
 async function fetchSettingsFromCloud() {
   if(!SETTINGS_SCRIPT_URL || SETTINGS_SCRIPT_URL.includes('YOUR_SETTINGS')) return null;
   try {
@@ -993,18 +993,19 @@ async function fetchSettingsFromCloud() {
   } catch(e) { return null; }
 }
 
-// ── Save settings to cloud ────────────────────────
+// ── Save settings to cloud (GAS POST — no-cors, treat success as ok) ──
 async function saveSettingsToCloud(settings) {
   if(!SETTINGS_SCRIPT_URL || SETTINGS_SCRIPT_URL.includes('YOUR_SETTINGS')) return false;
-  try {
-    const res = await fetch(SETTINGS_SCRIPT_URL, {
+  return new Promise(resolve => {
+    fetch(SETTINGS_SCRIPT_URL, {
       method: 'POST',
-      headers: {'Content-Type':'application/json'},
+      mode: 'no-cors',
+      headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({ action: 'saveSettings', settings })
-    });
-    const data = await res.json();
-    return data.ok === true;
-  } catch(e) { return false; }
+    })
+    .then(() => resolve(true))
+    .catch(() => resolve(false));
+  });
 }
 
 // ══ SCREENS ════════════════════════════════════════
@@ -1025,7 +1026,6 @@ function checkPin() {
     document.getElementById('pinErr').textContent = '';
     startClock();
     switchTab('booking', document.querySelector('.tab-btn'));
-    // Fetch fresh settings from cloud then build form
     fetchSettingsFromCloud().then(cloud => {
       if(cloud) {
         ST = {
@@ -1541,9 +1541,7 @@ function loadSettingsUI() {
       status.textContent = '✓ SETTINGS LOADED FROM CLOUD';
     } else {
       status.className = 'settings-sync-status err';
-      status.textContent = SETTINGS_SCRIPT_URL.includes('YOUR_SETTINGS')
-        ? '⚠ CLOUD SYNC NOT CONFIGURED — USING LOCAL SETTINGS'
-        : '⚠ COULD NOT REACH CLOUD — SHOWING CACHED SETTINGS';
+      status.textContent = '⚠ COULD NOT REACH CLOUD — SHOWING CACHED SETTINGS';
     }
     renderAllTags();
     document.getElementById('atcEmail').value  = ST.atcEmail;
@@ -1568,8 +1566,6 @@ function renderTags(containerId, items, key) {
     tag.dataset.index = i;
     tag.dataset.key = key;
     tag.innerHTML = `<span class="tag-handle">⠿</span><span>${item}</span><button class="tag-del" onclick="removeTag('${key}',${i})">×</button>`;
-
-    // Drag events
     tag.addEventListener('dragstart', e => {
       e.dataTransfer.effectAllowed = 'move';
       e.dataTransfer.setData('text/plain', JSON.stringify({key, idx: i}));
@@ -1588,7 +1584,6 @@ function renderTags(containerId, items, key) {
       arr.splice(i, 0, moved);
       renderTags(containerId, arr, key);
     });
-
     container.appendChild(tag);
   });
 }
@@ -1620,7 +1615,7 @@ async function saveSettings() {
   ST.fromEmail = document.getElementById('fromEmail').value.trim();
   saveSettingsToCache();
 
-  const btn = document.getElementById('saveBtn');
+  const btn   = document.getElementById('saveBtn');
   const flash = document.getElementById('settingsFlash');
   btn.disabled = true;
   btn.textContent = 'SAVING…';
@@ -1637,15 +1632,11 @@ async function saveSettings() {
     flash.textContent = '✓ SAVED TO CLOUD';
   } else {
     status.className = 'settings-sync-status err';
-    status.textContent = SETTINGS_SCRIPT_URL.includes('YOUR_SETTINGS')
-      ? '⚠ CLOUD SYNC NOT CONFIGURED — SAVED LOCALLY ONLY'
-      : '⚠ CLOUD SAVE FAILED — SAVED LOCALLY ONLY';
+    status.textContent = '⚠ CLOUD SAVE FAILED — SAVED LOCALLY ONLY';
     flash.textContent = '✓ SAVED LOCALLY';
   }
   flash.style.opacity = '1';
   setTimeout(() => flash.style.opacity = '0', 3000);
-
-  // Rebuild form with updated settings
   buildForm();
 }
 
