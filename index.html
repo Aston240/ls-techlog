@@ -2426,7 +2426,10 @@ function rMxPlanner(){
     // subtitle + help button
     +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">'
     +'<div style="font-size:11px;color:var(--mut)">Aircraft sorted by priority \u2014 fly from the top down \u00b7 Tier 1 = PPL Trainers \u00b7 Tier 2 = Leased \u00b7 Tier 3 = Advanced</div>'
+    +'<div style="display:flex;gap:8px;align-items:center">'
+    +'<button onclick="openFleetAnalysis()" style="font-size:11px;padding:4px 12px;background:#1a3a2a;border:1px solid #22c55e;color:#22c55e;border-radius:6px;cursor:pointer;font-weight:700;white-space:nowrap">&#128200; Fleet Analysis</button>'
     +'<button onclick="toggleMxHelp()" style="font-size:11px;padding:4px 12px;background:var(--panel);border:1px solid var(--border);color:var(--acc);border-radius:6px;cursor:pointer;font-weight:700;white-space:nowrap">&#9432; How this works</button>'
+    +'</div>'
     +'</div>'
     +mxHelpPanel()
 
@@ -2935,6 +2938,231 @@ function debugAirblyFields(){
 
 // ══ INIT ══════════════════════════════════════════
 initPassword();
-</script>
+
+// ══ FLEET ANALYSIS ════════════════════════════════
+function openFleetAnalysis() {
+  // Remove existing modal if any
+  const existing = document.getElementById('fleetAnalysisModal');
+  if (existing) { existing.remove(); return; }
+
+  const TIERS = {
+    1: ['G-BCGJ','G-PETR','G-MKAS','G-BTGO','G-FIAT','N150PK'],
+    2: ['G-EGTB','G-BOTN'],
+    3: ['G-HRYZ','G-SETG']
+  };
+  const TIER_NAMES = { 1: 'Tier 1 — PPL Trainers', 2: 'Tier 2 — Leased', 3: 'Tier 3 — Advanced' };
+
+  function getTier(reg) {
+    for (const [t, regs] of Object.entries(TIERS)) {
+      if (regs.includes(reg)) return parseInt(t);
+    }
+    return null;
+  }
+
+  function daysBetween(dateStr) {
+    if (!dateStr) return null;
+    const parts = dateStr.split('/');
+    if (parts.length !== 3) return null;
+    const d = new Date(parts[2]+'-'+parts[1]+'-'+parts[0]);
+    const now = new Date(); now.setHours(0,0,0,0);
+    return Math.round((d - now) / 86400000);
+  }
+
+  function buildSummaryText() {
+    const now = new Date();
+    const dateStr = now.toLocaleDateString('en-GB', { day:'2-digit', month:'long', year:'numeric' });
+    const cfg = ST.cfg || {};
+    const snapshots = ST.snapshots || {};
+    const downtime = ST.downtime || {};
+
+    const aircraft = [];
+    for (const [reg, settings] of Object.entries(cfg)) {
+      if (!settings || typeof settings !== 'object' || !settings.maint_due) continue;
+      const tier = getTier(reg);
+      const maintDue = parseFloat(settings.maint_due) || 0;
+      const maintType = settings.maint_type || '?';
+      const arcDate = settings.arc_due || null;
+      const annualDate = settings.annual_due || null;
+
+      const snaps = snapshots[reg] || {};
+      const snapEntries = Object.entries(snaps)
+        .map(([k,v]) => ({ date: new Date(k), hrs: parseFloat(v) }))
+        .filter(e => !isNaN(e.hrs) && e.hrs > 0 && e.hrs < 50000)
+        .sort((a,b) => a.date - b.date);
+
+      let burnRate = null, currentHours = null;
+      if (snapEntries.length >= 2) {
+        const cutoff = new Date(now.getTime() - 30*86400000);
+        const recent = snapEntries.filter(e => e.date >= cutoff);
+        const first = recent.length >= 2 ? recent[0] : snapEntries[snapEntries.length-2];
+        const last = snapEntries[snapEntries.length-1];
+        const daysDiff = (last.date - first.date) / 86400000;
+        if (daysDiff > 0) {
+          const hrsDiff = last.hrs - first.hrs;
+          burnRate = (hrsDiff / daysDiff) * 30;
+          if (burnRate < 0 || burnRate > 200) burnRate = null;
+        }
+        currentHours = last.hrs;
+      }
+
+      const hoursRemaining = (currentHours != null) ? Math.max(0, maintDue - currentHours) : null;
+      let estDaysToCheck = null;
+      if (burnRate && hoursRemaining != null && burnRate > 0) {
+        estDaysToCheck = Math.round((hoursRemaining / burnRate) * 30);
+      }
+
+      const downtimeEntries = Object.values(downtime[reg] || {});
+      const isDown = downtimeEntries.some(e => e.start && !e.end);
+      const currentDowntime = downtimeEntries.find(e => e.start && !e.end);
+
+      aircraft.push({ reg, tier, maintDue, maintType, arcDate, annualDate,
+        burnRate, currentHours, hoursRemaining, estDaysToCheck, isDown, currentDowntime });
+    }
+
+    aircraft.sort((a,b) => {
+      if (a.tier !== b.tier) return (a.tier||9) - (b.tier||9);
+      return (a.hoursRemaining||999) - (b.hoursRemaining||999);
+    });
+
+    const lines = [];
+    lines.push('===============================================');
+    lines.push('LS AIRMOTIVE — FLEET STATUS SUMMARY');
+    lines.push('Generated: ' + dateStr);
+    lines.push('EGTK Oxford Airport');
+    lines.push('===============================================');
+    lines.push('');
+    lines.push('CONTEXT FOR ANALYSIS:');
+    lines.push('You are an experienced flying school owner and aircraft engineer with 30+ years in GA operations.');
+    lines.push('Review the following live fleet data and provide:');
+    lines.push('1. A plain-English assessment of the fleet\'s current health and operational risk');
+    lines.push('2. Specific, actionable suggestions I can present to my board of directors at the next managers meeting');
+    lines.push('Focus on maintenance sequencing, utilisation, revenue risk, and any urgent flags.');
+    lines.push('');
+    lines.push('-----------------------------------------------');
+    lines.push('FLEET OVERVIEW');
+    lines.push('-----------------------------------------------');
+    lines.push('Total aircraft: ' + aircraft.length);
+    lines.push('Currently unserviceable: ' + aircraft.filter(a=>a.isDown).length);
+    lines.push('Serviceable: ' + aircraft.filter(a=>!a.isDown).length);
+    lines.push('');
+
+    for (const [tierNum, tierName] of Object.entries(TIER_NAMES)) {
+      const group = aircraft.filter(a => a.tier === parseInt(tierNum));
+      if (!group.length) continue;
+      lines.push('-----------------------------------------------');
+      lines.push(tierName.toUpperCase());
+      lines.push('-----------------------------------------------');
+      for (const ac of group) {
+        lines.push('');
+        lines.push('  ' + ac.reg + (ac.isDown ? ' [UNSERVICEABLE]' : ''));
+        lines.push('  ─────────────────────────────');
+        lines.push('  Current hours:    ' + (ac.currentHours != null ? ac.currentHours.toFixed(1)+' hrs' : 'No recent data'));
+        lines.push('  Next '+ac.maintType+' due at: ' + ac.maintDue.toFixed(1)+' hrs');
+        if (ac.hoursRemaining != null) lines.push('  Hours remaining:  ' + ac.hoursRemaining.toFixed(1)+' hrs');
+        lines.push('  Burn rate (30d):  ' + (ac.burnRate != null ? ac.burnRate.toFixed(1)+' hrs/month' : 'Insufficient data'));
+        if (ac.estDaysToCheck != null) {
+          const estDate = new Date(now.getTime() + ac.estDaysToCheck*86400000);
+          lines.push('  Est. check date:  ~' + estDate.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}) + ' (in ~'+ac.estDaysToCheck+' days)');
+        }
+        if (ac.arcDate) {
+          const d = daysBetween(ac.arcDate);
+          const flag = d==null?'': d<0?' ⚠ OVERDUE': d<=10?' ⚠ CRITICAL': d<=30?' ! SOON':'';
+          lines.push('  ARC expires:      '+ac.arcDate+(d!=null?' ('+(d<0?Math.abs(d)+' days overdue':d+' days')+')':'')+flag);
+        }
+        if (ac.annualDate) {
+          const d = daysBetween(ac.annualDate);
+          const flag = d==null?'': d<0?' ⚠ OVERDUE': d<=30?' ! UPCOMING':'';
+          lines.push('  Annual due:       '+ac.annualDate+(d!=null?' ('+(d<0?Math.abs(d)+' days overdue':d+' days')+')':'')+flag);
+        }
+        if (ac.isDown && ac.currentDowntime) {
+          lines.push('  Downtime reason:  '+(ac.currentDowntime.reason||'Reason not recorded'));
+          lines.push('  Down since:       '+(ac.currentDowntime.start||'Unknown date'));
+        }
+        if (ac.tier === 2) {
+          lines.push('  Target utilisation: 15 hrs/month (leased aircraft)');
+          if (ac.burnRate != null) lines.push('  On target?        '+(ac.burnRate>=15?'YES':'NO — currently '+ac.burnRate.toFixed(1)+' hrs/month'));
+        }
+        if (ac.tier === 3) lines.push('  Note: Advanced aircraft — never assigned to standby');
+      }
+      lines.push('');
+    }
+
+    // Urgent flags
+    const urgent = [];
+    for (const ac of aircraft) {
+      if (ac.arcDate) { const d=daysBetween(ac.arcDate); if(d!=null&&d<=10) urgent.push(ac.reg+' ARC '+(d<0?'OVERDUE by '+Math.abs(d)+' days':'expires in '+d+' days')); }
+      if (ac.annualDate) { const d=daysBetween(ac.annualDate); if(d!=null&&d<=30) urgent.push(ac.reg+' Annual '+(d<0?'OVERDUE by '+Math.abs(d)+' days':'due in '+d+' days')); }
+      if (ac.hoursRemaining!=null&&ac.hoursRemaining<5) urgent.push(ac.reg+' only '+ac.hoursRemaining.toFixed(1)+' hrs to next '+ac.maintType);
+      if (ac.isDown) urgent.push(ac.reg+' currently UNSERVICEABLE');
+    }
+    if (urgent.length) {
+      lines.push('-----------------------------------------------');
+      lines.push('URGENT FLAGS');
+      lines.push('-----------------------------------------------');
+      urgent.forEach(u => lines.push('  ⚠ '+u));
+      lines.push('');
+    }
+
+    lines.push('-----------------------------------------------');
+    lines.push('END OF DATA — PLEASE PROVIDE YOUR ANALYSIS');
+    lines.push('-----------------------------------------------');
+    return lines.join('\n');
+  }
+
+  // Build modal
+  const overlay = document.createElement('div');
+  overlay.id = 'fleetAnalysisModal';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9000;display:flex;align-items:center;justify-content:center;padding:20px';
+
+  const modal = document.createElement('div');
+  modal.style.cssText = 'background:#13161e;border:1px solid #1f2433;border-radius:12px;width:100%;max-width:740px;max-height:88vh;display:flex;flex-direction:column;overflow:hidden';
+
+  const summaryText = buildSummaryText();
+
+  modal.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid #1f2433">
+      <span style="font-weight:700;font-size:13px;color:#22c55e">&#128200; Fleet Analysis — Board Summary</span>
+      <button onclick="document.getElementById('fleetAnalysisModal').remove()" style="background:none;border:none;color:#64748b;font-size:18px;cursor:pointer;line-height:1">&#10005;</button>
+    </div>
+    <div style="padding:12px 18px;border-bottom:1px solid #1f2433;font-size:11px;color:#64748b;line-height:1.6">
+      Copy this text, open a new Claude chat, and paste it. Claude will respond as an experienced flying school owner &amp; engineer with board-ready suggestions.
+    </div>
+    <div style="flex:1;overflow-y:auto;padding:14px 18px">
+      <pre id="faPreview" style="font-family:monospace;font-size:11px;line-height:1.7;color:#94a3b8;white-space:pre-wrap;margin:0">${summaryText.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</pre>
+    </div>
+    <div style="padding:12px 18px;border-top:1px solid #1f2433;display:flex;gap:10px;align-items:center">
+      <button id="faCopyBtn" onclick="faDoClipboard()" style="background:#22c55e;color:#0d0f14;border:none;border-radius:6px;padding:7px 18px;font-size:12px;font-weight:700;cursor:pointer">⎘ Copy to Clipboard</button>
+      <span id="faCopyMsg" style="font-size:11px;color:#22c55e;display:none">✓ Copied!</span>
+      <span style="font-size:11px;color:#64748b;margin-left:auto">Built from live app data</span>
+    </div>
+  `;
+
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', e => { if (e.target===overlay) overlay.remove(); });
+
+  window._faText = summaryText;
+}
+
+function faDoClipboard() {
+  if (!window._faText) return;
+  navigator.clipboard.writeText(window._faText).then(() => {
+    const msg = document.getElementById('faCopyMsg');
+    const btn = document.getElementById('faCopyBtn');
+    if (msg) { msg.style.display='inline'; setTimeout(()=>msg.style.display='none', 2500); }
+    if (btn) { btn.textContent='✓ Copied!'; setTimeout(()=>btn.textContent='⎘ Copy to Clipboard', 2500); }
+  }).catch(() => {
+    // Fallback
+    const ta = document.createElement('textarea');
+    ta.value = window._faText;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    const msg = document.getElementById('faCopyMsg');
+    if (msg) { msg.style.display='inline'; setTimeout(()=>msg.style.display='none', 2500); }
+  });
+}
+
 </body>
 </html>
