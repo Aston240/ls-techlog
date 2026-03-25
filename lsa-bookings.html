@@ -60,8 +60,9 @@ body::before{
 .clock-date{font-family:var(--mono);font-size:11px;color:var(--dim);margin-top:2px;}
 
 /* ── TABS ── */
-.tabs{display:flex;gap:0;border-bottom:1px solid var(--border);padding:0 24px;flex-shrink:0;}
-.tab-btn{font-family:var(--head);font-size:14px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;padding:12px 20px;background:none;border:none;border-bottom:2px solid transparent;color:var(--dim);cursor:pointer;transition:all .2s;margin-bottom:-1px;}
+.tabs{display:flex;gap:0;border-bottom:1px solid var(--border);padding:0 24px;flex-shrink:0;overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;scrollbar-width:none;}
+.tabs::-webkit-scrollbar{display:none;}
+.tab-btn{font-family:var(--head);font-size:14px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;padding:12px 20px;background:none;border:none;border-bottom:2px solid transparent;color:var(--dim);cursor:pointer;transition:all .2s;margin-bottom:-1px;white-space:nowrap;flex-shrink:0;}
 .tab-btn:hover{color:var(--text);}
 .tab-btn.active{color:var(--accent);border-bottom-color:var(--accent);}
 
@@ -173,7 +174,11 @@ textarea.form-input{resize:vertical;min-height:90px;}
 .settings-section{margin-bottom:32px;}
 .settings-section-title{font-family:var(--mono);font-size:10px;letter-spacing:.2em;color:var(--accent);text-transform:uppercase;margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border);}
 .tag-editor{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;}
-.tag{display:flex;align-items:center;gap:6px;background:#060a10;border:1px solid var(--border);border-radius:4px;padding:6px 10px;font-family:var(--mono);font-size:12px;color:var(--text);}
+.tag{display:flex;align-items:center;gap:6px;background:#060a10;border:1px solid var(--border);border-radius:4px;padding:6px 10px;font-family:var(--mono);font-size:12px;color:var(--text);cursor:grab;user-select:none;transition:opacity .15s,border-color .15s;}
+.tag:active{cursor:grabbing;}
+.tag.drag-over{border-color:var(--accent);opacity:.7;}
+.tag.dragging{opacity:.3;}
+.tag-handle{color:var(--dim);font-size:11px;margin-right:2px;cursor:grab;}
 .tag-del{background:none;border:none;color:var(--dim);cursor:pointer;font-size:14px;padding:0;line-height:1;}
 .tag-del:hover{color:var(--red);}
 .tag-add-row{display:flex;gap:8px;}
@@ -183,7 +188,12 @@ textarea.form-input{resize:vertical;min-height:90px;}
 .tag-add-btn:hover{background:rgba(0,170,255,.25);}
 .settings-save{font-family:var(--head);font-size:14px;font-weight:700;letter-spacing:.1em;background:var(--green);border:none;border-radius:8px;padding:12px 28px;color:#000;cursor:pointer;text-transform:uppercase;margin-top:12px;}
 .settings-save:hover{opacity:.85;}
+.settings-save:disabled{opacity:.5;cursor:default;}
 .settings-flash{font-family:var(--mono);font-size:11px;color:var(--green);margin-left:14px;opacity:0;transition:opacity .3s;}
+.settings-sync-status{font-family:var(--mono);font-size:10px;letter-spacing:.08em;margin-bottom:16px;padding:8px 12px;border-radius:5px;border:1px solid var(--border);color:var(--dim);}
+.settings-sync-status.ok{color:var(--green);border-color:rgba(0,230,118,.3);background:rgba(0,230,118,.06);}
+.settings-sync-status.err{color:var(--amber);border-color:rgba(255,171,0,.3);background:rgba(255,171,0,.06);}
+.settings-sync-status.loading{color:var(--accent);border-color:rgba(0,170,255,.3);background:rgba(0,170,255,.06);}
 
 /* ── SETTINGS PIN SCREEN ── */
 #s-settings-pin{min-height:100vh;align-items:center;justify-content:center;flex-direction:column;}
@@ -660,7 +670,7 @@ textarea.form-input{resize:vertical;min-height:90px;}
         <div id="ctDefaultBtns" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;width:100%;">
           <button class="ct-action-btn ct-book-btn" onclick="openBookModal()">＋ BOOK SLOT</button>
           <button class="ct-action-btn ct-cancel-btn" onclick="openCancelModal()">✕ CANCEL SLOT</button>
-          <a class="ct-action-btn" href="https://docs.google.com/spreadsheets/d/1fnMYghrTIi8EdHDN6JxFrAdqqFMuRbnB4Oj8041Y5ZY/edit?gid=818960255" target="_blank" style="background:rgba(58,85,112,.15);color:var(--dim);border:1px solid var(--border);text-decoration:none;">↗ ATC SHEET</a>
+          <a class="ct-action-btn" href="https://docs.google.com/spreadsheets/d/1fnMYghrTIi8EdHDN6JxFrAdqqFMuRbnB4Oj8041Y5ZY/edit?gid=818960255" target="_blank" rel="noopener noreferrer" style="background:rgba(58,85,112,.15);color:var(--dim);border:1px solid var(--border);text-decoration:none;">↗ ATC SHEET</a>
           <div style="display:flex;align-items:center;gap:8px;margin-left:auto;">
             <div class="ct-status-dot" id="ctDot"></div>
             <span class="ct-status-lbl" id="ctLbl">LOADING…</span>
@@ -851,6 +861,8 @@ textarea.form-input{resize:vertical;min-height:90px;}
     </div>
     <div class="settings-body">
 
+      <div class="settings-sync-status loading" id="syncStatus">⟳ LOADING SETTINGS FROM CLOUD…</div>
+
       <div class="settings-section">
         <div class="settings-section-title">Aircraft Registrations</div>
         <div class="tag-editor" id="acTags"></div>
@@ -861,7 +873,7 @@ textarea.form-input{resize:vertical;min-height:90px;}
       </div>
 
       <div class="settings-section">
-        <div class="settings-section-title">Instructors</div>
+        <div class="settings-section-title">Instructors / Pilots in Command</div>
         <div class="tag-editor" id="instrTags"></div>
         <div class="tag-add-row">
           <input class="tag-input" id="instrInput" placeholder="Name - Rating">
@@ -898,28 +910,12 @@ textarea.form-input{resize:vertical;min-height:90px;}
             <div class="form-label" style="margin-bottom:8px;">From Address</div>
             <input class="form-input" id="fromEmail" type="email" placeholder="ops@example.com">
           </div>
-          <div>
-            <div class="form-label" style="margin-bottom:8px;">EmailJS Service ID</div>
-            <input class="form-input" id="ejsService" placeholder="service_xxxxxxx">
-          </div>
-          <div>
-            <div class="form-label" style="margin-bottom:8px;">EmailJS Template ID</div>
-            <input class="form-input" id="ejsTemplate" placeholder="template_xxxxxxx">
-          </div>
-          <div style="grid-column:1/-1;">
-            <div class="form-label" style="margin-bottom:8px;">EmailJS Public Key</div>
-            <input class="form-input" id="ejsKey" placeholder="Your EmailJS public key">
-          </div>
-        </div>
-        <div style="margin-top:12px;background:#060a10;border:1px solid var(--border);border-radius:6px;padding:12px 14px;font-family:var(--mono);font-size:10px;color:var(--dim);line-height:1.8;">
-          To enable email sending: create a free account at <span style="color:var(--accent)">emailjs.com</span>, set up a service (Gmail/SMTP), create a template, then paste the IDs above.<br>
-          Template variables to include: <span style="color:var(--text)">{{aircraft}}, {{dep_time}}, {{instructor}}, {{pob}}, {{route}}, {{duration}}, {{destination}}, {{notes}}, {{eta}}</span>
         </div>
       </div>
 
       <div>
-        <button class="settings-save" onclick="saveSettings()">SAVE ALL SETTINGS</button>
-        <span class="settings-flash" id="settingsFlash">✓ SAVED</span>
+        <button class="settings-save" onclick="saveSettings()" id="saveBtn">SAVE ALL SETTINGS</button>
+        <span class="settings-flash" id="settingsFlash">✓ SAVED TO CLOUD</span>
       </div>
     </div>
   </div>
@@ -938,6 +934,9 @@ textarea.form-input{resize:vertical;min-height:90px;}
 
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <script>
+// ══ SETTINGS SCRIPT URL ═══════════════════════════
+const SETTINGS_SCRIPT_URL = 'YOUR_SETTINGS_SCRIPT_URL_HERE';
+
 // ══ DEFAULTS ══════════════════════════════════════
 const DEFAULTS = {
   ac:       ['G-BCGJ','G-BTGO','G-FIAT','N150PK','G-MKAS','G-PETR','G-EGTB','G-BOTN','G-HRYZ','G-SETG'],
@@ -953,15 +952,13 @@ const DEFAULTS = {
              'Dual to Solo Check (Details in notes)','Other'],
   dest:     ['Oxford','Enstone','Leicester','Wellesbourne','Thruxton','Kemble','Other'],
   atcEmail: 'atc1@londonoxfordairport.com',
-  fromEmail:'ops@limasierra.org',
-  ejsService:'',ejsTemplate:'',ejsKey:''
+  fromEmail:'ops@limasierra.org'
 };
 
 // ══ STATE ══════════════════════════════════════════
-let ST = loadSettings();
+let ST = loadSettingsFromCache();
 
-
-function loadSettings() {
+function loadSettingsFromCache() {
   try {
     const s = JSON.parse(localStorage.getItem('lsa_settings') || '{}');
     return {
@@ -970,16 +967,44 @@ function loadSettings() {
       route:     s.route     || [...DEFAULTS.route],
       dest:      s.dest      || [...DEFAULTS.dest],
       atcEmail:  s.atcEmail  || DEFAULTS.atcEmail,
-      fromEmail: s.fromEmail || DEFAULTS.fromEmail,
-      ejsService:s.ejsService|| '',
-      ejsTemplate:s.ejsTemplate||'',
-      ejsKey:    s.ejsKey    || ''
+      fromEmail: s.fromEmail || DEFAULTS.fromEmail
     };
-  } catch(e){ return {...DEFAULTS, ac:[...DEFAULTS.ac], instr:[...DEFAULTS.instr], route:[...DEFAULTS.route], dest:[...DEFAULTS.dest]}; }
+  } catch(e) {
+    return {
+      ac:[...DEFAULTS.ac], instr:[...DEFAULTS.instr],
+      route:[...DEFAULTS.route], dest:[...DEFAULTS.dest],
+      atcEmail:DEFAULTS.atcEmail, fromEmail:DEFAULTS.fromEmail
+    };
+  }
 }
 
-function saveSettingsToStorage() {
+function saveSettingsToCache() {
   localStorage.setItem('lsa_settings', JSON.stringify(ST));
+}
+
+// ── Fetch settings from cloud ──────────────────────
+async function fetchSettingsFromCloud() {
+  if(!SETTINGS_SCRIPT_URL || SETTINGS_SCRIPT_URL.includes('YOUR_SETTINGS')) return null;
+  try {
+    const res = await fetch(SETTINGS_SCRIPT_URL + '?action=getSettings');
+    const data = await res.json();
+    if(data.ok && data.settings) return data.settings;
+    return null;
+  } catch(e) { return null; }
+}
+
+// ── Save settings to cloud ────────────────────────
+async function saveSettingsToCloud(settings) {
+  if(!SETTINGS_SCRIPT_URL || SETTINGS_SCRIPT_URL.includes('YOUR_SETTINGS')) return false;
+  try {
+    const res = await fetch(SETTINGS_SCRIPT_URL, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ action: 'saveSettings', settings })
+    });
+    const data = await res.json();
+    return data.ok === true;
+  } catch(e) { return false; }
 }
 
 // ══ SCREENS ════════════════════════════════════════
@@ -998,9 +1023,23 @@ function checkPin() {
     showScreen('s-app');
     document.getElementById('pinInput').value = '';
     document.getElementById('pinErr').textContent = '';
-    buildForm();
     startClock();
     switchTab('booking', document.querySelector('.tab-btn'));
+    // Fetch fresh settings from cloud then build form
+    fetchSettingsFromCloud().then(cloud => {
+      if(cloud) {
+        ST = {
+          ac:        cloud.ac        || ST.ac,
+          instr:     cloud.instr     || ST.instr,
+          route:     cloud.route     || ST.route,
+          dest:      cloud.dest      || ST.dest,
+          atcEmail:  cloud.atcEmail  || ST.atcEmail,
+          fromEmail: cloud.fromEmail || ST.fromEmail
+        };
+        saveSettingsToCache();
+      }
+      buildForm();
+    });
   } else {
     document.getElementById('pinErr').textContent = 'Incorrect PIN';
     document.getElementById('pinInput').value = '';
@@ -1483,15 +1522,40 @@ function renderSlotsGrid(json) {
 
 // ══ SETTINGS UI ════════════════════════════════════
 function loadSettingsUI() {
-  renderTags('acTags', ST.ac, 'ac');
+  const status = document.getElementById('syncStatus');
+  status.className = 'settings-sync-status loading';
+  status.textContent = '⟳ LOADING SETTINGS FROM CLOUD…';
+
+  fetchSettingsFromCloud().then(cloud => {
+    if(cloud) {
+      ST = {
+        ac:        cloud.ac        || ST.ac,
+        instr:     cloud.instr     || ST.instr,
+        route:     cloud.route     || ST.route,
+        dest:      cloud.dest      || ST.dest,
+        atcEmail:  cloud.atcEmail  || ST.atcEmail,
+        fromEmail: cloud.fromEmail || ST.fromEmail
+      };
+      saveSettingsToCache();
+      status.className = 'settings-sync-status ok';
+      status.textContent = '✓ SETTINGS LOADED FROM CLOUD';
+    } else {
+      status.className = 'settings-sync-status err';
+      status.textContent = SETTINGS_SCRIPT_URL.includes('YOUR_SETTINGS')
+        ? '⚠ CLOUD SYNC NOT CONFIGURED — USING LOCAL SETTINGS'
+        : '⚠ COULD NOT REACH CLOUD — SHOWING CACHED SETTINGS';
+    }
+    renderAllTags();
+    document.getElementById('atcEmail').value  = ST.atcEmail;
+    document.getElementById('fromEmail').value = ST.fromEmail;
+  });
+}
+
+function renderAllTags() {
+  renderTags('acTags',    ST.ac,    'ac');
   renderTags('instrTags', ST.instr, 'instr');
   renderTags('routeTags', ST.route, 'route');
-  renderTags('destTags', ST.dest, 'dest');
-  document.getElementById('atcEmail').value  = ST.atcEmail;
-  document.getElementById('fromEmail').value = ST.fromEmail;
-  document.getElementById('ejsService').value  = ST.ejsService;
-  document.getElementById('ejsTemplate').value = ST.ejsTemplate;
-  document.getElementById('ejsKey').value     = ST.ejsKey;
+  renderTags('destTags',  ST.dest,  'dest');
 }
 
 function renderTags(containerId, items, key) {
@@ -1500,24 +1564,46 @@ function renderTags(containerId, items, key) {
   items.forEach((item, i) => {
     const tag = document.createElement('div');
     tag.className = 'tag';
-    tag.innerHTML = `<span>${item}</span><button class="tag-del" onclick="removeTag('${key}',${i})">×</button>`;
+    tag.draggable = true;
+    tag.dataset.index = i;
+    tag.dataset.key = key;
+    tag.innerHTML = `<span class="tag-handle">⠿</span><span>${item}</span><button class="tag-del" onclick="removeTag('${key}',${i})">×</button>`;
+
+    // Drag events
+    tag.addEventListener('dragstart', e => {
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', JSON.stringify({key, idx: i}));
+      tag.classList.add('dragging');
+    });
+    tag.addEventListener('dragend', () => tag.classList.remove('dragging'));
+    tag.addEventListener('dragover', e => { e.preventDefault(); tag.classList.add('drag-over'); });
+    tag.addEventListener('dragleave', () => tag.classList.remove('drag-over'));
+    tag.addEventListener('drop', e => {
+      e.preventDefault();
+      tag.classList.remove('drag-over');
+      const from = JSON.parse(e.dataTransfer.getData('text/plain'));
+      if(from.key !== key || from.idx === i) return;
+      const arr = ST[key];
+      const moved = arr.splice(from.idx, 1)[0];
+      arr.splice(i, 0, moved);
+      renderTags(containerId, arr, key);
+    });
+
     container.appendChild(tag);
   });
 }
 
 function removeTag(key, idx) {
-  const map = {ac:'ac',instr:'instr',route:'route',dest:'dest'};
-  ST[map[key]].splice(idx,1);
-  renderTags(key+'Tags', ST[map[key]], key);
+  ST[key].splice(idx, 1);
+  renderTags(key+'Tags', ST[key], key);
 }
 
 function addTag(key) {
   const inputId = key+'Input';
   const val = document.getElementById(inputId).value.trim();
   if(!val) return;
-  const map = {ac:'ac',instr:'instr',route:'route',dest:'dest'};
-  ST[map[key]].push(val);
-  renderTags(key+'Tags', ST[map[key]], key);
+  ST[key].push(val);
+  renderTags(key+'Tags', ST[key], key);
   document.getElementById(inputId).value = '';
 }
 
@@ -1529,16 +1615,38 @@ function addTag(key) {
   });
 });
 
-function saveSettings() {
-  ST.atcEmail   = document.getElementById('atcEmail').value.trim();
-  ST.fromEmail  = document.getElementById('fromEmail').value.trim();
-  ST.ejsService = document.getElementById('ejsService').value.trim();
-  ST.ejsTemplate= document.getElementById('ejsTemplate').value.trim();
-  ST.ejsKey     = document.getElementById('ejsKey').value.trim();
-  saveSettingsToStorage();
+async function saveSettings() {
+  ST.atcEmail  = document.getElementById('atcEmail').value.trim();
+  ST.fromEmail = document.getElementById('fromEmail').value.trim();
+  saveSettingsToCache();
+
+  const btn = document.getElementById('saveBtn');
   const flash = document.getElementById('settingsFlash');
+  btn.disabled = true;
+  btn.textContent = 'SAVING…';
+
+  const ok = await saveSettingsToCloud(ST);
+
+  btn.disabled = false;
+  btn.textContent = 'SAVE ALL SETTINGS';
+
+  const status = document.getElementById('syncStatus');
+  if(ok) {
+    status.className = 'settings-sync-status ok';
+    status.textContent = '✓ SETTINGS SAVED TO CLOUD — ALL DEVICES WILL UPDATE';
+    flash.textContent = '✓ SAVED TO CLOUD';
+  } else {
+    status.className = 'settings-sync-status err';
+    status.textContent = SETTINGS_SCRIPT_URL.includes('YOUR_SETTINGS')
+      ? '⚠ CLOUD SYNC NOT CONFIGURED — SAVED LOCALLY ONLY'
+      : '⚠ CLOUD SAVE FAILED — SAVED LOCALLY ONLY';
+    flash.textContent = '✓ SAVED LOCALLY';
+  }
   flash.style.opacity = '1';
-  setTimeout(()=>flash.style.opacity='0', 2500);
+  setTimeout(() => flash.style.opacity = '0', 3000);
+
+  // Rebuild form with updated settings
+  buildForm();
 }
 
 // ══ CIRCUIT SLOT BOOKING & CANCELLATION ════════════════════════
