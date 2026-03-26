@@ -734,16 +734,16 @@ textarea.form-input{resize:vertical;min-height:90px;}
 <div class="ct-modal-overlay" id="bookModalOverlay" onclick="closeBookModal(event)">
   <div class="ct-modal">
     <div class="ct-modal-head">
-      <span class="ct-modal-title">BOOK CIRCUIT SLOT</span>
+      <span class="ct-modal-title" id="bookModalTitle">BOOK CIRCUIT SLOT</span>
       <button class="ct-modal-close" onclick="closeBookModal()">✕</button>
     </div>
     <div class="ct-modal-body">
       <div class="ct-field">
         <label class="ct-label">LANE</label>
         <div class="ct-radio-row">
-          <label class="ct-radio-opt"><input type="radio" name="bookLane" value="CCT1" checked> CCT 1</label>
-          <label class="ct-radio-opt"><input type="radio" name="bookLane" value="CCT2"> CCT 2</label>
-          <label class="ct-radio-opt"><input type="radio" name="bookLane" value="ARR"> ARR</label>
+          <label class="ct-radio-opt"><input type="radio" name="bookLane" value="CCT1" checked onchange="updateBookModalTitle()"> CCT 1</label>
+          <label class="ct-radio-opt"><input type="radio" name="bookLane" value="CCT2" onchange="updateBookModalTitle()"> CCT 2</label>
+          <label class="ct-radio-opt"><input type="radio" name="bookLane" value="ARR" onchange="updateBookModalTitle()"> ARR</label>
         </div>
       </div>
       <div class="ct-field-row">
@@ -1672,10 +1672,17 @@ function openBookModal(prefillLane, prefillStart, prefillEnd) {
     const laneInput = document.querySelector(`input[name="bookLane"][value="${prefillLane}"]`);
     if(laneInput) laneInput.checked = true;
   }
+  updateBookModalTitle();
   document.getElementById('bookName').value = '';
   document.getElementById('bookNotes').value = '';
   document.getElementById('bookErr').textContent = '';
   document.getElementById('bookModalOverlay').classList.add('open');
+}
+
+function updateBookModalTitle() {
+  const lane = document.querySelector('input[name="bookLane"]:checked')?.value || '';
+  document.getElementById('bookModalTitle').textContent =
+    lane === 'ARR' ? 'BOOK APPROACH SLOT' : 'BOOK CIRCUIT SLOT';
 }
 
 function closeBookModal(e) {
@@ -1698,9 +1705,10 @@ function submitBookSlot() {
   if(!name)  { err.textContent = 'Please enter your name.'; return; }
   err.textContent = '';
 
-  const subject = `CIRCUIT SLOT REQUEST — ${ac} ${lane} ${start}–${end} UTC`;
+  const slotType = lane === 'ARR' ? 'APPROACH SLOT REQUEST' : 'CIRCUIT SLOT REQUEST';
+  const subject = `${slotType} — ${ac} ${lane} ${start}–${end} UTC`;
   const body =
-    `CIRCUIT SLOT REQUEST
+    `${slotType}
 ` +
     `─────────────────────────────
 ` +
@@ -1977,6 +1985,7 @@ function bookFromSelection() {
 
   // Pre-fill book modal
   document.querySelector('input[name="bookLane"][value="'+first.lane+'"]').checked = true;
+  updateBookModalTitle();
   document.getElementById('bookStart').value = first.tStr;
   document.getElementById('bookEnd').value   = endStr;
   document.getElementById('bookName').value  = '';
