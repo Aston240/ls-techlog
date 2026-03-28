@@ -343,10 +343,13 @@ canvas { display: block; max-width: 100%; }
       <div class="tool-hint" id="formStatusHint">Upload the blank PDF template to fill</div>
     </div>
     <div class="canvas-wrap" id="formPreviewWrap">
-      <div class="empty-state">
+      <div class="canvas-container" id="formCanvasContainer" style="display:none">
+        <canvas id="formPreviewCanvas"></canvas>
+      </div>
+      <div class="empty-state" id="formPreviewEmpty">
         <div class="empty-icon">📄</div>
         <h2>No Form Selected</h2>
-        <p>Select a student and form above, then fill in the details on the left to generate the completed PDF.</p>
+        <p>Select a student and form to see a live preview.</p>
       </div>
     </div>
   </div>
@@ -450,6 +453,9 @@ let certSigDataUrl = null;
 // Form state
 let formTemplateFiles = {}; // srg5016/5017/5019 -> ArrayBuffer
 let currentFormKey = '';
+let previewPdjsDocs = {}; // cache rendered pdf.js docs per form
+let previewCurrentPage = 1;
+let previewRenderTimeout = null;
 
 // ══ TABS ══
 function switchTab(tab) {
@@ -770,17 +776,17 @@ const FORM_FIELDS = {
     label: 'SRG5016 — PPL/LAPL Course Completion',
     pages: 5,
     sections: [
-      { title: 'Training Organisation', fields: [
+      { title: 'Training Organisation', page: 1, fields: [
         { id: 'Name of organisation', label: 'Organisation Name', default: 'LS Airmotive' },
         { id: 'ATO Certificate or DTO Declaration reference number', label: 'ATO/DTO Ref Number', default: 'DTO.0258' }
       ]},
-      { title: 'Student Details', fields: [
+      { title: 'Student Details', page: 1, fields: [
         { id: 'Title', label: 'Title', studentField: 'title' },
         { id: 'Forenames', label: 'Forename(s)', studentField: 'forenames' },
         { id: 'Surname', label: 'Surname', studentField: 'surname' },
         { id: 'Date of Birth ddmmyyyy', label: 'Date of Birth (dd/mm/yyyy)', studentField: 'dob' },
       ]},
-      { title: 'Course Completed', type: 'checkboxes', checkboxes: [
+      { title: 'Course Completed', page: 1, type: 'checkboxes', checkboxes: [
         { id: 'Check Box1', label: 'PPL(A) Flight training' },
         { id: 'Check Box2', label: 'PPL(H) Flight training' },
         { id: 'Check Box3', label: 'LAPL(A) Extension' },
@@ -790,34 +796,34 @@ const FORM_FIELDS = {
         { id: 'Check Box7', label: 'Conversion of an ICAO PPL' },
         { id: 'Check Box8', label: 'Military Aircrew Accreditation' },
       ]},
-      { title: 'Theoretical Knowledge — Common Subjects', type: 'examTable', subjects: [
+      { title: 'Theoretical Knowledge — Common Subjects', page: 1, type: 'examTable', subjects: [
         'Air Law','Human Performance','Meteorology','Communications','Navigation'
       ]},
-      { title: 'Theoretical Knowledge — Aeroplane Subjects', type: 'examTable', subjects: [
+      { title: 'Theoretical Knowledge — Aeroplane Subjects', page: 1, type: 'examTable', subjects: [
         'Principles of Flight  Aeroplane','Operational Procedures  Aeroplane',
         'Flight Performance and Planning  Aeroplane','Aircraft General Knowledge  Aeroplane'
       ]},
-      { title: 'Section 6 — Ground Examiner Certification', fields: [
+      { title: 'Section 6 — Ground Examiner Certification', page: 2, fields: [
         { id: 'Name', label: 'Ground Examiner Name', default: 'Tom Newell' },
         { id: 'Ground Examiners CAA personal reference number', label: 'Ground Examiner CAA Ref', default: '466104D' },
         { id: 'Date', label: 'Date Signed (dd/mm/yyyy)', default: 'TODAY' },
       ]},
-      { title: 'Section 7 — Course Dates & Aircraft', fields: [
+      { title: 'Section 7 — Course Dates & Aircraft', page: 2, fields: [
         { id: 'Date training course started', label: 'Course Start Date' },
         { id: 'Date training course completed', label: 'Course End Date' },
         { id: 'Aircraft Class or Type the course was conducted on', label: 'Aircraft Class/Type' },
       ]},
-      { title: 'Section 8 — PPL(A) Flight Hours', fields: [
+      { title: 'Section 8 — PPL(A) Flight Hours', page: 3, fields: [
         { id: 'Actual25 hours', label: 'Dual Instruction (Actual hrs)' },
         { id: 'Actual10 hours2', label: 'Solo Flight Time (Actual hrs)' },
         { id: 'Actual40 hours2', label: 'Total Flight Experience (Actual hrs)' },
       ]},
-      { title: 'Section 16 — Instructor Recommendation', fields: [
+      { title: 'Section 16 — Instructor Recommendation', page: 4, fields: [
         { id: 'Name_2', label: 'Instructor Name', default: HT.name },
         { id: 'Instructors CAA personal reference number', label: 'Instructor CAA Ref', default: HT.ref },
         { id: 'Date_2', label: 'Date (dd/mm/yyyy)', default: 'TODAY' },
       ]},
-      { title: 'Section 17 — HT Declaration', fields: [
+      { title: 'Section 17 — HT Declaration', page: 5, fields: [
         { id: '__ht_name', label: 'HT Name', default: HT.name, readonly: true },
         { id: '__ht_ref', label: 'HT CAA Ref', default: HT.ref, readonly: true },
         { id: '__ht_date', label: 'Date (dd/mm/yyyy)', default: 'TODAY' },
@@ -828,31 +834,31 @@ const FORM_FIELDS = {
     label: 'SRG5017 — Night Rating Course Completion',
     pages: 2,
     sections: [
-      { title: 'Applicant Details', fields: [
+      { title: 'Applicant Details', page: 1, fields: [
         { id: 'Title', label: 'Title', studentField: 'title' },
         { id: 'Forenames', label: 'Forename(s)', studentField: 'forenames' },
         { id: 'Surname', label: 'Surname', studentField: 'surname' },
         { id: 'Date of Birth', label: 'Date of Birth', studentField: 'dob' },
         { id: 'CAA Personal reference number if known', label: 'CAA Personal Ref', studentField: 'caaRef' },
       ]},
-      { title: 'Night Rating Course', fields: [
+      { title: 'Night Rating Course', page: 1, fields: [
         { id: 'Text1', label: 'Student Full Name (certify line)', studentField: 'fullname' },
         { id: 'Date course started', label: 'Course Start Date' },
         { id: 'Date course completed', label: 'Course End Date' },
       ]},
-      { title: 'Aircraft Type', type: 'checkboxes', checkboxes: [
+      { title: 'Aircraft Type', page: 1, type: 'checkboxes', checkboxes: [
         { id: 'Check Box13', label: 'Aeroplane' },
         { id: 'Check Box14', label: 'Helicopter' },
         { id: 'Check Box15', label: 'Balloon' },
         { id: 'Check Box16', label: 'Airship' },
       ]},
-      { title: 'Course Details', fields: [
+      { title: 'Course Details', page: 1, fields: [
         { id: 'Text4', label: 'Dual instruction at night (hrs)' },
         { id: 'Text5', label: 'Total hours experience at night' },
         { id: 'Text6', label: 'Take-offs & landings as PIC' },
         { id: 'Text7', label: 'Dual cross-country instruction (hrs)' },
       ]},
-      { title: 'ATO / Instructor Details', fields: [
+      { title: 'ATO / Instructor Details', page: 1, fields: [
         { id: 'Name of Approved Training Organisation ATO  Declared Training Organisation DTOFIB', label: 'Organisation Name', default: 'LS Airmotive' },
         { id: 'ATODTO approval number if applicable', label: 'ATO/DTO Approval Number', default: 'DTO.0258' },
         { id: 'Name of Head of Training if applicable', label: 'Head of Training Name', default: HT.name },
@@ -864,19 +870,19 @@ const FORM_FIELDS = {
     label: 'SRG5019 — IMC/IR(R) Course Completion',
     pages: 2,
     sections: [
-      { title: 'Applicant Details', fields: [
+      { title: 'Applicant Details', page: 1, fields: [
         { id: 'Title', label: 'Title', studentField: 'title' },
         { id: 'Forename', label: 'Forename(s)', studentField: 'forenames' },
         { id: 'Surname', label: 'Surname', studentField: 'surname' },
         { id: 'Date of Birth', label: 'Date of Birth', studentField: 'dob' },
         { id: 'CAA Reference', label: 'CAA Personal Ref', studentField: 'caaRef' },
       ]},
-      { title: 'Course Details', fields: [
+      { title: 'Course Details', page: 1, fields: [
         { id: 'Name', label: 'Student Name (certify line)', studentField: 'fullname' },
         { id: 'DDMMYYYY', label: 'Course Start Date (dd/mm/yyyy)' },
         { id: 'DDMMYYYY_2', label: 'Course End Date (dd/mm/yyyy)' },
       ]},
-      { title: 'Course Content', fields: [
+      { title: 'Course Content', page: 1, fields: [
         { id: 'Hours1', label: 'Dual instruction hours' },
         { id: 'Hours2', label: 'Solo reference to instruments hours' },
         { id: 'UK Flight Instructor certificatelicence number', label: 'FI Certificate/Licence No.' },
@@ -884,11 +890,11 @@ const FORM_FIELDS = {
         { id: 'Paper set no', label: 'Paper set no.' },
         { id: 'Pass mark', label: 'Pass mark' },
       ]},
-      { title: 'Organisation Details', fields: [
+      { title: 'Organisation Details', page: 1, fields: [
         { id: 'Name of UK Training Organisation if applicable', label: 'Training Organisation', default: 'LS Airmotive' },
         { id: 'ATO number if applicable', label: 'ATO Number', default: 'DTO.0258' },
       ]},
-      { title: 'HT / Head of Training Sign-off', fields: [
+      { title: 'HT / Head of Training Sign-off', page: 2, fields: [
         { id: 'Name4', label: 'HT Name', default: HT.name, readonly: true },
         { id: 'DDMMYYYY_4', label: 'Date (dd/mm/yyyy)', default: 'TODAY' },
       ]},
@@ -906,6 +912,127 @@ function formSelected() {
   currentFormKey = document.getElementById('formSelector').value;
   renderFormFields();
   document.getElementById('formFillBtn').disabled = !currentFormKey;
+  if (currentFormKey) renderFormPreview(1);
+}
+
+// ── LIVE PREVIEW ──
+async function renderFormPreview(pageNum) {
+  const canvas = document.getElementById('formPreviewCanvas');
+  const empty  = document.getElementById('formPreviewEmpty');
+  const container = document.getElementById('formCanvasContainer');
+
+  if (!currentFormKey) {
+    container.style.display = 'none';
+    empty.style.display = 'flex';
+    return;
+  }
+
+  empty.style.display = 'none';
+  container.style.display = 'inline-block';
+  previewCurrentPage = pageNum;
+
+  // Get or load pdf.js doc for this form
+  if (!previewPdjsDocs[currentFormKey]) {
+    const ab = b64ToArrayBuffer(EMBEDDED_PDFS[currentFormKey]);
+    previewPdjsDocs[currentFormKey] = await pdfjsLib.getDocument({ data: ab }).promise;
+  }
+  const pdjsDoc = previewPdjsDocs[currentFormKey];
+
+  const page = await pdjsDoc.getPage(pageNum);
+  const vp   = page.getViewport({ scale: 1.5 });
+  canvas.width  = vp.width;
+  canvas.height = vp.height;
+  const ctx = canvas.getContext('2d');
+  await page.render({ canvasContext: ctx, viewport: vp }).promise;
+
+  // Overlay filled values using the field coordinates
+  overlayFormValues(ctx, pageNum, vp.scale);
+}
+
+function overlayFormValues(ctx, pageNum, scale) {
+  if (!currentFormKey) return;
+  const def = FORM_FIELDS[currentFormKey];
+
+  // Get pdf.js page height for coordinate flip
+  const canvas = document.getElementById('formPreviewCanvas');
+  const pageH  = canvas.height / scale; // PDF points height
+
+  ctx.save();
+  ctx.font = `${9 * scale}px Arial`;
+  ctx.fillStyle = '#0000cc';
+
+  def.sections.forEach(sec => {
+    if ((sec.page || 1) !== pageNum) return;
+
+    if (sec.fields) {
+      sec.fields.forEach(f => {
+        if (f.id.startsWith('__')) return;
+        const val = formValues[f.id];
+        if (!val) return;
+        const coord = getFieldCoord(currentFormKey, f.id);
+        if (!coord) return;
+        // coord is [left, bottom, right, top] in PDF points (y from bottom)
+        // Convert to canvas pixels: x * scale, canvas.height - top * scale
+        const x = coord[0] * scale;
+        const y = canvas.height - coord[3] * scale + (9 * scale * 0.8);
+        ctx.fillText(val, x, y);
+      });
+    }
+
+    if (sec.type === 'examTable' && sec.subjects) {
+      sec.subjects.forEach(subj => {
+        ['Date 1st Attempt','Date Passed','Credited YN'].forEach(prefix => {
+          const val = formValues[prefix + subj];
+          if (!val) return;
+          const coord = getFieldCoord(currentFormKey, prefix + subj);
+          if (!coord) return;
+          const x = coord[0] * scale;
+          const y = canvas.height - coord[3] * scale + (9 * scale * 0.8);
+          ctx.fillText(val, x, y);
+        });
+      });
+    }
+
+    if (sec.type === 'checkboxes' && sec.checkboxes) {
+      sec.checkboxes.forEach(cb => {
+        if (!formValues[cb.id]) return;
+        const coord = getFieldCoord(currentFormKey, cb.id);
+        if (!coord) return;
+        const cx = ((coord[0] + coord[2]) / 2) * scale;
+        const cy = canvas.height - ((coord[1] + coord[3]) / 2) * scale;
+        ctx.font = `bold ${10 * scale}px Arial`;
+        ctx.fillText('✓', cx - 5 * scale, cy + 4 * scale);
+        ctx.font = `${9 * scale}px Arial`;
+      });
+    }
+  });
+  ctx.restore();
+}
+
+// Field coordinate lookup — from our extracted field data
+function getFieldCoord(formKey, fieldId) {
+  return FIELD_COORDS[formKey]?.[fieldId] || null;
+}
+
+function schedulePreviewUpdate(pageNum) {
+  clearTimeout(previewRenderTimeout);
+  previewRenderTimeout = setTimeout(() => renderFormPreview(pageNum), 300);
+}
+
+// Get page for currently active section
+function getActiveSectionPage() {
+  const def = FORM_FIELDS[currentFormKey];
+  if (!def) return 1;
+  // Find first section that has focus based on scroll position
+  const panel = document.getElementById('formFieldsPanel');
+  const sections = panel.querySelectorAll('.form-section');
+  let activePage = 1;
+  sections.forEach((el, i) => {
+    if (el.getBoundingClientRect().top < window.innerHeight * 0.6) {
+      activePage = def.sections[i]?.page || 1;
+    }
+  });
+  return activePage;
 }
 
 function formStudentSearched() {
@@ -950,13 +1077,14 @@ function renderFormFields() {
   });
 
   let html = '';
-  def.sections.forEach(sec => {
-    html += `<div class="form-section"><div class="form-section-title">${sec.title}</div>`;
+  def.sections.forEach((sec, secIdx) => {
+    const pg = sec.page || 1;
+    html += `<div class="form-section" data-page="${pg}" onclick="renderFormPreview(${pg})"><div class="form-section-title">${sec.title} <span style="font-size:0.6rem;color:var(--gold-dim);margin-left:0.5rem">pg ${pg}</span></div>`;
     if (sec.type === 'checkboxes') {
       sec.checkboxes.forEach(cb => {
         const chk = formValues[cb.id] ? 'checked' : '';
         html += `<div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.4rem">
-          <input type="checkbox" id="ff_${cb.id}" ${chk} onchange="formValues['${cb.id}']=this.checked" style="width:auto;padding:0;background:none;border:none" />
+          <input type="checkbox" id="ff_${cb.id}" ${chk} onchange="formValues['${cb.id}']=this.checked;schedulePreviewUpdate(${pg})" style="width:auto;padding:0;background:none;border:none" />
           <label for="ff_${cb.id}" style="color:var(--white);font-size:0.78rem;cursor:pointer">${cb.label}</label>
         </div>`;
       });
@@ -966,9 +1094,9 @@ function renderFormFields() {
         const shortSubj = subj.replace('  Aeroplane','').replace('  Helicopter','').replace(' - Aeroplane','');
         html += `<tr>
           <td class="subject-name">${shortSubj}</td>
-          <td><input type="text" placeholder="dd/mm/yy" value="${formValues['Date 1st Attempt'+subj]||''}" oninput="formValues['Date 1st Attempt${subj}']=this.value" /></td>
-          <td><input type="text" placeholder="dd/mm/yy" value="${formValues['Date Passed'+subj]||''}" oninput="formValues['Date Passed${subj}']=this.value" /></td>
-          <td><input type="text" placeholder="Y/N" value="${formValues['Credited YN'+subj]||''}" oninput="formValues['Credited YN${subj}']=this.value" /></td>
+          <td><input type="text" placeholder="dd/mm/yy" value="${formValues['Date 1st Attempt'+subj]||''}" oninput="formValues['Date 1st Attempt${subj}']=this.value;schedulePreviewUpdate(${pg})" /></td>
+          <td><input type="text" placeholder="dd/mm/yy" value="${formValues['Date Passed'+subj]||''}" oninput="formValues['Date Passed${subj}']=this.value;schedulePreviewUpdate(${pg})" /></td>
+          <td><input type="text" placeholder="Y/N" value="${formValues['Credited YN'+subj]||''}" oninput="formValues['Credited YN${subj}']=this.value;schedulePreviewUpdate(${pg})" /></td>
         </tr>`;
       });
       html += '</tbody></table>';
@@ -976,15 +1104,119 @@ function renderFormFields() {
       sec.fields.forEach(f => {
         const val = formValues[f.id] || '';
         const ro = f.readonly ? 'readonly style="opacity:0.6"' : '';
-        html += `<div class="field"><label>${f.label}</label><input type="text" value="${escHtml(val)}" ${ro} oninput="formValues['${f.id}']=this.value" /></div>`;
+        html += `<div class="field"><label>${f.label}</label><input type="text" value="${escHtml(val)}" ${ro} oninput="formValues['${f.id}']=this.value;schedulePreviewUpdate(${pg})" /></div>`;
       });
     }
     html += '</div>';
   });
   panel.innerHTML = html;
+
+  // Render first page immediately
+  renderFormPreview(1);
 }
 
-function refreshFormStudentList() {
+// ── FIELD COORDINATES (from extracted form field data, rect = [left, bottom, right, top]) ──
+const FIELD_COORDS = {
+  srg5016: {
+    'Name of organisation':                              [143.76, 578.12, 553.44, 594.44],
+    'ATO Certificate or DTO Declaration reference number': [302.04, 553.16, 555.12, 569.48],
+    'Title':                                             [59.64,  462.2,  103.68, 478.52],
+    'Forenames':                                         [174.96, 462.2,  559.68, 478.52],
+    'Surname':                                           [83.16,  443.24, 325.08, 459.56],
+    'Date of Birth ddmmyyyy':                            [460.56, 443.24, 559.56, 459.56],
+    'Check Box1':  [268.401, 383.427, 286.401, 401.427],
+    'Check Box2':  [268.401, 359.863, 286.401, 377.863],
+    'Check Box3':  [268.401, 335.645, 286.401, 353.645],
+    'Check Box4':  [268.401, 312.081, 286.401, 330.081],
+    'Check Box5':  [268.401, 289.172, 286.401, 307.172],
+    'Check Box6':  [539.384, 383.427, 557.384, 401.427],
+    'Check Box7':  [539.384, 359.863, 557.384, 377.863],
+    'Check Box8':  [539.384, 335.645, 557.384, 353.645],
+    'Date 1st AttemptAir Law':                           [285.083, 227.84, 383.08, 241.52],
+    'Date PassedAir Law':                                [384.4,   227.84, 475.0,  241.52],
+    'Credited YNAir Law':                                [476.8,   227.84, 567.16, 241.52],
+    'Date 1st AttemptHuman Performance':                 [285.084, 213.2,  383.08, 226.76],
+    'Date PassedHuman Performance':                      [384.4,   213.2,  475.0,  226.76],
+    'Credited YNHuman Performance':                      [476.8,   213.2,  567.16, 226.76],
+    'Date 1st AttemptMeteorology':                       [285.084, 198.56, 383.08, 212.12],
+    'Date PassedMeteorology':                            [384.4,   198.56, 475.0,  212.12],
+    'Credited YNMeteorology':                            [476.8,   198.56, 567.16, 212.12],
+    'Date 1st AttemptCommunications':                    [285.084, 183.92, 383.08, 197.48],
+    'Date PassedCommunications':                         [384.4,   183.92, 475.0,  197.48],
+    'Credited YNCommunications':                         [476.8,   183.92, 567.16, 197.48],
+    'Date 1st AttemptNavigation':                        [285.084, 169.28, 383.08, 182.84],
+    'Date PassedNavigation':                             [384.4,   169.28, 475.0,  182.84],
+    'Credited YNNavigation':                             [476.8,   169.28, 567.16, 182.84],
+    'Date 1st AttemptPrinciples of Flight  Aeroplane':   [285.084, 138.92, 383.08, 152.6],
+    'Date PassedPrinciples of Flight  Aeroplane':        [384.4,   138.92, 475.0,  152.6],
+    'Credited YNPrinciples of Flight  Aeroplane':        [476.8,   138.92, 567.16, 152.6],
+    'Date 1st AttemptOperational Procedures  Aeroplane': [285.084, 124.28, 383.08, 137.84],
+    'Date PassedOperational Procedures  Aeroplane':      [384.4,   124.28, 475.0,  137.84],
+    'Credited YNOperational Procedures  Aeroplane':      [476.8,   124.28, 567.16, 137.84],
+    'Date 1st AttemptFlight Performance and Planning  Aeroplane': [285.084, 109.64, 383.08, 123.2],
+    'Date PassedFlight Performance and Planning  Aeroplane':      [384.4,   109.64, 475.0,  123.2],
+    'Credited YNFlight Performance and Planning  Aeroplane':      [476.8,   109.64, 567.16, 123.2],
+    'Date 1st AttemptAircraft General Knowledge  Aeroplane':      [285.084, 95.0,   383.08, 108.56],
+    'Date PassedAircraft General Knowledge  Aeroplane':           [384.4,   95.0,   475.0,  108.56],
+    'Credited YNAircraft General Knowledge  Aeroplane':           [476.8,   95.0,   567.16, 108.56],
+    'Name':                                              [374.16, 313.52, 548.28, 332.513],
+    'Ground Examiners CAA personal reference number':    [297.0,  286.52, 415.8,  303.32],
+    'Date':                                              [468.72, 287.96, 548.64, 306.298],
+    'Date training course started':                      [176.007, 220.4, 295.451, 242.36],
+    'Date training course completed':                    [461.847, 220.4, 565.32,  242.36],
+    'Aircraft Class or Type the course was conducted on': [297.884, 197.24, 565.32, 219.08],
+    'Actual25 hours':   [505.0,   711.967, 567.16, 728.942],
+    'Actual10 hours2':  [505.196, 642.487, 566.44, 709.382],
+    'Actual40 hours2':  [505.0,   623.647, 567.16, 639.575],
+    'Name_2':           [358.194, 103.83,  543.354, 123.652],
+    'Instructors CAA personal reference number': [277.6, 75.6, 396.4, 92.4],
+    'Date_2':           [467.994, 78.75,   545.034, 98.572],
+  },
+  srg5017: {
+    'Title':            [56.04,  614.04, 89.04,  627.6],
+    'Forenames':        [158.4,  614.04, 290.4,  627.24],
+    'Surname':          [358.32, 614.04, 518.28, 627.6],
+    'Date of Birth':    [412.56, 630.84, 509.52, 644.04],
+    'CAA Personal reference number if known': [210.48, 628.44, 349.8, 644.04],
+    'Text1':            [115.2,  565.99, 271.483, 579.088],
+    'Date course started':   [118.92, 478.2, 195.0,  491.76],
+    'Date course completed': [295.32, 478.2, 379.2,  491.76],
+    'Check Box13': [76.9743,  490.398, 94.9743, 508.398],
+    'Check Box14': [156.567,  491.445, 174.567, 509.445],
+    'Check Box15': [235.112,  490.921, 253.112, 508.921],
+    'Check Box16': [314.181,  491.445, 332.181, 509.445],
+    'Text4': [32.1416, 438.747, 60.1347, 456.034],
+    'Text5': [32.1416, 423.303, 60.1347, 440.591],
+    'Text6': [32.1416, 406.023, 60.1347, 423.311],
+    'Text7': [32.1416, 388.976, 60.1347, 406.263],
+    'Name of Approved Training Organisation ATO  Declared Training Organisation DTOFIB': [33.6, 196.2, 530.16, 209.76],
+    'ATODTO approval number if applicable': [204.72, 179.28, 305.88, 192.84],
+    'Name of Head of Training if applicable': [203.04, 163.2,  532.68, 176.76],
+    'Date': [476.16, 119.88, 554.64, 133.44],
+  },
+  srg5019: {
+    'Title':       [45.7527,  568.396, 95.6727,  583.156],
+    'Forename':    [170.433,  568.396, 302.073,  583.156],
+    'Surname':     [345.873,  568.396, 525.153,  583.156],
+    'Date of Birth': [360.48, 584.793, 415.265,  599.88],
+    'CAA Reference': [187.097, 585.0,  302.33,   599.76],
+    'Name':        [100.173,  510.643, 288.366,  525.403],
+    'DDMMYYYY':    [171.829,  397.669, 255.829,  415.119],
+    'DDMMYYYY_2':  [441.218,  397.32,  524.978,  414.48],
+    'Hours1':      [24.3272,  255.58,  53.1707,  270.1],
+    'Hours2':      [136.385,  254.533, 165.228,  269.053],
+    'UK Flight Instructor certificatelicence number': [198.0, 173.88, 293.52, 188.4],
+    'DDMMYYYY_3':  [200.039,  51.8755, 283.799,  69.0356],
+    'Paper set no': [388.8,   54.0655, 447.6,    68.8255],
+    'Pass mark':   [494.88,   54.0655, 557.04,   68.8255],
+    'Name of UK Training Organisation if applicable': [206.76, 87.4255, 310.8, 102.185],
+    'ATO number if applicable': [415.32, 87.4255, 514.92, 102.185],
+    'Name4':       [120.594,  296.827, 296.219,  311.587],
+    'DDMMYYYY_4':  [495.369,  295.889, 573.369,  313.049],
+  }
+};
+
+// ── FIELD COORDINATES ──
   const dl = document.getElementById('formStudentList');
   dl.innerHTML = '';
   students.forEach(s => {
