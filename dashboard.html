@@ -90,7 +90,7 @@
   .live-txt { font-family:var(--mono); font-size:12px; color:var(--green); letter-spacing:0.1em; }
   .clock-time { font-family:var(--mono); font-size:35px; color:var(--accent); line-height:1; letter-spacing:0.05em; text-align:right; }
   .clock-date { font-family:var(--mono); font-size:12px; color:var(--dim); margin-top:2px; letter-spacing:.1em; text-align:right; }
-  .clock-utc  { font-family:var(--mono); font-size:12px; color:var(--dim); margin-top:1px; text-align:right; }
+  .clock-utc  { font-family:var(--mono); font-size:12px; color:var(--text); margin-top:1px; text-align:right; }
 
   /* ── COLLAPSIBLE SECTION ── */
   .slabel {
@@ -906,7 +906,7 @@ function toggleWidth(e, btn) {
 // ══════════════════════════════════════════════════════
 function tick() {
   const n = new Date();
-  document.getElementById('clkTime').textContent = n.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  document.getElementById('clkTime').textContent = n.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',second:'2-digit'}) + ' (Local)';
   document.getElementById('clkDate').textContent = n.toLocaleDateString('en-GB',{weekday:'short',day:'2-digit',month:'short',year:'numeric'});
   document.getElementById('clkUtc').textContent  = 'UTC ' + (n.toUTCString().match(/(\d\d:\d\d)/)?.[1]??'--:--') + 'Z';
 }
