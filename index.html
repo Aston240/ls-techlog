@@ -2001,7 +2001,7 @@ function rMxPlanner(){
 
   function weeksLabel(days){
     if(days===null) return null;
-    if(days<=0) return 'OVERDUE';
+    if(days<=0) return 'est. date passed';
     if(days<=7) return 'less than 1 week';
     if(days<=14) return 'in ~'+Math.round(days/7)+' weeks';
     if(days<=21) return 'in ~3 weeks';
@@ -2265,9 +2265,13 @@ function rMxPlanner(){
     // ARC excluded from action triggers — info only on card
     if(annDays!==null) deadlineMap.push({label:'Annual', days:annDays, type:'ann'});
     if(deadlineMap.length>0){
-      deadlineMap.sort(function(a,b){return a.days-b.days;});
-      drivingDeadline = deadlineMap[0].label;
-      drivingDays = deadlineMap[0].days;
+      // Filter out hours-predicted deadlines that have "passed" — they just mean burn rate slowed.
+      // Only real calendar deadlines (Annual) with days<=0 are genuinely overdue.
+      const activeDl = deadlineMap.filter(function(d){ return d.type==='ann' || d.days > 0; });
+      const sortedDl = activeDl.length > 0 ? activeDl : deadlineMap;
+      sortedDl.sort(function(a,b){return a.days-b.days;});
+      drivingDeadline = sortedDl[0].label;
+      drivingDays = sortedDl[0].days;
     }
 
     // ── Urgency tier ──
@@ -2279,7 +2283,10 @@ function rMxPlanner(){
       actionSub=esc(dtEntry&&dtEntry.reason||'') + (downtimeDays!==null?'<br>Day '+downtimeDays+' of downtime.':'');
     } else {
       rankNum++;
-      if(drivingDays!==null && drivingDays<=0){
+      // Only treat as OVERDUE if a real calendar deadline (Annual) has passed.
+      // Hours-based predicted date going past is NOT overdue — burn rate just slowed down.
+      const calendarOverdue = deadlineMap.some(function(d){ return d.type==='ann' && d.days<=0; });
+      if(calendarOverdue){
         urgTier='urgent'; label='OVERDUE'; action='OVERDUE';
         actionSub='<span style="color:#ff8080">'+drivingDeadline+'</span> is overdue.<br>Immediate action required.';
       } else if(drivingDays!==null && drivingDays<=7){
@@ -2330,7 +2337,8 @@ function rMxPlanner(){
 
     // Predicted check label: use weeks wording
     const mxWksLabel = mxDays!==null ? weeksLabel(mxDays) : null;
-    const predCol = mxDays===null?'var(--txt)':mxDays<=7?'#ff6060':mxDays<=10?'var(--amb)':'var(--grn)';
+    // Predicted check colour follows hours remaining — date passing alone is not a warning
+    const predCol = hrsRemCol;
 
     const statsArr = isGrounded
       ? [stat('Total Hrs',ac.totalHobbs.toFixed(1),'var(--acc)'),
