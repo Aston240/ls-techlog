@@ -1946,7 +1946,7 @@ function rMxPlanner(){
     const dates = Object.keys(snaps).sort();
     const cutoff = new Date(now-30*DAY).toISOString().slice(0,10);
     const recent = dates.filter(function(d){return d>=cutoff;});
-    if(recent.length<2) return ac.totalHobbs/90||0;
+    if(recent.length<2) return 0;
     const first = recent[0], last = recent[recent.length-1];
     const calDays = Math.max(1,(new Date(last)-new Date(first))/DAY);
     const hrsFlown = Math.max(0,(snaps[last]||0)-(snaps[first]||0));
@@ -1962,7 +1962,7 @@ function rMxPlanner(){
       const span = Math.max(1,(new Date(recent[recent.length-1])-new Date(recent[0]))/DAY);
       return Math.max(0,(snaps[recent[recent.length-1]]-snaps[recent[0]])/span);
     }
-    return ac.totalHobbs/90;
+    return 0; // insufficient snapshot data
   }
 
   function predictDays(ac, targetHrs){
