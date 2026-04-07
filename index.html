@@ -1780,7 +1780,10 @@ function rHours(){
     </tr></tfoot>
   </table></div>
   <p style="margin-top:11px;font-size:11px;color:var(--dim)">Click an <span style='color:var(--amb)'>■</span> manual aircraft row to add daily hours. Click an Airbly row to preview its tech log. Set maintenance dates in ⚙️ Aircraft Settings.</p>
-  <div id="daily-log-panel" style="display:none"></div>`;
+  <div id="daily-log-panel" style="display:none"></div>
+  <div style="height:32px"></div>
+  <div style="font-size:11px;font-weight:700;color:var(--mut);letter-spacing:2px;text-transform:uppercase;margin-bottom:12px;padding-bottom:6px;border-bottom:1px solid var(--border)">Monthly Utilisation — Hours Flown</div>
+  ${buildMonthlyTable()}`;
 }
 
 // ── SETTINGS ─────────────────────────────────────
@@ -2483,10 +2486,6 @@ function rMxPlanner(){
     +'<input id="dt-reason" type="text" placeholder="e.g. Awaiting engine part, Annual inspection..." style="'+inp+'"></div>'
     +'<button onclick="addDowntime()" style="background:var(--blue);color:#fff;border:none;border-radius:8px;padding:9px 22px;font-weight:700;font-size:12px;cursor:pointer;letter-spacing:.5px">+ Add Downtime Entry</button>'
     +'</div>'
-
-    +'<div style="height:28px"></div>'
-    +'<div style="font-size:11px;font-weight:700;color:var(--mut);letter-spacing:2px;text-transform:uppercase;margin-bottom:12px;padding-bottom:6px;border-bottom:1px solid var(--border)">Monthly Utilisation — Hours Flown</div>'
-    +buildMonthlyTable()
 
     +'</div>';
 }
