@@ -2571,13 +2571,31 @@ function buildMonthlyTable(){
   // Colours per aircraft
   const colours = ['#4fc3f7','#81c784','#ffb74d','#e57373','#ba68c8','#4db6ac','#fff176','#ff8a65','#90caf9','#a5d6a7'];
 
+  // ── SORT STATE ──
+  if(!ST.utilSort) ST.utilSort = {col:null, dir:1};
+  const sortCol = ST.utilSort.col;
+  const sortDir = ST.utilSort.dir;
+  if(sortCol === 'reg'){
+    acList.sort(function(a,b){ return sortDir * a.reg.localeCompare(b.reg); });
+  } else if(sortCol !== null){
+    acList.sort(function(a,b){
+      const va = data[a.reg][sortCol]||0, vb = data[b.reg][sortCol]||0;
+      return sortDir * (vb - va);
+    });
+  }
+
+  function arrow(col){
+    if(ST.utilSort.col !== col) return ' <span style="opacity:0.25">⇅</span>';
+    return ST.utilSort.dir === 1 ? ' ↑' : ' ↓';
+  }
+
   // ── TABLE ──
-  const thS = 'padding:5px 8px;text-align:right;font-size:9px;color:var(--mut);letter-spacing:.5px;text-transform:uppercase;white-space:nowrap;border-bottom:1px solid var(--border)';
+  const thS = 'padding:5px 8px;text-align:right;font-size:9px;color:var(--acc);letter-spacing:.5px;text-transform:uppercase;white-space:nowrap;border-bottom:1px solid var(--border);cursor:pointer;user-select:none';
   const tdS = 'padding:5px 8px;text-align:right;font-size:11px;color:var(--txt);white-space:nowrap;border-bottom:1px solid #1a1f2e';
   const tdR = 'padding:5px 8px;text-align:left;font-size:11px;font-weight:700;white-space:nowrap;border-bottom:1px solid #1a1f2e';
 
-  let thead = '<tr><th style="'+thS+';text-align:left">Aircraft</th>';
-  months.forEach(function(ym,i){ thead+='<th style="'+thS+'">'+monthLabels[i]+'</th>'; });
+  let thead = '<tr><th style="'+thS+';text-align:left" onclick="setUtilSort(\'reg\')">Aircraft'+arrow('reg')+'</th>';
+  months.forEach(function(ym,i){ thead+='<th style="'+thS+'" onclick="setUtilSort('+i+')">'+monthLabels[i]+arrow(i)+'</th>'; });
   thead+='<th style="'+thS+'">Total</th></tr>';
 
   let tbody = '';
@@ -2587,14 +2605,11 @@ function buildMonthlyTable(){
     const total = row.reduce(function(s,v){return s+(v||0);},0);
     tbody+='<tr>';
     tbody+='<td style="'+tdR+';color:'+col+'">'+ac.reg+'</td>';
-    row.forEach(function(v){
-      tbody+='<td style="'+tdS+'">'+(v!==null?v.toFixed(1):'—')+'</td>';
-    });
+    row.forEach(function(v){ tbody+='<td style="'+tdS+'">'+(v!==null?v.toFixed(1):'—')+'</td>'; });
     tbody+='<td style="'+tdS+';font-weight:700;color:'+col+'">'+total.toFixed(1)+'</td>';
     tbody+='</tr>';
   });
 
-  // Monthly totals row
   tbody+='<tr style="border-top:1px solid var(--border)">';
   tbody+='<td style="'+tdR+';color:var(--mut);font-size:10px">FLEET TOTAL</td>';
   let grandTotal=0;
@@ -2605,86 +2620,21 @@ function buildMonthlyTable(){
   tbody+='<td style="'+tdS+';font-weight:700;color:var(--acc)">'+grandTotal.toFixed(1)+'</td>';
   tbody+='</tr>';
 
-  const table = '<div style="overflow-x:auto;margin-bottom:24px">'
+  return '<div style="overflow-x:auto;margin-bottom:4px">'
     +'<table style="border-collapse:collapse;font-size:12px;min-width:100%">'
-    +'<thead>'+thead+'</thead><tbody>'+tbody+'</tbody></table></div>';
+    +'<thead>'+thead+'</thead><tbody>'+tbody+'</tbody></table></div>'
+    +'<div style="font-size:10px;color:var(--mut);margin-bottom:16px">Click any column header to sort ⇅</div>';
+}
 
-  // ── CHART ──
-  const chartId = 'utilChart_'+Date.now();
-  const maxVal = Math.max.apply(null, acList.map(function(ac){
-    return Math.max.apply(null, data[ac.reg].map(function(v){return v||0;}));
-  }).concat([1]));
-  const chartH = 200, chartW_pad = 48, chartTop = 16, chartBottom = 32;
-  const plotH = chartH - chartTop - chartBottom;
-
-  // Will render via canvas after DOM insertion
-  const chart = '<canvas id="'+chartId+'" height="'+chartH+'" style="width:100%;max-width:900px;display:block;margin-bottom:8px"></canvas>'
-    +'<div id="'+chartId+'_leg" style="display:flex;flex-wrap:wrap;gap:8px 18px;margin-bottom:4px"></div>'
-    +'<script>(function(){'
-    +'function drawChart(){'
-    +'var c=document.getElementById("'+chartId+'");'
-    +'if(!c){setTimeout(drawChart,100);return;}'
-    +'var W=c.offsetWidth||800; c.width=W;'
-    +'var ctx=c.getContext("2d");'
-    +'var months='+JSON.stringify(monthLabels)+';'
-    +'var data='+JSON.stringify(acList.map(function(ac,i){return {reg:ac.reg,col:colours[i%colours.length],vals:data[ac.reg]};})) +';'
-    +'var maxV='+maxVal+';'
-    +'var padL='+chartW_pad+',padR=20,padT='+chartTop+',padB='+chartBottom+';'
-    +'var pH='+plotH+';'
-    +'var pW=W-padL-padR;'
-    +'var n=months.length;'
-    +'ctx.clearRect(0,0,W,'+chartH+');'
-    // Grid lines
-    +'var gridSteps=5;'
-    +'ctx.strokeStyle="rgba(255,255,255,0.06)"; ctx.lineWidth=1;'
-    +'for(var g=0;g<=gridSteps;g++){'
-    +'var gy=padT+pH-(g/gridSteps)*pH;'
-    +'ctx.beginPath();ctx.moveTo(padL,gy);ctx.lineTo(padL+pW,gy);ctx.stroke();'
-    +'ctx.fillStyle="rgba(255,255,255,0.3)";ctx.font="9px monospace";ctx.textAlign="right";'
-    +'ctx.fillText(((maxV*g/gridSteps)).toFixed(0)+"h",padL-4,gy+3);'
-    +'}'
-    // X axis labels
-    +'ctx.fillStyle="rgba(255,255,255,0.35)";ctx.font="9px monospace";ctx.textAlign="center";'
-    +'for(var i=0;i<n;i++){'
-    +'var x=padL+(i/(n-1||1))*pW;'
-    +'ctx.fillText(months[i],x,'+chartH+'-6);'
-    +'}'
-    // Lines
-    +'data.forEach(function(ac){'
-    +'var pts=[];'
-    +'for(var i=0;i<n;i++){if(ac.vals[i]!==null){var x=padL+(i/(n-1||1))*pW;var y=padT+pH-(ac.vals[i]/maxV)*pH;pts.push({x:x,y:y,v:ac.vals[i]});}else{pts.push(null);}}'
-    +'ctx.strokeStyle=ac.col;ctx.lineWidth=1.5;ctx.setLineDash([]);'
-    +'var started=false;'
-    +'pts.forEach(function(p,i){'
-    +'if(!p){started=false;return;}'
-    +'if(!started){ctx.beginPath();ctx.moveTo(p.x,p.y);started=true;}else{ctx.lineTo(p.x,p.y);}'
-    +'});'
-    +'if(started)ctx.stroke();'
-    // Dots and values
-    +'pts.forEach(function(p){'
-    +'if(!p)return;'
-    +'ctx.fillStyle=ac.col;ctx.beginPath();ctx.arc(p.x,p.y,3,0,Math.PI*2);ctx.fill();'
-    +'ctx.fillStyle="rgba(255,255,255,0.7)";ctx.font="8px monospace";ctx.textAlign="center";'
-    +'ctx.fillText(p.v.toFixed(1),p.x,p.y-7);'
-    +'});'
-    +'});'
-    +'}'
-    // Legend
-    +'var leg=document.getElementById("'+chartId+'_leg");'
-    +'if(leg){'
-    +'var data2='+JSON.stringify(acList.map(function(ac,i){return {reg:ac.reg,col:colours[i%colours.length]};})) +';'
-    +'data2.forEach(function(ac){'
-    +'var el=document.createElement("div");'
-    +'el.style.cssText="display:flex;align-items:center;gap:5px;font-size:10px;color:"+ac.col;'
-    +'el.innerHTML=\'<span style="display:inline-block;width:18px;height:2px;background:\'+ac.col+\'"></span>\'+ac.reg;'
-    +'leg.appendChild(el);'
-    +'});'
-    +'}'
-    +'drawChart();'
-    +'window.addEventListener("resize",drawChart);'
-    +'}());<\/script>';
-
-  return table + chart;
+function setUtilSort(col){
+  if(!ST.utilSort) ST.utilSort = {col:null, dir:1};
+  if(ST.utilSort.col === col){
+    ST.utilSort.dir = ST.utilSort.dir === 1 ? -1 : 1;
+  } else {
+    ST.utilSort.col = col;
+    ST.utilSort.dir = 1;
+  }
+  render();
 }
 
 function addDowntime(){
