@@ -88,9 +88,9 @@
   .live-row { display:flex; align-items:center; gap:6px; margin-top:6px; }
   .live-dot { width:7px; height:7px; border-radius:50%; background:var(--green); animation:pulse 2s infinite; }
   .live-txt { font-family:var(--mono); font-size:12px; color:var(--green); letter-spacing:0.1em; }
-  .clock-time { font-family:var(--mono); font-size:35px; color:var(--accent); line-height:1; letter-spacing:0.05em; text-align:right; }
+  .clock-time { font-family:var(--mono); font-size:28px; color:var(--accent); line-height:1; letter-spacing:0.05em; text-align:right; }
   .clock-date { font-family:var(--mono); font-size:12px; color:var(--dim); margin-top:2px; letter-spacing:.1em; text-align:right; }
-  .clock-utc  { font-family:var(--mono); font-size:12px; color:var(--text); margin-top:1px; text-align:right; }
+  .clock-utc  { display:none; }
 
   /* ── COLLAPSIBLE SECTION ── */
   .slabel {
@@ -345,9 +345,9 @@
       </div>
     </div>
     <div>
-      <div class="clock-time" id="clkTime">--:--:--</div>
+      <div class="clock-time" id="clkTime">--:-- (Local) &nbsp; --:-- (UTC)</div>
       <div class="clock-date" id="clkDate"></div>
-      <div class="clock-utc"  id="clkUtc">UTC ----Z</div>
+      <div class="clock-utc"  id="clkUtc" style="display:none"></div>
     </div>
   </div>
 
@@ -906,9 +906,10 @@ function toggleWidth(e, btn) {
 // ══════════════════════════════════════════════════════
 function tick() {
   const n = new Date();
-  document.getElementById('clkTime').textContent = n.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',second:'2-digit'}) + ' (Local)';
+  const local = n.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+  const utc   = (n.toUTCString().match(/(\d\d:\d\d)/)?.[1] ?? '--:--');
+  document.getElementById('clkTime').textContent = local + ' (Local)   ' + utc + ' (UTC)';
   document.getElementById('clkDate').textContent = n.toLocaleDateString('en-GB',{weekday:'short',day:'2-digit',month:'short',year:'numeric'});
-  document.getElementById('clkUtc').textContent  = 'UTC ' + (n.toUTCString().match(/(\d\d:\d\d)/)?.[1]??'--:--') + 'Z';
 }
 setInterval(tick,1000); tick();
 
