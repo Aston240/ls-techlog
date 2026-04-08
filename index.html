@@ -383,20 +383,23 @@ async function syncPull(){
       localStorage.setItem('tl_snapshots',JSON.stringify(ST.hoursSnapshots));
     }
     if(remote.dailyLog && typeof remote.dailyLog==='object'){
-      // Merge daily logs — combine entries from both sides, deduplicate by date+tacho+sorties
-      Object.keys(remote.dailyLog).forEach(id=>{
-        const local=ST.dailyLog[id]||[];
-        const rem=remote.dailyLog[id]||[];
-        // Use remote as base, keep any local entries not in remote
-        const remKeys=new Set(rem.map(e=>e.date+'|'+e.tacho+'|'+e.sorties));
-        const localOnly=local.filter(e=>!remKeys.has(e.date+'|'+e.tacho+'|'+e.sorties));
-        ST.dailyLog[id]=[...rem,...localOnly];
-      });
-      // Also keep any local aircraft ids not in remote
-      Object.keys(ST.dailyLog).forEach(id=>{
-        if(!remote.dailyLog[id]) {} // keep local
-      });
-      localStorage.setItem('tl_dailylog',JSON.stringify(ST.dailyLog));
+      // Only merge remote dailyLog if it's newer than our local version
+      const remoteLogTs = remote._dailyLogSavedAt || 0;
+      const localLogTs  = ST._dailyLogSavedAt || 0;
+      if(localLogTs > remoteLogTs){
+        console.log('[sync] Local dailyLog is newer than cloud — skipping remote merge, pushing local up');
+        syncPush();
+      } else {
+        // Merge: combine entries from both sides, deduplicate by date+tacho+sorties
+        Object.keys(remote.dailyLog).forEach(id=>{
+          const local=ST.dailyLog[id]||[];
+          const rem=remote.dailyLog[id]||[];
+          const remKeys=new Set(rem.map(e=>e.date+'|'+e.tacho+'|'+e.sorties));
+          const localOnly=local.filter(e=>!remKeys.has(e.date+'|'+e.tacho+'|'+e.sorties));
+          ST.dailyLog[id]=[...rem,...localOnly];
+        });
+        localStorage.setItem('tl_dailylog',JSON.stringify(ST.dailyLog));
+      }
     }
     syncStatus('ok');
     return true;
@@ -426,6 +429,7 @@ function syncPush(){
         ),
         _updated: new Date().toISOString(),
         _cfgSavedAt: ST._cfgSavedAt||0,
+        _dailyLogSavedAt: ST._dailyLogSavedAt||0,
       };
       const r=await fetch(JB.URL+JB.BIN,{
         method:'PUT',
@@ -461,6 +465,7 @@ const ST={
   dailyLog: JSON.parse(localStorage.getItem('tl_dailylog')||'{}'),
   hoursSnapshots: JSON.parse(localStorage.getItem('tl_snapshots')||'{}'),
   _cfgSavedAt: parseInt(localStorage.getItem('tl_cfg_ts')||'0'),
+  _dailyLogSavedAt: parseInt(localStorage.getItem('tl_dailylog_ts')||'0'),
   downtimeLog: JSON.parse(localStorage.getItem('tl_downtime')||'[]'),
 };
 
@@ -476,7 +481,9 @@ function saveManual(){
   syncPush();
 }
 function saveDailyLog(){
+  ST._dailyLogSavedAt = Date.now();
   localStorage.setItem('tl_dailylog',JSON.stringify(ST.dailyLog));
+  localStorage.setItem('tl_dailylog_ts', ST._dailyLogSavedAt.toString());
   syncPush();
 }
 function saveSnapshots(){
