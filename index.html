@@ -1627,17 +1627,18 @@ function buildDailyLogPanel(id, ac){
 
   const historyRows = log.length === 0
     ? `<tr><td colspan="5" style="text-align:center;color:var(--dim);font-style:italic;padding:10px">No entries yet</td></tr>`
-    : [...log].reverse().map((e,ri)=>{
-        const i = log.length - 1 - ri; // real index for deletion
+    : [...log].reverse().map((e)=>{
         const displayDate = e.display || (e.date && e.date.match(/^\d{4}-\d{2}-\d{2}$/)
           ? new Date(e.date+'T12:00:00').toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'})
           : e.date) || '—';
+        // Use date+tacho as unique fingerprint for deletion
+        const fingerprint = encodeURIComponent(e.date+'|'+e.tacho+'|'+e.sorties);
         return `<tr>
           <td style="color:var(--mut)">${esc(displayDate)}</td>
           <td style="text-align:center">${e.tacho.toFixed(2)}</td>
           <td style="text-align:center">${e.sorties}</td>
           <td style="text-align:center;color:var(--grn);font-weight:700">+${e.added.toFixed(2)}</td>
-          <td style="text-align:center"><button onclick="deleteDailyEntry('${id}',${i})" style="background:none;border:1px solid var(--red);color:var(--red);border-radius:4px;padding:1px 7px;font-size:10px;cursor:pointer">✕</button></td>
+          <td style="text-align:center"><button onclick="deleteDailyEntry('${id}','${fingerprint}')" style="background:none;border:1px solid var(--red);color:var(--red);border-radius:4px;padding:1px 7px;font-size:10px;cursor:pointer">✕</button></td>
         </tr>`;
       }).join('');
 
@@ -1755,19 +1756,19 @@ function submitDailyLog(id){
   if(panel && ac) panel.innerHTML = buildDailyLogPanel(id, ac);
 }
 
-function deleteDailyEntry(id, index){
+function deleteDailyEntry(id, fingerprint){
   if(!ST.dailyLog[id]) return;
 
-  // Sort log by date so the index matches what the user sees in the panel
-  ST.dailyLog[id].sort(function(a,b){
-    return new Date(a.date+'T12:00:00') - new Date(b.date+'T12:00:00');
+  // Find entry by fingerprint (date|tacho|sorties)
+  const key = decodeURIComponent(fingerprint);
+  const realIndex = ST.dailyLog[id].findIndex(function(e){
+    return (e.date+'|'+e.tacho+'|'+e.sorties) === key;
   });
+  if(realIndex === -1) { alert('Could not find entry to delete — please refresh and try again.'); return; }
 
-  // Panel displays newest-first (reversed), so map display index back to sorted index
-  const sortedIndex = ST.dailyLog[id].length - 1 - index;
-  const entry = ST.dailyLog[id][sortedIndex];
-  if(!entry) return;
-  if(!confirm(`Delete entry: ${entry.display||entry.date} — +${entry.added.toFixed(2)} hrs?`)) return;
+  const entry = ST.dailyLog[id][realIndex];
+  const displayDate = entry.display || entry.date;
+  if(!confirm(`Delete entry: ${displayDate} — +${entry.added.toFixed(2)} hrs?`)) return;
 
   // Reverse the hours addition
   const m = ST.manualAircraft.find(x=>x.id===id);
@@ -1781,10 +1782,8 @@ function deleteDailyEntry(id, index){
     saveManual();
   }
 
-  ST.dailyLog[id].splice(sortedIndex, 1);
+  ST.dailyLog[id].splice(realIndex, 1);
   saveDailyLog();
-
-  // Rebuild snapshots after deletion
   rebuildManualSnapshots(id);
 
   const ac = allAircraft().find(a=>a.id===id);
