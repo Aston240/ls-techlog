@@ -487,8 +487,17 @@ function saveSnapshots(){
 // Rebuild hoursSnapshots for a manual aircraft from its dailyLog entries.
 // Called on every add/delete so snapshots stay in sync with the log.
 function rebuildManualSnapshots(id){
+  // Helper to get ISO date string from either "2026-02-14" or "14 Feb 2026"
+  function toISO(dateStr){
+    if(!dateStr) return null;
+    if(dateStr.match(/^\d{4}-\d{2}-\d{2}$/)) return dateStr;
+    const d = new Date(dateStr);
+    return isNaN(d) ? null : d.toISOString().slice(0,10);
+  }
+
   const entries = (ST.dailyLog[id]||[]).slice().sort(function(a,b){
-    return new Date(a.date+'T12:00:00') - new Date(b.date+'T12:00:00');
+    const da = toISO(a.date)||'', db = toISO(b.date)||'';
+    return da.localeCompare(db);
   });
   if(!entries.length) return;
   const m = ST.manualAircraft.find(function(x){return x.id===id;});
@@ -498,8 +507,8 @@ function rebuildManualSnapshots(id){
   const newSnaps = {};
   entries.forEach(function(e){
     running += (e.added||0);
-    const isoDate = e.date.slice(0,10);
-    newSnaps[isoDate] = parseFloat(running.toFixed(2));
+    const isoDate = toISO(e.date);
+    if(isoDate) newSnaps[isoDate] = parseFloat(running.toFixed(2));
   });
   newSnaps[new Date().toISOString().slice(0,10)] = currentTotal;
   if(!ST.hoursSnapshots[id]) ST.hoursSnapshots[id] = {};
@@ -1609,7 +1618,9 @@ function openDailyLog(id){
 
 function buildDailyLogPanel(id, ac){
   const log = (ST.dailyLog[id] || []).slice().sort(function(a,b){
-    return new Date(a.date+'T12:00:00') - new Date(b.date+'T12:00:00');
+    const da = a.date.match(/^\d{4}-\d{2}-\d{2}$/) ? a.date : new Date(a.date).toISOString().slice(0,10)||a.date;
+    const db = b.date.match(/^\d{4}-\d{2}-\d{2}$/) ? b.date : new Date(b.date).toISOString().slice(0,10)||b.date;
+    return da.localeCompare(db);
   });
   const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD for input default
   const todayDisplay = new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});
@@ -1618,7 +1629,9 @@ function buildDailyLogPanel(id, ac){
     ? `<tr><td colspan="5" style="text-align:center;color:var(--dim);font-style:italic;padding:10px">No entries yet</td></tr>`
     : [...log].reverse().map((e,ri)=>{
         const i = log.length - 1 - ri; // real index for deletion
-        const displayDate = e.display || new Date(e.date+'T12:00:00').toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});
+        const displayDate = e.display || (e.date && e.date.match(/^\d{4}-\d{2}-\d{2}$/)
+          ? new Date(e.date+'T12:00:00').toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'})
+          : e.date) || '—';
         return `<tr>
           <td style="color:var(--mut)">${esc(displayDate)}</td>
           <td style="text-align:center">${e.tacho.toFixed(2)}</td>
@@ -2566,8 +2579,15 @@ function buildMonthlyTable(){
     if(ac.isManual){
       const entries = ST.dailyLog[ac.id]||[];
       entries.forEach(function(e){
-        const ym = e.date.slice(0,7); // YYYY-MM
-        map[ym] = (map[ym]||0) + (e.added||0);
+        // Handle both ISO (2026-02-14) and old display format (14 Feb 2026)
+        let ym = null;
+        if(e.date && e.date.match(/^\d{4}-\d{2}-\d{2}$/)){
+          ym = e.date.slice(0,7);
+        } else if(e.date) {
+          const d = new Date(e.date);
+          if(!isNaN(d)) ym = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+        }
+        if(ym) map[ym] = (map[ym]||0) + (e.added||0);
       });
     } else {
       const flights = ST.flights[ac.id]||[];
