@@ -1618,8 +1618,9 @@ function buildDailyLogPanel(id, ac){
     ? `<tr><td colspan="5" style="text-align:center;color:var(--dim);font-style:italic;padding:10px">No entries yet</td></tr>`
     : [...log].reverse().map((e,ri)=>{
         const i = log.length - 1 - ri; // real index for deletion
+        const displayDate = e.display || new Date(e.date+'T12:00:00').toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});
         return `<tr>
-          <td style="color:var(--mut)">${esc(e.date)}</td>
+          <td style="color:var(--mut)">${esc(displayDate)}</td>
           <td style="text-align:center">${e.tacho.toFixed(2)}</td>
           <td style="text-align:center">${e.sorties}</td>
           <td style="text-align:center;color:var(--grn);font-weight:700">+${e.added.toFixed(2)}</td>
@@ -2542,70 +2543,65 @@ function buildMonthlyTable(){
 
   // Build unified aircraft list
   const acList = [];
-  allAc.forEach(function(a){ if(a.reg) acList.push({id:a.id, reg:a.reg}); });
+  allAc.forEach(function(a){ if(a.reg) acList.push({id:a.id, reg:a.reg, isManual:false}); });
   manualAc.forEach(function(a){
     const reg = (ST.cfg[a.id]&&ST.cfg[a.id].reg)||a.reg||'';
-    if(reg && !acList.find(function(x){return x.reg===reg;})) acList.push({id:a.id, reg:reg});
+    if(reg && !acList.find(function(x){return x.reg===reg;})) acList.push({id:a.id, reg:reg, isManual:true});
   });
 
-  // Sort by tier
   const tierOrder = {'G-BCGJ':1,'G-PETR':1,'G-MKAS':1,'G-BTGO':1,'G-FIAT':1,'N150PK':1,'G-EGTB':2,'G-BOTN':2,'G-HRYZ':3,'G-SETG':3};
   acList.sort(function(a,b){
     const ta=tierOrder[a.reg]||9, tb=tierOrder[b.reg]||9;
     return ta!==tb ? ta-tb : a.reg.localeCompare(b.reg);
   });
 
-  // Find earliest snapshot date
-  let earliestDate = null;
-  acList.forEach(function(ac){
-    const dates = Object.keys(ST.hoursSnapshots[ac.id]||{}).sort();
-    if(dates.length && (!earliestDate || dates[0]<earliestDate)) earliestDate = dates[0];
-  });
-  if(!earliestDate) return '<div style="font-size:12px;color:var(--mut);padding:12px 0">No snapshot data available yet.</div>';
+  // Build per-aircraft monthly hours maps from source data (not snapshots)
+  // Airbly: use ST.flights dep_ms + air_sec
+  // Manual: use ST.dailyLog entries
+  const acMonthMap = {}; // acId -> { 'YYYY-MM': hours }
+  let earliestYM = null;
 
-  // Build month list (up to 12)
+  acList.forEach(function(ac){
+    const map = {};
+    if(ac.isManual){
+      const entries = ST.dailyLog[ac.id]||[];
+      entries.forEach(function(e){
+        const ym = e.date.slice(0,7); // YYYY-MM
+        map[ym] = (map[ym]||0) + (e.added||0);
+      });
+    } else {
+      const flights = ST.flights[ac.id]||[];
+      flights.forEach(function(f){
+        if(!f.dep_ms || !f.air_sec) return;
+        const ym = new Date(f.dep_ms).toISOString().slice(0,7);
+        map[ym] = (map[ym]||0) + (f.air_sec/3600);
+      });
+    }
+    // Round all values
+    Object.keys(map).forEach(function(ym){ map[ym] = parseFloat(map[ym].toFixed(1)); });
+    acMonthMap[ac.id] = map;
+    // Track earliest month with data
+    const yms = Object.keys(map).sort();
+    if(yms.length && (!earliestYM || yms[0] < earliestYM)) earliestYM = yms[0];
+  });
+
+  if(!earliestYM) return '<div style="font-size:12px;color:var(--mut);padding:12px 0">No flight data available yet.</div>';
+
+  // Build month list capped at 12
   const months = [];
-  let m = new Date(earliestDate.slice(0,7)+'-01');
+  let m = new Date(earliestYM+'-01');
   const cur = new Date(now.getFullYear(), now.getMonth(), 1);
   while(m<=cur){ months.push(m.getFullYear()+'-'+String(m.getMonth()+1).padStart(2,'0')); m=new Date(m.getFullYear(),m.getMonth()+1,1); }
   if(months.length>12) months.splice(0,months.length-12);
 
-  // Calculate hours flown per aircraft per month
-  function monthHrs(acId, ym){
-    const snaps = ST.hoursSnapshots[acId]||{};
-    const [y,mo] = ym.split('-').map(Number);
-    const mStart = ym+'-01';
-    const mEnd = ym+'-'+String(new Date(y,mo,0).getDate()).padStart(2,'0');
-    const dates = Object.keys(snaps).sort();
-    const inMonth = dates.filter(function(d){return d>=mStart&&d<=mEnd;});
-    if(inMonth.length>=2){
-      const diff = snaps[inMonth[inMonth.length-1]] - snaps[inMonth[0]];
-      return diff>=0 ? parseFloat(diff.toFixed(1)) : null;
-    } else if(inMonth.length===1){
-      const before = dates.filter(function(d){return d<mStart;});
-      if(before.length){ const diff=snaps[inMonth[0]]-snaps[before[before.length-1]]; return diff>=0?parseFloat(diff.toFixed(1)):null; }
-    }
-    // Bridge across whole month using nearest snapshots either side
-    const before = dates.filter(function(d){return d<mStart;});
-    const after  = dates.filter(function(d){return d>mEnd;});
-    if(before.length&&after.length){
-      // Interpolate
-      const d0=new Date(before[before.length-1]), d1=new Date(after[0]);
-      const dMonth=new Date(mStart), dMonthEnd=new Date(mEnd);
-      const totalDays=(d1-d0)/86400000;
-      if(totalDays>0){
-        const h0=snaps[before[before.length-1]], h1=snaps[after[0]];
-        const ratePerDay=(h1-h0)/totalDays;
-        const daysInMonth=(dMonthEnd-dMonth)/86400000+1;
-        return ratePerDay>=0 ? parseFloat((ratePerDay*daysInMonth).toFixed(1)) : null;
-      }
-    }
-    return null;
-  }
-
   // Build data matrix
   const data = {};
-  acList.forEach(function(ac){ data[ac.reg] = months.map(function(ym){return monthHrs(ac.id,ym);}); });
+  acList.forEach(function(ac){
+    data[ac.reg] = months.map(function(ym){
+      const v = acMonthMap[ac.id][ym];
+      return (v !== undefined) ? v : null;
+    });
+  });
 
   // Month labels
   const monthLabels = months.map(function(ym){
@@ -2616,7 +2612,7 @@ function buildMonthlyTable(){
   // Colours per aircraft
   const colours = ['#4fc3f7','#81c784','#ffb74d','#e57373','#ba68c8','#4db6ac','#fff176','#ff8a65','#90caf9','#a5d6a7'];
 
-  // ── SORT STATE ──
+  // Sort state
   if(!ST.utilSort) ST.utilSort = {col:null, dir:1};
   const sortCol = ST.utilSort.col;
   const sortDir = ST.utilSort.dir;
@@ -2634,7 +2630,6 @@ function buildMonthlyTable(){
     return ST.utilSort.dir === 1 ? ' ↑' : ' ↓';
   }
 
-  // ── TABLE ──
   const thS = 'padding:5px 8px;text-align:right;font-size:9px;color:var(--acc);letter-spacing:.5px;text-transform:uppercase;white-space:nowrap;border-bottom:1px solid var(--border);cursor:pointer;user-select:none';
   const tdS = 'padding:5px 8px;text-align:right;font-size:11px;color:var(--txt);white-space:nowrap;border-bottom:1px solid #1a1f2e';
   const tdR = 'padding:5px 8px;text-align:left;font-size:11px;font-weight:700;white-space:nowrap;border-bottom:1px solid #1a1f2e';
@@ -2668,7 +2663,7 @@ function buildMonthlyTable(){
   return '<div style="overflow-x:auto;margin-bottom:4px">'
     +'<table style="border-collapse:collapse;font-size:12px;min-width:100%">'
     +'<thead>'+thead+'</thead><tbody>'+tbody+'</tbody></table></div>'
-    +'<div style="font-size:10px;color:var(--mut);margin-bottom:16px">Click any column header to sort ⇅</div>';
+    +'<div style="font-size:10px;color:var(--mut);margin-bottom:16px">Click any column header to sort ⇅&nbsp;&nbsp;·&nbsp;&nbsp;Airbly aircraft: from flight logs&nbsp;&nbsp;·&nbsp;&nbsp;Manual aircraft: from daily log entries</div>';
 }
 
 function setUtilSort(col){
