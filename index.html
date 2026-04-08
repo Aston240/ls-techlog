@@ -484,6 +484,29 @@ function saveSnapshots(){
   syncPush();
 }
 
+// Rebuild hoursSnapshots for a manual aircraft from its dailyLog entries.
+// Called on every add/delete so snapshots stay in sync with the log.
+function rebuildManualSnapshots(id){
+  const entries = (ST.dailyLog[id]||[]).slice().sort(function(a,b){
+    return new Date(a.date+'T12:00:00') - new Date(b.date+'T12:00:00');
+  });
+  if(!entries.length) return;
+  const m = ST.manualAircraft.find(function(x){return x.id===id;});
+  const currentTotal = parseFloat((ST.cfg[id]&&ST.cfg[id].man_hours)||(m&&m.hours)||'0');
+  const totalAdded = entries.reduce(function(s,e){return s+(e.added||0);},0);
+  let running = currentTotal - totalAdded;
+  const newSnaps = {};
+  entries.forEach(function(e){
+    running += (e.added||0);
+    const isoDate = e.date.slice(0,10);
+    newSnaps[isoDate] = parseFloat(running.toFixed(2));
+  });
+  newSnaps[new Date().toISOString().slice(0,10)] = currentTotal;
+  if(!ST.hoursSnapshots[id]) ST.hoursSnapshots[id] = {};
+  Object.assign(ST.hoursSnapshots[id], newSnaps);
+  saveSnapshots();
+}
+
 // Manual push button handler
 function manualPush(){
   ST._cfgSavedAt = Date.now();
@@ -898,6 +921,12 @@ async function bootstrapSnapshotsFromFlightLogs(){
 
   saveSnapshots();
   console.log('[Bootstrap] Done.');
+
+  // Seed snapshots for manual aircraft from their daily log entries
+  ST.manualAircraft.forEach(function(m){
+    if(ST.dailyLog[m.id] && ST.dailyLog[m.id].length) rebuildManualSnapshots(m.id);
+  });
+
   if(ST.dashGraph) drawHoursGraph(ST.dashGraph);
 }
 
@@ -1579,7 +1608,9 @@ function openDailyLog(id){
 }
 
 function buildDailyLogPanel(id, ac){
-  const log = ST.dailyLog[id] || [];
+  const log = (ST.dailyLog[id] || []).slice().sort(function(a,b){
+    return new Date(a.date+'T12:00:00') - new Date(b.date+'T12:00:00');
+  });
   const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD for input default
   const todayDisplay = new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});
 
@@ -1699,6 +1730,9 @@ function submitDailyLog(id){
     saveManual();
   }
 
+  // Rebuild snapshots so burn rate and monthly table stay in sync
+  rebuildManualSnapshots(id);
+
   // Clear inputs and refresh panel
   if(tachoEl) tachoEl.value='';
   if(sortiesEl) sortiesEl.value='';
@@ -1709,7 +1743,15 @@ function submitDailyLog(id){
 
 function deleteDailyEntry(id, index){
   if(!ST.dailyLog[id]) return;
-  const entry = ST.dailyLog[id][index];
+
+  // Sort log by date so the index matches what the user sees in the panel
+  ST.dailyLog[id].sort(function(a,b){
+    return new Date(a.date+'T12:00:00') - new Date(b.date+'T12:00:00');
+  });
+
+  // Panel displays newest-first (reversed), so map display index back to sorted index
+  const sortedIndex = ST.dailyLog[id].length - 1 - index;
+  const entry = ST.dailyLog[id][sortedIndex];
   if(!entry) return;
   if(!confirm(`Delete entry: ${entry.display||entry.date} — +${entry.added.toFixed(2)} hrs?`)) return;
 
@@ -1725,8 +1767,11 @@ function deleteDailyEntry(id, index){
     saveManual();
   }
 
-  ST.dailyLog[id].splice(index, 1);
+  ST.dailyLog[id].splice(sortedIndex, 1);
   saveDailyLog();
+
+  // Rebuild snapshots after deletion
+  rebuildManualSnapshots(id);
 
   const ac = allAircraft().find(a=>a.id===id);
   const panel = document.getElementById('daily-log-panel');
