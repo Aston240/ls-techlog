@@ -1634,30 +1634,58 @@ function openDailyLog(id){
 }
 
 function buildDailyLogPanel(id, ac){
-  const log = (ST.dailyLog[id] || []).slice().sort(function(a,b){
-    const da = a.date.match(/^\d{4}-\d{2}-\d{2}$/) ? a.date : new Date(a.date).toISOString().slice(0,10)||a.date;
-    const db = b.date.match(/^\d{4}-\d{2}-\d{2}$/) ? b.date : new Date(b.date).toISOString().slice(0,10)||b.date;
+  const rawLog = ST.dailyLog[id] || [];
+
+  // Detect old-format date entries
+  const hasOldFormat = rawLog.some(e => !/^\d{4}-\d{2}-\d{2}$/.test(e.date));
+
+  // Detect duplicate dates (same ISO date appearing more than once)
+  const isoMap = {};
+  rawLog.forEach(e => {
+    const iso = e.date.match(/^\d{4}-\d{2}-\d{2}$/) ? e.date : (()=>{const d=new Date(e.date);return isNaN(d)?e.date:d.toISOString().slice(0,10);})();
+    isoMap[iso] = (isoMap[iso]||0) + 1;
+  });
+  const hasDupes = Object.values(isoMap).some(v=>v>1);
+
+  const log = rawLog.slice().sort(function(a,b){
+    const da = a.date.match(/^\d{4}-\d{2}-\d{2}$/) ? a.date : (()=>{const d=new Date(a.date);return isNaN(d)?a.date:d.toISOString().slice(0,10);})();
+    const db = b.date.match(/^\d{4}-\d{2}-\d{2}$/) ? b.date : (()=>{const d=new Date(b.date);return isNaN(d)?b.date:d.toISOString().slice(0,10);})();
     return da.localeCompare(db);
   });
-  const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD for input default
+
+  const today = new Date().toISOString().split('T')[0];
   const todayDisplay = new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});
 
   const historyRows = log.length === 0
     ? `<tr><td colspan="5" style="text-align:center;color:var(--dim);font-style:italic;padding:10px">No entries yet</td></tr>`
     : [...log].reverse().map((e)=>{
-        const displayDate = e.display || (e.date && e.date.match(/^\d{4}-\d{2}-\d{2}$/)
+        const isOldFormat = !/^\d{4}-\d{2}-\d{2}$/.test(e.date);
+        const isoDate = isOldFormat ? (()=>{const d=new Date(e.date);return isNaN(d)?null:d.toISOString().slice(0,10);})() : e.date;
+        const isDupe = isoDate && isoMap[isoDate] > 1;
+        const displayDate = e.display || (e.date.match(/^\d{4}-\d{2}-\d{2}$/)
           ? new Date(e.date+'T12:00:00').toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'})
           : e.date) || '—';
-        // Use date+tacho as unique fingerprint for deletion
         const fingerprint = encodeURIComponent(e.date+'|'+e.tacho+'|'+e.sorties);
-        return `<tr>
-          <td style="color:var(--mut)">${esc(displayDate)}</td>
+        const rowStyle = isDupe ? 'background:#2a1008;' : isOldFormat ? 'background:#1a1208;' : '';
+        const flag = isDupe ? ' <span style="color:#ff6060;font-size:9px">DUPE</span>' : isOldFormat ? ' <span style="color:#f59e0b;font-size:9px">OLD</span>' : '';
+        return `<tr style="${rowStyle}">
+          <td style="color:var(--mut)">${esc(displayDate)}${flag}</td>
           <td style="text-align:center">${e.tacho.toFixed(2)}</td>
           <td style="text-align:center">${e.sorties}</td>
           <td style="text-align:center;color:var(--grn);font-weight:700">+${e.added.toFixed(2)}</td>
           <td style="text-align:center"><button onclick="deleteDailyEntry('${id}','${fingerprint}')" style="background:none;border:1px solid var(--red);color:var(--red);border-radius:4px;padding:1px 7px;font-size:10px;cursor:pointer">✕</button></td>
         </tr>`;
       }).join('');
+
+  const warningBanner = (hasOldFormat || hasDupes) ? `
+    <div style="background:#2a1208;border:1px solid #f59e0b;border-radius:8px;padding:10px 14px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;gap:12px">
+      <div style="font-size:11px;color:#f59e0b">
+        ${hasDupes ? '⚠ Duplicate entries detected (shown in red). ' : ''}
+        ${hasOldFormat ? '⚠ Old date format entries detected (shown in amber). ' : ''}
+        Click Clean to remove duplicates and old-format entries automatically.
+      </div>
+      <button onclick="cleanDailyLog('${id}')" style="background:#f59e0b;color:#000;border:none;border-radius:6px;padding:5px 14px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap">🧹 Clean</button>
+    </div>` : '';
 
   return `
   <div style="background:var(--panel);border:1px solid var(--amb);border-radius:11px;padding:20px;margin-top:18px" onkeydown="trapTabInForm(event,'daily-log-panel')">
@@ -1667,8 +1695,13 @@ function buildDailyLogPanel(id, ac){
         <span style="font-size:11px;color:var(--amb);margin-left:8px;background:#2a1a00;border:1px solid var(--amb);padding:2px 7px;border-radius:4px">MANUAL</span>
         <span style="font-size:12px;color:var(--mut);margin-left:10px">Current total: <strong style="color:var(--acc)">${ac.totalHobbs.toFixed(2)} hrs</strong></span>
       </div>
-      <button onclick="closeDailyLog()" style="background:none;border:1px solid var(--dim);color:var(--mut);border-radius:6px;padding:4px 12px;font-size:11px;cursor:pointer">✕ Close</button>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button onclick="forcePushDailyLog()" style="background:#1a2a3a;border:1px solid #4fc3f7;color:#4fc3f7;border-radius:6px;padding:4px 12px;font-size:11px;font-weight:700;cursor:pointer">⬆ Force Push</button>
+        <button onclick="closeDailyLog()" style="background:none;border:1px solid var(--dim);color:var(--mut);border-radius:6px;padding:4px 12px;font-size:11px;cursor:pointer">✕ Close</button>
+      </div>
     </div>
+
+    ${warningBanner}
 
     <div style="font-size:13px;font-weight:700;color:var(--amb);margin-bottom:12px;border-bottom:1px solid #2a1a00;padding-bottom:8px">➕ Add Daily Hours Entry</div>
 
@@ -1794,6 +1827,45 @@ function deleteDailyEntry(id, fingerprint){
 function closeDailyLog(){
   const panel = document.getElementById('daily-log-panel');
   if(panel){ panel.style.display='none'; panel.innerHTML=''; }
+}
+
+function cleanDailyLog(id){
+  const before = ST.dailyLog[id].length;
+
+  // Normalise all dates to ISO, then deduplicate keeping the ISO version
+  const seen = {};
+  const clean = [];
+  ST.dailyLog[id].forEach(function(e){
+    const iso = e.date.match(/^\d{4}-\d{2}-\d{2}$/) ? e.date : (function(){ const d=new Date(e.date); return isNaN(d)?null:d.toISOString().slice(0,10); })();
+    if(!iso) return; // skip unparseable dates
+    const key = iso+'|'+e.tacho+'|'+e.sorties;
+    if(seen[key]) return; // skip duplicate
+    seen[key] = true;
+    // Normalise the entry to ISO date format
+    clean.push({ date: iso, display: new Date(iso+'T12:00:00').toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}), tacho: e.tacho, sorties: e.sorties, added: e.added });
+  });
+
+  ST.dailyLog[id] = clean;
+  saveDailyLog();
+  rebuildManualSnapshots(id);
+
+  const after = ST.dailyLog[id].length;
+  const removed = before - after;
+
+  const ac = allAircraft().find(a=>a.id===id);
+  const panel = document.getElementById('daily-log-panel');
+  if(panel && ac) panel.innerHTML = buildDailyLogPanel(id, ac);
+
+  if(removed > 0) alert(`Cleaned ${removed} duplicate/old-format entr${removed===1?'y':'ies'}. Data pushed to cloud.`);
+  else alert('No duplicates found — data is already clean.');
+}
+
+function forcePushDailyLog(){
+  ST._dailyLogSavedAt = Date.now() + 999999999;
+  localStorage.setItem('tl_dailylog_ts', ST._dailyLogSavedAt.toString());
+  localStorage.setItem('tl_dailylog', JSON.stringify(ST.dailyLog));
+  syncPush();
+  alert('Local daily log force-pushed to cloud. Phone will update within 60 seconds.');
 }
 
 // ── HOURS TRACKER ────────────────────────────────
