@@ -390,13 +390,19 @@ async function syncPull(){
         console.log('[sync] Local dailyLog is newer than cloud — skipping remote merge, pushing local up');
         syncPush();
       } else {
-        // Merge: combine entries from both sides, deduplicate by date+tacho+sorties
+        // Normalise date to ISO for deduplication — handles both "2026-02-14" and "14 Feb 2026"
+        function toISOKey(dateStr){
+          if(!dateStr) return dateStr;
+          if(/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
+          const d = new Date(dateStr);
+          return isNaN(d) ? dateStr : d.toISOString().slice(0,10);
+        }
         Object.keys(remote.dailyLog).forEach(id=>{
-          const local=ST.dailyLog[id]||[];
-          const rem=remote.dailyLog[id]||[];
-          const remKeys=new Set(rem.map(e=>e.date+'|'+e.tacho+'|'+e.sorties));
-          const localOnly=local.filter(e=>!remKeys.has(e.date+'|'+e.tacho+'|'+e.sorties));
-          ST.dailyLog[id]=[...rem,...localOnly];
+          const local = ST.dailyLog[id]||[];
+          const rem   = remote.dailyLog[id]||[];
+          const remKeys = new Set(rem.map(e=>toISOKey(e.date)+'|'+e.tacho+'|'+e.sorties));
+          const localOnly = local.filter(e=>!remKeys.has(toISOKey(e.date)+'|'+e.tacho+'|'+e.sorties));
+          ST.dailyLog[id] = [...rem, ...localOnly];
         });
         localStorage.setItem('tl_dailylog',JSON.stringify(ST.dailyLog));
       }
@@ -538,13 +544,17 @@ function allAircraft(){ return [...ST.aircraft, ...ST.manualAircraft.map(manToAc
 
 // Convert a manual aircraft record to the same shape as an Airbly aircraft object
 function manToAc(m){
-  // Always use cfg as source of truth for hours/lastflight (editable in preview)
-  const c=ST.cfg[m.id]||{};
-  const hours=parseFloat(c.man_hours||m.hours||'0');
-  const lf=c.man_last_flight||m.last_flight||'';
+  const c = ST.cfg[m.id]||{};
+  const lf = c.man_last_flight||m.last_flight||'';
+  // Calculate totalHobbs from baseline + sum of daily log entries
+  // This prevents drift from accumulated add/delete mutations
+  const baseline = parseFloat(c.man_hours_baseline || c.man_hours || m.hours || '0');
+  const entries = ST.dailyLog[m.id]||[];
+  const logged = entries.reduce(function(s,e){ return s+(e.added||0); }, 0);
+  const totalHobbs = parseFloat((baseline + logged).toFixed(2));
   return {
     id: m.id, reg: (c.reg||m.reg||'').toUpperCase(), type: c.type||m.type||'',
-    totalHobbs: hours,
+    totalHobbs,
     totalLandings: parseInt(c.man_landings||m.landings||'0',10),
     totalCycles: parseInt(c.man_landings||m.landings||'0',10),
     opStatus: '', attStatus: '', maintStatus: '',
@@ -1737,17 +1747,12 @@ function submitDailyLog(id){
   ST.dailyLog[id].push({ date: dateISO, display: dateDisplay, tacho, sorties, added });
   saveDailyLog();
 
-  // Update aircraft total hours
+  // Update last flight date only — totalHobbs is now calculated from baseline + entries
   const m = ST.manualAircraft.find(x=>x.id===id);
   if(m){
-    const currentHrs = parseFloat(ST.cfg[id]?.man_hours || m.hours || '0');
-    const newHrs = Math.round((currentHrs + added) * 100) / 100;
     if(!ST.cfg[id]) ST.cfg[id]={};
-    ST.cfg[id].man_hours = String(newHrs);
-    // Update last flight date
     ST.cfg[id].man_last_flight = dateISO;
     saveCfg();
-    m.hours = String(newHrs);
     m.last_flight = dateDisplay;
     saveManual();
   }
@@ -1766,7 +1771,6 @@ function submitDailyLog(id){
 function deleteDailyEntry(id, fingerprint){
   if(!ST.dailyLog[id]) return;
 
-  // Find entry by fingerprint (date|tacho|sorties)
   const key = decodeURIComponent(fingerprint);
   const realIndex = ST.dailyLog[id].findIndex(function(e){
     return (e.date+'|'+e.tacho+'|'+e.sorties) === key;
@@ -1777,18 +1781,7 @@ function deleteDailyEntry(id, fingerprint){
   const displayDate = entry.display || entry.date;
   if(!confirm(`Delete entry: ${displayDate} — +${entry.added.toFixed(2)} hrs?`)) return;
 
-  // Reverse the hours addition
-  const m = ST.manualAircraft.find(x=>x.id===id);
-  if(m){
-    const currentHrs = parseFloat(ST.cfg[id]?.man_hours || m.hours || '0');
-    const newHrs = Math.max(0, Math.round((currentHrs - entry.added) * 100) / 100);
-    if(!ST.cfg[id]) ST.cfg[id]={};
-    ST.cfg[id].man_hours = String(newHrs);
-    saveCfg();
-    m.hours = String(newHrs);
-    saveManual();
-  }
-
+  // Remove entry — totalHobbs recalculates automatically from baseline + remaining entries
   ST.dailyLog[id].splice(realIndex, 1);
   saveDailyLog();
   rebuildManualSnapshots(id);
