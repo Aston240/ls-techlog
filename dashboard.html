@@ -638,7 +638,15 @@ async function fetchNotams() {
       startValidity: Number(r.c?.[3]?.v ?? 0),
       endValidity  : Number(r.c?.[4]?.v ?? 9999999999),
       hidden       : String(r.c?.[5]?.v ?? '').toLowerCase() === 'yes'
-    })).filter(n => n.id && n.endValidity > now && !n.hidden);
+    // Only show NOTAMs valid today — started before end of today, not yet expired
+    const endOfToday = new Date();
+    endOfToday.setUTCHours(23, 59, 59, 999);
+    const endOfTodaySec = endOfToday.getTime() / 1000;
+
+    })).filter(n => n.id && !n.hidden
+      && n.endValidity > now              // not expired
+      && n.startValidity <= endOfTodaySec // started today or earlier
+    );
 
     window.liveNotamsActive = notams.length > 0;
     renderNotams(notams);
