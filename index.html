@@ -311,6 +311,7 @@ tfoot td{padding:11px;background:#112240;font-weight:700;}
       <div style="display:flex;align-items:center;gap:12px">
         <div id="sync-status" style="font-size:11px;color:var(--mut)"></div>
         <button onclick="manualPush()" style="font-size:11px;padding:4px 12px;background:#0a2318;border:1px solid var(--grn);color:var(--grn);border-radius:6px;cursor:pointer;font-weight:700">&#9729; Push to Cloud</button>
+        <button onclick="backupToSheets()" style="font-size:11px;padding:4px 12px;background:#1a2a1a;border:1px solid #81c784;color:#81c784;border-radius:6px;cursor:pointer;font-weight:700" title="Backup all data to Google Sheets">&#128196; Backup</button>
         <div id="print-btns" style="display:none;gap:8px;align-items:center"><button class="btn-print" onclick="doPrint(false)">🖨 Print THIS Tech Log</button><button class="btn-print" style="background:#1a4a20;border:1px solid var(--grn)" onclick="doPrint(true)">🖨 Print ALL Tech Logs</button></div>
       </div>
     </div>
@@ -537,6 +538,32 @@ function manualPush(){
   JB._pushing=false;
   syncPush();
   syncStatus('syncing','Pushing to cloud…');
+}
+
+const BACKUP_GAS_URL = 'https://script.google.com/macros/s/AKfycbwX-3amJ-nmdCWPDZP7qBVnTb43e3v5Jav5LNMXTzKxx_oQ3s4YKQDjeNLlgEzLAJS4/exec';
+
+async function backupToSheets(){
+  const btn = document.querySelector('[onclick="backupToSheets()"]');
+  if(btn){ btn.textContent='⏳ Backing up…'; btn.style.opacity='0.7'; }
+  try {
+    const payload = {
+      cfg: ST.cfg,
+      dailyLog: ST.dailyLog,
+      downtimeLog: ST.downtimeLog||[],
+    };
+    const res = await fetch(BACKUP_GAS_URL, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(payload),
+      mode: 'no-cors'
+    });
+    if(btn){ btn.textContent='✓ Backed up'; btn.style.opacity='1'; btn.style.color='#a5d6a7'; }
+    setTimeout(()=>{ if(btn){ btn.textContent='📄 Backup'; btn.style.color='#81c784'; }}, 3000);
+    alert('Backup sent to Google Sheets successfully.');
+  } catch(err) {
+    if(btn){ btn.textContent='📄 Backup'; btn.style.opacity='1'; }
+    alert('Backup failed: ' + err.message);
+  }
 }
 
 // Returns all aircraft (Airbly + manual) for display purposes
