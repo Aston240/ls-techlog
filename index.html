@@ -663,7 +663,7 @@ function goLogin(){
 
 // ══ CONNECT ══════════════════════════════════════
 async function fetchAirbly(key, after=null, before=null){
-  let url=`https://airbly.com/api/v3/assetList?groupKey=${encodeURIComponent(key)}&log_types=flight&log_limit_per_asset=100`;
+  let url=`https://airbly.com/api/v3/assetList?groupKey=${encodeURIComponent(key)}&log_types=flight&log_limit_per_asset=300`;
   if(after)  url += `&log_completed_after=${after}`;
   if(before) url += `&log_completed_before=${before}`;
   const r=await fetch(url);
