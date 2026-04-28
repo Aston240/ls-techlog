@@ -732,9 +732,9 @@ async function doConnect(keyOverride){
     const prevDate = new Date(now.getFullYear(), now.getMonth()-1, 1);
     const py = prevDate.getFullYear();
     const pm = String(prevDate.getMonth()+1).padStart(2,'0');
-    const curMonthStart  = `${y}-${m}-01`;
-    const curMonthMid    = `${y}-${m}-15`;
-    const prevMonthStart = `${py}-${pm}-01`;
+    const curMonthStart  = new Date(y, now.getMonth(), 1).getTime();
+    const curMonthMid    = new Date(y, now.getMonth(), 15).getTime();
+    const prevMonthStart = new Date(prevDate.getFullYear(), prevDate.getMonth(), 1).getTime();
 
     // Fetch all three windows for both accounts in parallel (6 total calls)
     if(btn) btn.textContent='⏳  Fetching flights…';
@@ -869,8 +869,8 @@ function parseAirbly(raw){
         const u = l.usage;
         return {
           id:       l.uuid || Math.random(),
-          dep_ms:   u.engine_start_at || l.happened_at,
-          arr_ms:   u.engine_stop_at  || l.happened_at,
+          dep_ms:   u.air_first_takeoff || u.engine_start_at || l.happened_at,
+          arr_ms:   u.air_last_landing  || u.engine_stop_at  || l.happened_at,
           from:     l.route?.departure_ident||'',
           to:       l.route?.arrival_ident||'',
           air_sec:  u.air_seconds||0,
