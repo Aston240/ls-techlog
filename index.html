@@ -325,7 +325,6 @@ tfoot td{padding:11px;background:#112240;font-weight:700;}
 // ══ JSONBIN SYNC ══════════════════════════════════
 const JB={
   BIN: '69ac06bf43b1c97be9bd5667',
-  FLIGHTS_BIN: '69f0f6ceaaba8821974add24',
   KEY: '$2a$10$wjZldGseV25iurze/grlbOQ1ZxUVCugh.kmmRH3LOo3zEiUF4RKPS',
   URL: 'https://api.jsonbin.io/v3/b/',
   _pushing: false,
@@ -1057,82 +1056,55 @@ async function bootstrapSnapshotsFromFlightLogs(){
 
 // ══ SHOW APP ═════════════════════════════════════
 // ══ FLIGHT STORE SYNC ════════════════════════════
-// Persists all Airbly flight records to a dedicated JSONBin bin.
+// Persists all Airbly flight records to Google Sheets via GAS.
 // Uses UUID as key — adds new flights, updates changed ones, never deletes.
 // This gives the monthly utilisation table a stable historical record
 // that is immune to Airbly's 100-flight API cap and any retrospective changes.
+const GAS_FLIGHT_URL = 'https://script.google.com/macros/s/AKfycbyxXxnCcg-l8L4wDJwdRiyHGmZbSelNCVljDIrpugAEFE3SkSO1UC2K_rHe8Kn4Fshh/exec';
+
 async function syncFlightStore(){
   if(ST.isDemo || JB._flightsPushing) return;
   if(!ST.flights || !Object.keys(ST.flights).length) return;
   JB._flightsPushing = true;
   try{
-    // Pull existing store from flights bin
-    let stored = {};
-    try{
-      const r = await fetch(JB.URL + JB.FLIGHTS_BIN + '/latest', {
-        headers: {'X-Master-Key': JB.KEY, 'X-Bin-Meta': 'false'},
-      });
-      if(r.ok){
-        const data = await r.json();
-        stored = (data && typeof data.flights === 'object') ? data.flights : {};
-      }
-    } catch(e){
-      console.warn('[FlightStore] Pull failed — will still attempt push:', e.message);
-    }
-
-    // Merge current ST.flights into stored, keyed by UUID
-    // Never remove existing entries — only add or update
-    let changed = false;
+    // Build flights object from current ST.flights — keyed by UUID
+    const toSync = {};
+    const today = new Date().toISOString().slice(0,10);
     Object.keys(ST.flights).forEach(function(acId){
       const flights = ST.flights[acId] || [];
       flights.forEach(function(f){
         const uuid = f.id;
         if(!uuid) return;
-        const existing = stored[uuid];
-        // Determine if this is new or has changed
-        const newEntry = {
-          uuid:       uuid,
+        toSync[uuid] = {
+          uuid:        uuid,
           aircraft_id: acId,
-          reg:        (ST.aircraft.find(a=>a.id===acId)||{}).reg || '',
-          dep_ms:     f.dep_ms,
-          arr_ms:     f.arr_ms,
-          air_sec:    f.air_sec,
-          from:       f.from || '',
-          to:         f.to || '',
-          cycles:     f.cycles || 1,
-          fuel:       f.fuel || null,
-          last_seen:  new Date().toISOString().slice(0,10),
+          reg:         (ST.aircraft.find(a=>a.id===acId)||{}).reg || '',
+          dep_ms:      f.dep_ms,
+          arr_ms:      f.arr_ms,
+          air_sec:     f.air_sec,
+          from:        f.from || '',
+          to:          f.to || '',
+          cycles:      f.cycles || 1,
+          fuel:        f.fuel || null,
+          first_seen:  today,
+          last_seen:   today,
         };
-        if(!existing){
-          newEntry.first_seen = newEntry.last_seen;
-          stored[uuid] = newEntry;
-          changed = true;
-        } else if(existing.air_sec !== f.air_sec || existing.dep_ms !== f.dep_ms){
-          // Flight was edited in Airbly — update values but preserve first_seen
-          newEntry.first_seen = existing.first_seen || existing.last_seen;
-          stored[uuid] = newEntry;
-          changed = true;
-        }
       });
     });
 
-    if(!changed){
-      console.log('[FlightStore] No new or changed flights — skipping push');
+    if(!Object.keys(toSync).length){
+      console.log('[FlightStore] No flights to sync');
       return;
     }
 
-    // Push merged store back
-    const r2 = await fetch(JB.URL + JB.FLIGHTS_BIN, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Master-Key': JB.KEY,
-      },
-      body: JSON.stringify({flights: stored, _updated: new Date().toISOString()}),
+    // POST to GAS — no-cors so we won't get a response body, but data will be written
+    await fetch(GAS_FLIGHT_URL, {
+      method: 'POST',
+      mode:   'no-cors',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({flights: toSync}),
     });
-    if(!r2.ok) throw new Error('HTTP ' + r2.status);
-    const count = Object.keys(stored).length;
-    console.log('[FlightStore] Synced — ' + count + ' total flights stored');
+    console.log('[FlightStore] Synced — ' + Object.keys(toSync).length + ' flights sent to GAS');
   } catch(e){
     console.warn('[FlightStore] Sync failed:', e.message);
   } finally{
