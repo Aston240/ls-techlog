@@ -687,19 +687,21 @@ function mergeAirblyPages(pages){
 
   // Collect all flight UUIDs across all pages, per aircraft ID
   const allFlightsByAc = {}; // acId -> { uuid: flightObj }
-  pages.forEach(function(raw){
+  pages.forEach(function(raw, pageIdx){
     const p = parseAirbly(raw);
     p.aircraft.forEach(function(ac){
       if(!allFlightsByAc[ac.id]) allFlightsByAc[ac.id] = {};
       const flights = p.flights[ac.id] || [];
+      const before = Object.keys(allFlightsByAc[ac.id]).length;
       flights.forEach(function(f){
         const uuid = f.id;
         if(!uuid) return;
-        // Keep entry with largest air_sec in case of duplicates across pages
         if(!allFlightsByAc[ac.id][uuid] || f.air_sec > allFlightsByAc[ac.id][uuid].air_sec){
           allFlightsByAc[ac.id][uuid] = f;
         }
       });
+      const after = Object.keys(allFlightsByAc[ac.id]).length;
+      if(after > before) console.log('[Merge] Page',pageIdx, ac.reg,'added', after-before,'new flights (total',after+')');
     });
   });
 
