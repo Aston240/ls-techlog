@@ -325,10 +325,12 @@ tfoot td{padding:11px;background:#112240;font-weight:700;}
 // ══ JSONBIN SYNC ══════════════════════════════════
 const JB={
   BIN: '69ac06bf43b1c97be9bd5667',
+  FLIGHTS_BIN: '69f0e6a3856a682189827a76',
   KEY: '$2a$10$wjZldGseV25iurze/grlbOQ1ZxUVCugh.kmmRH3LOo3zEiUF4RKPS',
   URL: 'https://api.jsonbin.io/v3/b/',
   _pushing: false,
   _timer: null,
+  _flightsPushing: false,
 };
 
 // Set sync status indicator in topbar
@@ -663,7 +665,9 @@ function goLogin(){
 
 // ══ CONNECT ══════════════════════════════════════
 async function fetchAirbly(key, after=null, before=null){
-  let url=`https://airbly.com/api/v3/assetList?groupKey=${encodeURIComponent(key)}&log_types=flight&log_limit_per_asset=300`;
+  // Hard cap per Airbly is 100 flights per request regardless of limit set.
+  // Date windows are used in doConnect to paginate around this.
+  let url=`https://airbly.com/api/v3/assetList?groupKey=${encodeURIComponent(key)}&log_types=flight&log_limit_per_asset=100`;
   if(after)  url += `&log_completed_after=${after}`;
   if(before) url += `&log_completed_before=${before}`;
   const r=await fetch(url);
@@ -671,6 +675,41 @@ async function fetchAirbly(key, after=null, before=null){
   const raw=await r.json();
   if(raw.auth_group_success===false) throw new Error('API key rejected by Airbly.');
   return raw;
+}
+
+// Merge paginated Airbly responses for a single account into one unified flights map.
+// Deduplicates by flight UUID — keeps entry with largest air_sec if seen in multiple pages.
+function mergeAirblyPages(pages){
+  // Use first successful page as base for aircraft metadata (totalHobbs etc)
+  const base = pages[0];
+  if(!base) return {aircraft:[], flights:{}};
+  const parsed = parseAirbly(base);
+
+  // Collect all flight UUIDs across all pages, per aircraft ID
+  const allFlightsByAc = {}; // acId -> { uuid: flightObj }
+  pages.forEach(function(raw){
+    const p = parseAirbly(raw);
+    p.aircraft.forEach(function(ac){
+      if(!allFlightsByAc[ac.id]) allFlightsByAc[ac.id] = {};
+      const flights = p.flights[ac.id] || [];
+      flights.forEach(function(f){
+        const uuid = f.id;
+        if(!uuid) return;
+        // Keep entry with largest air_sec in case of duplicates across pages
+        if(!allFlightsByAc[ac.id][uuid] || f.air_sec > allFlightsByAc[ac.id][uuid].air_sec){
+          allFlightsByAc[ac.id][uuid] = f;
+        }
+      });
+    });
+  });
+
+  // Rebuild flights arrays from deduplicated maps, sorted by dep_ms
+  parsed.aircraft.forEach(function(ac){
+    const map = allFlightsByAc[ac.id] || {};
+    parsed.flights[ac.id] = Object.values(map).sort((a,b)=>(a.dep_ms||0)-(b.dep_ms||0));
+  });
+
+  return parsed;
 }
 
 async function doConnect(keyOverride){
@@ -681,22 +720,52 @@ async function doConnect(keyOverride){
   if(err) err.style.display='none';
   try{
     ST._primaryKey = key; // store for bootstrap use
-    // Fetch both Airbly accounts in parallel
     const SECOND_KEY = '6W9TZU5ECtrE3U1UeptzaNsCaXoWcQ';
-    const [raw1, raw2] = await Promise.allSettled([
+
+    // Build date windows for pagination
+    // Window 1: no filter — gets most recent 100 flights + all aircraft metadata (totalHobbs etc)
+    // Window 2: current month first half (1st–15th)
+    // Window 3: previous full month
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth()+1).padStart(2,'0');
+    const prevDate = new Date(now.getFullYear(), now.getMonth()-1, 1);
+    const py = prevDate.getFullYear();
+    const pm = String(prevDate.getMonth()+1).padStart(2,'0');
+    const curMonthStart  = `${y}-${m}-01`;
+    const curMonthMid    = `${y}-${m}-15`;
+    const prevMonthStart = `${py}-${pm}-01`;
+
+    // Fetch all three windows for both accounts in parallel (6 total calls)
+    if(btn) btn.textContent='⏳  Fetching flights…';
+    const [
+      p1w1, p1w2, p1w3,
+      p2w1, p2w2, p2w3
+    ] = await Promise.allSettled([
       fetchAirbly(key),
-      fetchAirbly(SECOND_KEY)
+      fetchAirbly(key,  curMonthStart,  curMonthMid),
+      fetchAirbly(key,  prevMonthStart, curMonthStart),
+      fetchAirbly(SECOND_KEY),
+      fetchAirbly(SECOND_KEY, curMonthStart,  curMonthMid),
+      fetchAirbly(SECOND_KEY, prevMonthStart, curMonthStart),
     ]);
-    if(raw1.status==='rejected') throw new Error(raw1.reason?.message||'Primary Airbly connection failed.');
-    const primary = parseAirbly(raw1.value);
+
+    if(p1w1.status==='rejected') throw new Error(p1w1.reason?.message||'Primary Airbly connection failed.');
+
+    // Merge primary account pages — only use fulfilled pages
+    const primaryPages = [p1w1, p1w2, p1w3]
+      .filter(p=>p.status==='fulfilled')
+      .map(p=>p.value);
+    const primary = mergeAirblyPages(primaryPages);
     if(!primary.aircraft.length) throw new Error('No aircraft found in this Airbly group.');
 
     let allAirblyAircraft = [...primary.aircraft];
     let allFlights = {...primary.flights};
 
     // Merge second account — filter to G-EGTB only
-    if(raw2.status==='fulfilled'){
-      const secondary = parseAirbly(raw2.value);
+    const secondaryFulfilled = [p2w1, p2w2, p2w3].filter(p=>p.status==='fulfilled').map(p=>p.value);
+    if(secondaryFulfilled.length){
+      const secondary = mergeAirblyPages(secondaryFulfilled);
       const egtb = secondary.aircraft.find(a=>a.reg==='G-EGTB');
       if(egtb){
         allAirblyAircraft.push(egtb);
@@ -729,7 +798,7 @@ async function doConnect(keyOverride){
         console.warn('G-EGTB not found on second Airbly account');
       }
     } else {
-      console.warn('Second Airbly account unavailable:', raw2.reason?.message);
+      console.warn('Second Airbly account unavailable or no pages fulfilled');
     }
 
     // Save primary key permanently
@@ -984,6 +1053,90 @@ async function bootstrapSnapshotsFromFlightLogs(){
 }
 
 // ══ SHOW APP ═════════════════════════════════════
+// ══ FLIGHT STORE SYNC ════════════════════════════
+// Persists all Airbly flight records to a dedicated JSONBin bin.
+// Uses UUID as key — adds new flights, updates changed ones, never deletes.
+// This gives the monthly utilisation table a stable historical record
+// that is immune to Airbly's 100-flight API cap and any retrospective changes.
+async function syncFlightStore(){
+  if(ST.isDemo || JB._flightsPushing) return;
+  if(!ST.flights || !Object.keys(ST.flights).length) return;
+  JB._flightsPushing = true;
+  try{
+    // Pull existing store from flights bin
+    let stored = {};
+    try{
+      const r = await fetch(JB.URL + JB.FLIGHTS_BIN + '/latest', {
+        headers: {'X-Master-Key': JB.KEY, 'X-Bin-Meta': 'false'},
+      });
+      if(r.ok){
+        const data = await r.json();
+        stored = (data && typeof data.flights === 'object') ? data.flights : {};
+      }
+    } catch(e){
+      console.warn('[FlightStore] Pull failed — will still attempt push:', e.message);
+    }
+
+    // Merge current ST.flights into stored, keyed by UUID
+    // Never remove existing entries — only add or update
+    let changed = false;
+    Object.keys(ST.flights).forEach(function(acId){
+      const flights = ST.flights[acId] || [];
+      flights.forEach(function(f){
+        const uuid = f.id;
+        if(!uuid) return;
+        const existing = stored[uuid];
+        // Determine if this is new or has changed
+        const newEntry = {
+          uuid:       uuid,
+          aircraft_id: acId,
+          reg:        (ST.aircraft.find(a=>a.id===acId)||{}).reg || '',
+          dep_ms:     f.dep_ms,
+          arr_ms:     f.arr_ms,
+          air_sec:    f.air_sec,
+          from:       f.from || '',
+          to:         f.to || '',
+          cycles:     f.cycles || 1,
+          fuel:       f.fuel || null,
+          last_seen:  new Date().toISOString().slice(0,10),
+        };
+        if(!existing){
+          newEntry.first_seen = newEntry.last_seen;
+          stored[uuid] = newEntry;
+          changed = true;
+        } else if(existing.air_sec !== f.air_sec || existing.dep_ms !== f.dep_ms){
+          // Flight was edited in Airbly — update values but preserve first_seen
+          newEntry.first_seen = existing.first_seen || existing.last_seen;
+          stored[uuid] = newEntry;
+          changed = true;
+        }
+      });
+    });
+
+    if(!changed){
+      console.log('[FlightStore] No new or changed flights — skipping push');
+      return;
+    }
+
+    // Push merged store back
+    const r2 = await fetch(JB.URL + JB.FLIGHTS_BIN, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Master-Key': JB.KEY,
+      },
+      body: JSON.stringify({flights: stored, _updated: new Date().toISOString()}),
+    });
+    if(!r2.ok) throw new Error('HTTP ' + r2.status);
+    const count = Object.keys(stored).length;
+    console.log('[FlightStore] Synced — ' + count + ' total flights stored');
+  } catch(e){
+    console.warn('[FlightStore] Sync failed:', e.message);
+  } finally{
+    JB._flightsPushing = false;
+  }
+}
+
 async function showApp(){
   $('s-login').classList.remove('active');
   $('s-app').classList.add('active');
@@ -999,6 +1152,9 @@ async function showApp(){
   // Re-register manual aircraft flights slots after pull (may have new aircraft)
   ST.manualAircraft.forEach(m=>{ if(!ST.flights[m.id]) ST.flights[m.id]=[]; });
   buildAcList(); render();
+  // Background flight store sync — persists Airbly flights to dedicated bin
+  // Runs silently, does not affect app rendering or performance
+  syncFlightStore();
   // Background sync every 60s — picks up changes from other users
   if(!ST._syncInterval){
     ST._syncInterval=setInterval(async()=>{
