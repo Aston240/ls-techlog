@@ -711,7 +711,7 @@ function mergeRawLogs(baseFlights, extraLogsByAc){
       if(!existing || u.air_seconds > existing.air_sec){
         byUuid[acId][uuid] = {
           id:       uuid,
-          dep_ms:   u.air_first_takeoff || u.engine_start_at || l.happened_at,
+          dep_ms:   l.happened_at || u.air_first_takeoff || u.engine_start_at,
           arr_ms:   u.air_last_landing  || u.engine_stop_at  || l.happened_at,
           from:     l.route?.departure_ident || '',
           to:       l.route?.arrival_ident   || '',
@@ -925,7 +925,7 @@ function parseAirbly(raw){
         const u = l.usage;
         return {
           id:       l.uuid || Math.random(),
-          dep_ms:   u.air_first_takeoff || u.engine_start_at || l.happened_at,
+          dep_ms:   l.happened_at || u.air_first_takeoff || u.engine_start_at,
           arr_ms:   u.air_last_landing  || u.engine_stop_at  || l.happened_at,
           from:     l.route?.departure_ident||'',
           to:       l.route?.arrival_ident||'',
