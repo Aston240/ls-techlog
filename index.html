@@ -706,7 +706,12 @@ function mergeRawLogs(baseFlights, extraLogsByAc){
       const uuid = l.uuid;
       if(!uuid) return;
       const u = l.usage;
-      if(!u || u.air_seconds <= 0) return;
+      if(!u || u.air_seconds <= 0){
+        // Audit: log skipped zero-air-time entries for BTGO
+        const ac = Object.values(byUuid).length; // just to avoid unused var
+        if(acId && u) console.log('[Skip]', uuid.slice(-8), 'air_sec:', u.air_seconds||0, 'happened:', new Date(l.happened_at).toISOString().slice(0,10));
+        return;
+      }
       const existing = byUuid[acId][uuid];
       if(!existing || u.air_seconds > existing.air_sec){
         byUuid[acId][uuid] = {
@@ -742,36 +747,23 @@ async function doConnect(keyOverride){
     ST._primaryKey = key;
     const SECOND_KEY = '6W9TZU5ECtrE3U1UeptzaNsCaXoWcQ';
 
-    // Half-month windows exactly as demonstrated by Chris (Airbly support):
-    // W1: no filter — most recent 100 flights + correct aircraft metadata (totalHobbs)
-    // W2-W11: half-month splits Dec 2025 to now, each gets its own 100-flight cap
-    // Splitting at the 16th of each month matches Chris's Apr example exactly:
-    //   Apr 1-16: after=1775001600000 before=1776297600000
-    //   Apr 16-May: after=1776297600000 before=1777593600000
-    const W = [
-      [1775001600000, 1776297600000], // Apr  1-16
-      [1776297600000, 1777593600000], // Apr 16-May 1
-      [1773532800000, 1775001600000], // Mar 16-Apr 1
-      [1772323200000, 1773532800000], // Mar  1-16
-      [1770854400000, 1772323200000], // Feb 16-Mar 1
-      [1769644800000, 1770854400000], // Feb  1-16
-      [1768262400000, 1769644800000], // Jan 16-Feb 1
-      [1767052800000, 1768262400000], // Jan  1-16
-      [1765756800000, 1767052800000], // Dec 16-Jan 1
-      [1764547200000, 1765756800000], // Dec  1-16
-    ];
+    // Exactly as Chris (Airbly support) demonstrated:
+    // log_completed_after=1764547200000&log_completed_before=1777593600000
+    // One wide window Dec 1 2025 to May 1 2026 alongside the unfiltered W1 call
+    const W_AFTER  = 1764547200000; // Dec 1 2025
+    const W_BEFORE = 1777593600000; // May 1 2026
 
     const calls = [
       fetchAirbly(key),
       fetchAirbly(SECOND_KEY),
-      ...W.map(([a,b]) => fetchAirbly(key, a, b)),
-      ...W.map(([a,b]) => fetchAirbly(SECOND_KEY, a, b)),
+      fetchAirbly(key,         W_AFTER, W_BEFORE),
+      fetchAirbly(SECOND_KEY,  W_AFTER, W_BEFORE),
     ];
     const results = await Promise.allSettled(calls);
     const p1w1 = results[0];
     const p2w1 = results[1];
-    const p1windows = results.slice(2, 12);
-    const p2windows = results.slice(12, 22);
+    const p1windows = [results[2]];
+    const p2windows = [results[3]];
 
     if(p1w1.status==='rejected') throw new Error(p1w1.reason?.message||'Primary Airbly connection failed.');
 
