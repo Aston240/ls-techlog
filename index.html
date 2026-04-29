@@ -804,6 +804,16 @@ async function doConnect(keyOverride){
       console.log('[Extra]', ac.reg, 'raw logs from windows:', logs.length, '| sample dates:', JSON.stringify(sample));
     });
     const allFlights = mergeRawLogs(primary.flights, extraPrimary);
+    // Debug: log BTGO March flights and their air_sec
+    const btgo = primary.aircraft.find(a=>a.reg==='G-BTGO');
+    if(btgo){
+      const marchFlights = (allFlights[btgo.id]||[]).filter(f=>{
+        const ym = new Date(f.dep_ms).toISOString().slice(0,7);
+        return ym === '2026-03';
+      });
+      console.log('[BTGO March] flight count:', marchFlights.length);
+      marchFlights.forEach(f=>console.log('[BTGO March]', new Date(f.dep_ms).toISOString().slice(0,10), 'air_sec:', f.air_sec, '=', (f.air_sec/3600).toFixed(1)+'h'));
+    }
     // Debug: log per-aircraft flight counts after merge
     primary.aircraft.forEach(function(ac){
       const w1 = (primary.flights[ac.id]||[]).length;
