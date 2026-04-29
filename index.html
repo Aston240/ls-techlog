@@ -780,7 +780,12 @@ async function doConnect(keyOverride){
     // Log what W2+W3 contributed before merging
     Object.keys(extraPrimary).forEach(function(acId){
       const ac = primary.aircraft.find(a=>a.id===acId);
-      if(ac) console.log('[Extra]', ac.reg, 'raw logs from W2+W3:', extraPrimary[acId].length);
+      if(!ac) return;
+      const logs = extraPrimary[acId];
+      const sample = logs.slice(0,3).map(function(l){
+        return {uuid: l.uuid.slice(-8), happened: new Date(l.happened_at).toISOString().slice(0,10)};
+      });
+      console.log('[Extra]', ac.reg, 'raw logs from W2+W3:', logs.length, '| sample dates:', JSON.stringify(sample));
     });
     const allFlights = mergeRawLogs(primary.flights, extraPrimary);
     // Debug: log per-aircraft flight counts after merge
