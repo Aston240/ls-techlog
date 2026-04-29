@@ -777,7 +777,18 @@ async function doConnect(keyOverride){
     });
 
     // Merge W2+W3 flights into W1 flights by UUID
+    // Log what W2+W3 contributed before merging
+    Object.keys(extraPrimary).forEach(function(acId){
+      const ac = primary.aircraft.find(a=>a.id===acId);
+      if(ac) console.log('[Extra]', ac.reg, 'raw logs from W2+W3:', extraPrimary[acId].length);
+    });
     const allFlights = mergeRawLogs(primary.flights, extraPrimary);
+    // Debug: log per-aircraft flight counts after merge
+    primary.aircraft.forEach(function(ac){
+      const w1 = (primary.flights[ac.id]||[]).length;
+      const merged = (allFlights[ac.id]||[]).length;
+      console.log('[Merge]', ac.reg, 'W1:', w1, '→ merged:', merged);
+    });
     let allAirblyAircraft = [...primary.aircraft];
 
     // Second account — G-EGTB only, same three-window approach
