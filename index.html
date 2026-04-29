@@ -790,6 +790,8 @@ async function doConnect(keyOverride){
         if(ac && ac.reg === 'G-BTGO' && raw[acId].length > 0){
           const dates = raw[acId].map(l=>l.happened_at).sort((a,b)=>a-b);
           console.log('[Win'+i+'] BTGO:', raw[acId].length, 'flights | oldest:', new Date(dates[0]).toISOString().slice(0,10), '| newest:', new Date(dates[dates.length-1]).toISOString().slice(0,10));
+        } else if(ac && ac.reg === 'G-BTGO'){
+          console.log('[Win'+i+'] BTGO: 0 flights');
         }
       });
       Object.keys(raw).forEach(function(acId){
