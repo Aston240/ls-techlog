@@ -742,21 +742,17 @@ async function doConnect(keyOverride){
     ST._primaryKey = key;
     const SECOND_KEY = '6W9TZU5ECtrE3U1UeptzaNsCaXoWcQ';
 
-    // Three date windows per account (6 total parallel calls):
+    // Two calls per account (4 total parallel calls):
     // W1: no filter — most recent 100 flights + correct aircraft metadata (totalHobbs)
-    // W2: current month (1st UTC to now) — catches flights not in W1 due to cap
-    // W3: previous full month — catches older flights not in W1
-    const now       = new Date();
-    const curStart  = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1);
-    const prevStart = Date.UTC(now.getUTCFullYear(), now.getUTCMonth()-1, 1);
+    // W2: wide window Dec 1 2025 to now — catches all flights beyond W1's 100-flight cap
+    // Using exactly the approach Chris demonstrated: one wide date range covering the period needed
+    const decStart = Date.UTC(2025, 11, 1); // Dec 1 2025 midnight UTC
 
-    const [p1w1, p1w2, p1w3, p2w1, p2w2, p2w3] = await Promise.allSettled([
+    const [p1w1, p1w2, p2w1, p2w2] = await Promise.allSettled([
       fetchAirbly(key),
-      fetchAirbly(key,  curStart,  Date.now()),
-      fetchAirbly(key,  prevStart, curStart),
+      fetchAirbly(key,  decStart, Date.now()),
       fetchAirbly(SECOND_KEY),
-      fetchAirbly(SECOND_KEY, curStart,  Date.now()),
-      fetchAirbly(SECOND_KEY, prevStart, curStart),
+      fetchAirbly(SECOND_KEY, decStart, Date.now()),
     ]);
 
     if(p1w1.status==='rejected') throw new Error(p1w1.reason?.message||'Primary Airbly connection failed.');
@@ -765,9 +761,9 @@ async function doConnect(keyOverride){
     const primary = parseAirbly(p1w1.value);
     if(!primary.aircraft.length) throw new Error('No aircraft found in this Airbly group.');
 
-    // W2 + W3: extract raw logs only, do not call parseAirbly (would corrupt totalHobbs)
+    // W2: extract raw logs only, do not call parseAirbly (would corrupt totalHobbs)
     const extraPrimary = {};
-    [p1w2, p1w3].forEach(function(p){
+    [p1w2].forEach(function(p){
       if(p.status !== 'fulfilled') return;
       const raw = extractFlightsFromRaw(p.value);
       Object.keys(raw).forEach(function(acId){
@@ -804,7 +800,7 @@ async function doConnect(keyOverride){
         allAirblyAircraft.push(egtb);
         const egtbBase = { [egtb.id]: secondary.flights[egtb.id] || [] };
         const extraSecondary = {};
-        [p2w2, p2w3].forEach(function(p){
+        [p2w2].forEach(function(p){
           if(p.status !== 'fulfilled') return;
           const raw = extractFlightsFromRaw(p.value);
           Object.keys(raw).forEach(function(acId){
