@@ -781,9 +781,17 @@ async function doConnect(keyOverride){
 
     // W2-W11: extract raw logs only, do not call parseAirbly (would corrupt totalHobbs)
     const extraPrimary = {};
-    p1windows.forEach(function(p){
+    p1windows.forEach(function(p, i){
       if(p.status !== 'fulfilled') return;
       const raw = extractFlightsFromRaw(p.value);
+      // Debug: show oldest and newest happened_at for each window
+      Object.keys(raw).forEach(function(acId){
+        const ac = primary.aircraft.find(a=>a.id===acId);
+        if(ac && ac.reg === 'G-BTGO' && raw[acId].length > 0){
+          const dates = raw[acId].map(l=>l.happened_at).sort((a,b)=>a-b);
+          console.log('[Win'+i+'] BTGO:', raw[acId].length, 'flights | oldest:', new Date(dates[0]).toISOString().slice(0,10), '| newest:', new Date(dates[dates.length-1]).toISOString().slice(0,10));
+        }
+      });
       Object.keys(raw).forEach(function(acId){
         if(!extraPrimary[acId]) extraPrimary[acId] = [];
         extraPrimary[acId] = extraPrimary[acId].concat(raw[acId]);
