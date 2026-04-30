@@ -2858,12 +2858,12 @@ function buildMonthlyTable(){
 
   if(!earliestYM) return '<div style="font-size:12px;color:var(--mut);padding:12px 0">No flight data available yet.</div>';
 
-  // Build month list capped at 12
+  // Always start from Jan 2026 regardless of data history
+  const hardStart = '2026-01';
   const months = [];
-  let m = new Date(earliestYM+'-01');
+  let m = new Date((earliestYM > hardStart ? earliestYM : hardStart) + '-01');
   const cur = new Date(now.getFullYear(), now.getMonth(), 1);
   while(m<=cur){ months.push(m.getFullYear()+'-'+String(m.getMonth()+1).padStart(2,'0')); m=new Date(m.getFullYear(),m.getMonth()+1,1); }
-  if(months.length>12) months.splice(0,months.length-12);
 
   // Build data matrix
   const data = {};
