@@ -322,14 +322,11 @@ tfoot td{padding:11px;background:#112240;font-weight:700;}
 </div>
 
 <script>
-// ══ JSONBIN SYNC ══════════════════════════════════
-const JB={
-  BIN: '69ac06bf43b1c97be9bd5667',
-  KEY: '$2a$10$wjZldGseV25iurze/grlbOQ1ZxUVCugh.kmmRH3LOo3zEiUF4RKPS',
-  URL: 'https://api.jsonbin.io/v3/b/',
+// ══ APP DATA SYNC (GAS) ═══════════════════════════
+const GAS_APP_URL = 'https://script.google.com/macros/s/AKfycbzNELMMHNy6MVh6O3rL1vTtF8V2zTZr5Y2KGWt3I1YdgVRzzfH2BXqA2VcE4oH7cB2uAg/exec';
+const AD = {
   _pushing: false,
   _timer: null,
-  _flightsPushing: false,
 };
 
 // Set sync status indicator in topbar
@@ -346,20 +343,18 @@ function syncStatus(state, msg){
   el.innerHTML=`<span style="color:${s.color};font-size:11px">${s.icon} ${s.text}</span>`;
 }
 
-// Pull latest from JSONBin and merge into local state
+// Pull latest from GAS and merge into local state
 async function syncPull(){
   try{
-    const r=await fetch(JB.URL+JB.BIN+'/latest',{
-      headers:{'X-Master-Key':JB.KEY,'X-Bin-Meta':'false'},
-    });
+    const r = await fetch(GAS_APP_URL);
     if(!r.ok) throw new Error('HTTP '+r.status);
-    const remote=await r.json();
+    const remote = await r.json();
+    if(remote.error) throw new Error(remote.error);
     // Merge: remote is authoritative for cfg UNLESS local was saved more recently
     if(remote.cfg && typeof remote.cfg==='object'){
-      const remoteTs = remote._cfgSavedAt || (remote._updated ? new Date(remote._updated).getTime() : 0);
+      const remoteTs = remote._cfgSavedAt || 0;
       const localTs  = ST._cfgSavedAt || 0;
       if(localTs > remoteTs){
-        // Local cfg is newer — push it up instead of letting remote overwrite
         console.log('[sync] Local cfg is newer than cloud (' + new Date(localTs).toLocaleTimeString() + ' vs ' + new Date(remoteTs).toLocaleTimeString() + ') — skipping remote cfg merge, pushing local up');
         syncPush();
       } else {
@@ -385,14 +380,12 @@ async function syncPull(){
       localStorage.setItem('tl_snapshots',JSON.stringify(ST.hoursSnapshots));
     }
     if(remote.dailyLog && typeof remote.dailyLog==='object'){
-      // Only merge remote dailyLog if it's newer than our local version
       const remoteLogTs = remote._dailyLogSavedAt || 0;
       const localLogTs  = ST._dailyLogSavedAt || 0;
       if(localLogTs > remoteLogTs){
         console.log('[sync] Local dailyLog is newer than cloud — skipping remote merge, pushing local up');
         syncPush();
       } else {
-        // Normalise date to ISO for deduplication — handles both "2026-02-14" and "14 Feb 2026"
         function toISOKey(dateStr){
           if(!dateStr) return dateStr;
           if(/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
@@ -418,12 +411,12 @@ async function syncPull(){
   }
 }
 
-// Push current state to JSONBin (debounced — waits 800ms after last call)
+// Push current state to GAS (debounced — waits 800ms after last call)
 function syncPush(){
-  clearTimeout(JB._timer);
-  JB._timer=setTimeout(async ()=>{
-    if(JB._pushing) return;
-    JB._pushing=true;
+  clearTimeout(AD._timer);
+  AD._timer=setTimeout(async ()=>{
+    if(AD._pushing) return;
+    AD._pushing=true;
     syncStatus('syncing');
     try{
       const payload={
@@ -432,37 +425,26 @@ function syncPush(){
         dailyLog: ST.dailyLog||{},
         hoursSnapshots: ST.hoursSnapshots||{},
         downtimeLog: ST.downtimeLog||[],
-        sheets: Object.fromEntries(
-          Object.keys(ST.cfg).map(id=>[id, ST.cfg[id]?.sheet_start||'1'])
-        ),
         _updated: new Date().toISOString(),
         _cfgSavedAt: ST._cfgSavedAt||0,
         _dailyLogSavedAt: ST._dailyLogSavedAt||0,
       };
-      const r=await fetch(JB.URL+JB.BIN,{
-        method:'PUT',
-        headers:{
-          'Content-Type':'application/json',
-          'X-Master-Key':JB.KEY,
-        },
+      const r=await fetch(GAS_APP_URL,{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
         body: JSON.stringify(payload),
       });
-      if(r.status===429){
-        // Rate limited — retry after 5 seconds
-        setTimeout(()=>syncPush(), 5000);
-        syncStatus('offline','Rate limited — will retry…');
-        return;
-      }
       if(!r.ok) throw new Error('HTTP '+r.status);
       syncStatus('ok','Synced '+ new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}));
     } catch(e){
       console.warn('syncPush failed:',e.message);
       syncStatus('offline','Saved locally (offline)');
     } finally{
-      JB._pushing=false;
+      AD._pushing=false;
     }
   }, 800);
 }
+
 
 // ══ STATE ════════════════════════════════════════
 const ST={
@@ -535,8 +517,8 @@ function rebuildManualSnapshots(id){
 function manualPush(){
   ST._cfgSavedAt = Date.now();
   localStorage.setItem('tl_cfg_ts', ST._cfgSavedAt.toString());
-  clearTimeout(JB._timer);
-  JB._pushing=false;
+  clearTimeout(AD._timer);
+  AD._pushing=false;
   syncPush();
   syncStatus('syncing','Pushing to cloud…');
 }
@@ -1078,9 +1060,9 @@ async function bootstrapSnapshotsFromFlightLogs(){
 const GAS_FLIGHT_URL = 'https://script.google.com/macros/s/AKfycbyxXxnCcg-l8L4wDJwdRiyHGmZbSelNCVljDIrpugAEFE3SkSO1UC2K_rHe8Kn4Fshh/exec';
 
 async function syncFlightStore(){
-  if(ST.isDemo || JB._flightsPushing) return;
+  if(ST.isDemo || AD._flightsPushing) return;
   if(!ST.flights || !Object.keys(ST.flights).length) return;
-  JB._flightsPushing = true;
+  AD._flightsPushing = true;
   try{
     // Build flights object from current ST.flights — keyed by UUID
     const toSync = {};
@@ -1123,7 +1105,7 @@ async function syncFlightStore(){
   } catch(e){
     console.warn('[FlightStore] Sync failed:', e.message);
   } finally{
-    JB._flightsPushing = false;
+    AD._flightsPushing = false;
   }
 }
 
@@ -1132,7 +1114,7 @@ async function showApp(){
   $('s-app').classList.add('active');
   $('sb-stat').textContent=ST.isDemo?'● Demo Mode':'● Live – Airbly';
   $('sb-stat').style.color=ST.isDemo?'#f0a020':'#20c070';
-  // Pull latest settings from JSONBin before first render
+  // Pull latest settings from GAS before first render
   syncStatus('syncing','Loading cloud settings…');
   await syncPull();
   // Schedule nightly midnight snapshot for Airbly aircraft hours
@@ -3371,8 +3353,8 @@ async function forcePull(){
 async function forcePush(){
   syncStatus('syncing','Pushing to cloud…');
   // Push immediately (bypass debounce)
-  clearTimeout(JB._timer);
-  JB._pushing=false;
+  clearTimeout(AD._timer);
+  AD._pushing=false;
   syncPush();
   syncStatus('ok','Pushed to cloud');
 }
