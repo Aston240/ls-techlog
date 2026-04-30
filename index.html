@@ -681,8 +681,9 @@ async function fetchAirbly(key, after=null, before=null){
 async function loadFlightStore(){
   try{
     const res = await fetch(GAS_FLIGHT_URL);
-    if(!res.ok) return;
+    if(!res.ok){ console.warn('[FlightStore] GET failed:', res.status); return; }
     const data = await res.json();
+    console.log('[FlightStore] GET status:', data.status, '| flights received:', Object.keys(data.flights||{}).length);
     if(data.status !== 'ok' || !data.flights) return;
     // Group by reg
     const byReg = {};
@@ -692,6 +693,7 @@ async function loadFlightStore(){
       if(!byReg[reg]) byReg[reg] = {};
       byReg[reg][f.uuid] = f;
     });
+    console.log('[FlightStore] Regs loaded:', Object.keys(byReg).join(', '));
     ST.storeFlights = byReg;
     // Re-render utilisation tab if it's currently visible
     if(ST.view === 'utilisation') renderView();
