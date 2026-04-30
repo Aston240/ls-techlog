@@ -466,7 +466,7 @@ function syncPush(){
 
 // ══ STATE ════════════════════════════════════════
 const ST={
-  aircraft:[], flights:{}, selected:null,
+  aircraft:[], flights:{}, selected:null, storeFlights:{},
   view:'dashboard', isDemo:false, previewPage:0, dashGraph:null,
   cfg: JSON.parse(localStorage.getItem('tl_cfg')||'{}'),
   manualAircraft: JSON.parse(localStorage.getItem('tl_manual')||'[]'),
@@ -676,7 +676,31 @@ async function fetchAirbly(key, after=null, before=null){
   return raw;
 }
 
-// Extract raw flight logs from an Airbly response, keyed by aircraft UUID.
+// Fetch all flights from GAS flight store and populate ST.storeFlights keyed by reg.
+// Runs after connect and re-renders the utilisation tab when complete.
+async function loadFlightStore(){
+  try{
+    const res = await fetch(GAS_FLIGHT_URL);
+    if(!res.ok) return;
+    const data = await res.json();
+    if(data.status !== 'ok' || !data.flights) return;
+    // Group by reg
+    const byReg = {};
+    Object.values(data.flights).forEach(function(f){
+      const reg = f.reg;
+      if(!reg) return;
+      if(!byReg[reg]) byReg[reg] = {};
+      byReg[reg][f.uuid] = f;
+    });
+    ST.storeFlights = byReg;
+    // Re-render utilisation tab if it's currently visible
+    if(ST.view === 'utilisation') renderView();
+  } catch(e){
+    console.warn('[FlightStore] Load failed:', e.message);
+  }
+}
+
+
 // Used for paginated windows — only extracts flights, not aircraft metadata.
 // This avoids corrupting totalHobbs which reflects only the windowed period.
 function extractFlightsFromRaw(raw){
@@ -825,6 +849,7 @@ async function doConnect(keyOverride){
     if(!keyOverride) localStorage.setItem('tl_key', key);
     Object.assign(ST,{aircraft:allAirblyAircraft, flights:allFlights, selected:allAirblyAircraft[0], isDemo:false});
     showApp();
+    loadFlightStore(); // load historical flights from GAS in background
   } catch(e){
     if(err){ err.textContent='⚠ '+e.message; err.style.display='block'; }
     if(keyOverride){
@@ -2804,10 +2829,22 @@ function buildMonthlyTable(){
         if(ym) map[ym] = (map[ym]||0) + (e.added||0);
       });
     } else {
-      const flights = ST.flights[ac.id]||[];
-      flights.forEach(function(f){
+      // Build a deduplicated map of flights by UUID — live API first, then store fills gaps
+      const flightMap = {};
+      // Live Airbly flights (keyed by Airbly UUID)
+      (ST.flights[ac.id]||[]).forEach(function(f){ flightMap[f.id] = f; });
+      // GAS store flights for this reg — fills historical gaps not in live API
+      const storeFl = ST.storeFlights[ac.reg] || {};
+      Object.values(storeFl).forEach(function(f){
+        if(!flightMap[f.uuid]) flightMap[f.uuid] = {
+          id:      f.uuid,
+          dep_ms:  f.dep_ms,
+          air_sec: f.air_sec,
+        };
+      });
+      Object.values(flightMap).forEach(function(f){
         if(!f.dep_ms || !f.air_sec) return;
-        const ym = new Date(f.dep_ms).toISOString().slice(0,7);
+        const ym = new Date(Number(f.dep_ms)).toISOString().slice(0,7);
         map[ym] = (map[ym]||0) + (f.air_sec/3600);
       });
     }
