@@ -695,8 +695,8 @@ async function loadFlightStore(){
     });
     console.log('[FlightStore] Regs loaded:', Object.keys(byReg).join(', '));
     ST.storeFlights = byReg;
-    // Re-render utilisation tab if it's currently visible
-    if(ST.view === 'utilisation') renderView();
+    // Re-render current view to pick up store data
+    renderView();
   } catch(e){
     console.warn('[FlightStore] Load failed:', e.message);
   }
