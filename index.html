@@ -755,8 +755,9 @@ async function doConnect(keyOverride){
     // Exactly as Chris (Airbly support) demonstrated:
     // log_completed_after=1764547200000&log_completed_before=1777593600000
     // One wide window Dec 1 2025 to May 1 2026 alongside the unfiltered W1 call
+    const _now = new Date();
     const W_AFTER  = 1764547200000; // Dec 1 2025
-    const W_BEFORE = 1777593600000; // May 1 2026
+    const W_BEFORE = Date.UTC(_now.getUTCFullYear(), _now.getUTCMonth() + 1, 1); // first of next month
 
     const calls = [
       fetchAirbly(key),
