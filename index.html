@@ -275,6 +275,14 @@ tfoot td{padding:11px;background:#112240;font-weight:700;}
     </div>
 
     <div id="lerr" class="lerr"></div>
+    <div id="airbly-offline-btn" style="display:none;margin-top:12px">
+      <button class="btng" onclick="loadOffline()" style="width:100%;background:#1a2a1a;border-color:#2a4a2a;color:#6abf6a">
+        Continue without Airbly — use saved data only
+      </button>
+      <div style="font-size:11px;color:var(--mut);margin-top:6px;text-align:center">
+        Live flight data will not be available. Check <a href="https://airbly.com" target="_blank" style="color:var(--mut)">airbly.com</a> for status.
+      </div>
+    </div>
     <div class="lhint">
       <b>Find your key:</b> Airbly web app → Group Settings → Integrations &amp; API → Read-only key<br>
       <b>Tip:</b> Download &amp; open this file on your computer — your key is saved so you only enter it once.
@@ -309,6 +317,7 @@ tfoot td{padding:11px;background:#112240;font-weight:700;}
       <button id="mob-menu-btn" onclick="toggleSidebar()" aria-label="Menu">☰</button>
       <div class="tbar-title" id="view-title">Fleet Dashboard</div>
       <div style="display:flex;align-items:center;gap:12px">
+        <div id="offline-banner" style="display:none;font-size:11px;padding:4px 10px;background:#2a1a00;border:1px solid #a06020;border-radius:5px;color:#fbbf24">⚠ Airbly offline — saved data only</div>
         <div id="sync-status" style="font-size:11px;color:var(--mut)"></div>
         <button onclick="manualPush()" style="font-size:11px;padding:4px 12px;background:#0a2318;border:1px solid var(--grn);color:var(--grn);border-radius:6px;cursor:pointer;font-weight:700">&#9729; Push to Cloud</button>
         <button onclick="backupToSheets()" style="font-size:11px;padding:4px 12px;background:#1a2a1a;border:1px solid #81c784;color:#81c784;border-radius:6px;cursor:pointer;font-weight:700" title="Backup all data to Google Sheets">&#128196; Backup</button>
@@ -449,7 +458,7 @@ function syncPush(){
 
 // ══ STATE ════════════════════════════════════════
 const ST={
-  aircraft:[], flights:{}, selected:null, storeFlights:{}, storeLoaded:false,
+  aircraft:[], flights:{}, selected:null, storeFlights:{}, storeLoaded:false, offlineMode:false,
   view:'dashboard', isDemo:false, previewPage:0, dashGraph:null,
   cfg: JSON.parse(localStorage.getItem('tl_cfg')||'{}'),
   manualAircraft: JSON.parse(localStorage.getItem('tl_manual')||'[]'),
@@ -632,6 +641,16 @@ function clearSavedKey(){
   $('saved-banner').style.display='none';
   $('key-entry').style.display='block';
 }
+
+// Load app using only local data and GAS flight store — no Airbly connection
+async function loadOffline(){
+  ST.aircraft = [];
+  ST.flights  = {};
+  ST.isDemo   = false;
+  ST.offlineMode = true;
+  showApp();
+  loadFlightStore();
+}
 function goLogin(){
   $('s-app').classList.remove('active');
   $('s-login').classList.add('active');
@@ -648,15 +667,24 @@ function goLogin(){
 // ══ CONNECT ══════════════════════════════════════
 async function fetchAirbly(key, after=null, before=null){
   // Hard cap per Airbly is 100 flights per request regardless of limit set.
-  // Date windows are used in doConnect to paginate around this.
   let url=`https://airbly.com/api/v3/assetList?groupKey=${encodeURIComponent(key)}&log_types=flight&log_limit_per_asset=100`;
   if(after)  url += `&log_completed_after=${after}`;
   if(before) url += `&log_completed_before=${before}`;
-  const r=await fetch(url);
-  if(!r.ok) throw new Error(`Airbly returned HTTP ${r.status}.`);
-  const raw=await r.json();
-  if(raw.auth_group_success===false) throw new Error('API key rejected by Airbly.');
-  return raw;
+  // 15 second timeout — show offline button if Airbly doesn't respond
+  const controller = new AbortController();
+  const timer = setTimeout(()=>controller.abort(), 15000);
+  try{
+    const r=await fetch(url, {signal: controller.signal});
+    clearTimeout(timer);
+    if(!r.ok) throw new Error(`Airbly returned HTTP ${r.status}.`);
+    const raw=await r.json();
+    if(raw.auth_group_success===false) throw new Error('API key rejected by Airbly.');
+    return raw;
+  } catch(e){
+    clearTimeout(timer);
+    if(e.name==='AbortError') throw new Error('Airbly timed out — the service may be down. Check airbly.com for status.');
+    throw e;
+  }
 }
 
 // Fetch all flights from GAS flight store and populate ST.storeFlights keyed by reg.
@@ -794,6 +822,9 @@ async function doConnect(keyOverride){
       $('lerr').textContent='⚠ Auto-connect failed: '+e.message;
       $('lerr').style.display='block';
     }
+    // Show offline option if Airbly timed out or failed
+    const offlineBtn = $('airbly-offline-btn');
+    if(offlineBtn) offlineBtn.style.display='block';
   } finally{
     if(btn){ btn.textContent='CONNECT TO AIRBLY →'; btn.disabled=false; }
   }
@@ -1063,8 +1094,10 @@ async function syncFlightStore(){
 async function showApp(){
   $('s-login').classList.remove('active');
   $('s-app').classList.add('active');
-  $('sb-stat').textContent=ST.isDemo?'● Demo Mode':'● Live – Airbly';
-  $('sb-stat').style.color=ST.isDemo?'#f0a020':'#20c070';
+  $('sb-stat').textContent=ST.isDemo?'● Demo Mode':ST.offlineMode?'● Offline Mode':'● Live – Airbly';
+  $('sb-stat').style.color=ST.isDemo?'#f0a020':ST.offlineMode?'#fbbf24':'#20c070';
+  const offlineBanner = $('offline-banner');
+  if(offlineBanner) offlineBanner.style.display = ST.offlineMode ? 'block' : 'none';
   // Pull latest settings from GAS before first render
   syncStatus('syncing','Loading cloud settings…');
   await syncPull();
