@@ -295,15 +295,14 @@
   .spinner { width:20px; height:20px; border:2px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin 1s linear infinite; }
 
   /* ── FLEET HOURS ── */
-  .fhours-grid { display:flex; flex-direction:column; gap:6px; }
-  .fhours-row { display:flex; align-items:center; gap:10px; padding:7px 0; border-bottom:1px solid var(--border); animation:fadeUp 0.4s ease both; }
+  .fhours-row { display:flex; align-items:baseline; gap:12px; padding:8px 0; border-bottom:1px solid var(--border); animation:fadeUp 0.4s ease both; }
   .fhours-row:last-child { border-bottom:none; padding-bottom:0; }
   .fhours-row:first-child { padding-top:0; }
-  .fhours-reg { font-family:var(--mono); font-size:13px; font-weight:700; letter-spacing:0.08em; color:var(--text); width:58px; flex-shrink:0; }
-  .fhours-bar-wrap { flex:1; height:8px; background:var(--border); border-radius:4px; overflow:hidden; }
-  .fhours-bar { height:100%; border-radius:4px; transition:width 0.6s ease; }
-  .fhours-hrs { font-family:var(--mono); font-size:12px; font-weight:700; width:52px; text-align:right; flex-shrink:0; }
-  .fhours-type { font-family:var(--mono); font-size:9px; color:var(--dim); letter-spacing:0.08em; width:38px; flex-shrink:0; text-align:right; }
+  .fhours-reg { font-family:var(--head); font-weight:900; font-size:27px; letter-spacing:0.07em; color:var(--text); line-height:1; flex-shrink:0; min-width:100px; }
+  .fhours-hrs { font-family:var(--head); font-weight:900; font-size:27px; line-height:1; flex:1; }
+  .fhours-type { font-family:var(--mono); font-size:11px; color:var(--dim); letter-spacing:0.08em; flex-shrink:0; }
+  .fhours-showall { font-family:var(--mono); font-size:9px; letter-spacing:0.1em; color:var(--dim); cursor:pointer; text-align:center; padding:8px 0 2px; border-top:1px solid var(--border); margin-top:4px; }
+  .fhours-showall:hover { color:var(--accent); }
 
   /* ── DEFECTS ── */
   .defect-item { display:flex; flex-direction:column; gap:4px; padding:9px 0; border-bottom:1px solid var(--border); animation:fadeUp 0.4s ease both; }
@@ -1632,34 +1631,46 @@ async function fetchFleetHours() {
   }
 }
 
+let fleetHoursShowAll = false;
+let fleetHoursData    = [];
+
 function renderFleetHours(aircraft) {
+  fleetHoursData = aircraft;
+  fleetHoursShowAll = false;
+  drawFleetHours();
+}
+
+function drawFleetHours() {
   const wrap = document.getElementById('fleetHoursWrap');
-  if (!aircraft || !aircraft.length) {
+  if (!fleetHoursData || !fleetHoursData.length) {
     wrap.innerHTML = '<div style="font-family:var(--mono);font-size:10px;color:var(--dim);letter-spacing:.1em;text-align:center;padding:10px 0;">NO DATA</div>';
     return;
   }
 
-  // Find max hours remaining for bar scaling
-  const maxHrs = Math.max(...aircraft.map(a => a.maintDue), 100);
+  const display  = fleetHoursShowAll
+    ? fleetHoursData
+    : fleetHoursData.filter(a => a.hoursRemaining < 15);
 
-  wrap.innerHTML = aircraft.map((a, i) => {
-    // Colour based on hours remaining
+  const hasMore  = fleetHoursData.some(a => a.hoursRemaining >= 15);
+  const btnLabel = fleetHoursShowAll ? '▲ SHOW UNDER 15HRS ONLY' : '▼ SHOW ALL AIRCRAFT';
+
+  if (!display.length) {
+    wrap.innerHTML = '<div style="font-family:var(--mono);font-size:10px;color:var(--dim);letter-spacing:.1em;text-align:center;padding:10px 0;">ALL AIRCRAFT &gt;15HRS TO CHECK</div>'
+      + (hasMore ? `<div class="fhours-showall" onclick="fleetHoursShowAll=true;drawFleetHours()">${btnLabel}</div>` : '');
+    return;
+  }
+
+  wrap.innerHTML = display.map((a, i) => {
     const col = a.hoursRemaining < 5  ? '#ff6060'
               : a.hoursRemaining < 15 ? 'var(--amber)'
               : 'var(--green)';
-
-    // Bar width as % of maintenance interval
-    const pct = Math.min(100, (a.hoursRemaining / a.maintDue) * 100).toFixed(1);
-
     return `<div class="fhours-row" style="animation-delay:${i*0.06}s">
       <span class="fhours-reg">${a.reg}</span>
-      <div class="fhours-bar-wrap">
-        <div class="fhours-bar" style="width:${pct}%;background:${col};"></div>
-      </div>
-      <span class="fhours-hrs" style="color:${col}">${a.hoursRemaining.toFixed(1)}</span>
+      <span class="fhours-hrs" style="color:${col}">${a.hoursRemaining.toFixed(1)} hrs</span>
       <span class="fhours-type">${a.checkType}</span>
     </div>`;
-  }).join('');
+  }).join('')
+  + (hasMore ? `<div class="fhours-showall" onclick="fleetHoursShowAll=!fleetHoursShowAll;drawFleetHours()">${btnLabel}</div>` : '');
 }
 
 loadOrder();
