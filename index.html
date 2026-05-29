@@ -382,11 +382,16 @@ async function syncPull(){
       localStorage.setItem('tl_downtime',JSON.stringify(ST.downtimeLog));
     }
     if(remote.hoursSnapshots && typeof remote.hoursSnapshots==='object'){
-      Object.keys(remote.hoursSnapshots).forEach(id=>{
-        if(!ST.hoursSnapshots[id]) ST.hoursSnapshots[id]={};
-        Object.assign(ST.hoursSnapshots[id], remote.hoursSnapshots[id]);
-      });
-      localStorage.setItem('tl_snapshots',JSON.stringify(ST.hoursSnapshots));
+      // Don't merge remote snapshots into local — each device maintains its own
+      // clean nightly history. Merging remote data causes spikes from bad readings.
+      if(!Object.keys(ST.hoursSnapshots).length){
+        // Only accept remote snapshots if we have none at all (fresh install)
+        Object.keys(remote.hoursSnapshots).forEach(id=>{
+          if(!ST.hoursSnapshots[id]) ST.hoursSnapshots[id]={};
+          Object.assign(ST.hoursSnapshots[id], remote.hoursSnapshots[id]);
+        });
+        localStorage.setItem('tl_snapshots',JSON.stringify(ST.hoursSnapshots));
+      }
     }
     if(remote.dailyLog && typeof remote.dailyLog==='object'){
       const remoteLogTs = remote._dailyLogSavedAt || 0;
