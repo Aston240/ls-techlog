@@ -1571,15 +1571,22 @@ document.getElementById('resolvePasswordInput').addEventListener('keydown', func
 // ══════════════════════════════════════════════════════
 //  FLEET HOURS TO NEXT CHECK
 // ══════════════════════════════════════════════════════
-const TECHLOG_GAS = 'https://script.google.com/macros/s/AKfycbwX-3amJ-nmdCWPDZP7qBVnTb43e3v5Jav5LNMXTzKxx_oQ3s4YKQDjeNLlgEzLAJS4/exec';
+const TECHLOG_SHEET_ID  = '1KP5wGmSc2TI8kogZVH-wDtx95Mmqtlb8YwhHDrzyGnI';
+const TECHLOG_SHEET_GID = '0';
 
 // Known Tier 1 PPL trainers — only show these on the ops dashboard
 const FLEET_REGS = ['G-BCGJ','G-PETR','G-MKAS','G-BTGO','G-FIAT','N150PK','G-EGTB','G-BOTN','G-HRYZ','G-SETG'];
 
 async function fetchFleetHours() {
   try {
-    const res  = await fetch(TECHLOG_GAS);
-    const data = await res.json();
+    // Fetch cell A1 directly from the sheet using gviz
+    const url  = `https://docs.google.com/spreadsheets/d/${TECHLOG_SHEET_ID}/gviz/tq?tqx=out:json&gid=${TECHLOG_SHEET_GID}&range=A1`;
+    const res  = await fetch(url);
+    const text = await res.text();
+    const json = JSON.parse(text.replace(/^[^(]+\(/, '').replace(/\);?\s*$/, ''));
+    const raw  = json.table?.rows?.[0]?.c?.[0]?.v;
+    if (!raw) throw new Error('No data in cell A1');
+    const data = JSON.parse(raw);
     if (!data || data.error) throw new Error(data?.error || 'No data');
 
     const cfg      = data.cfg      || {};
