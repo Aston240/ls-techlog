@@ -810,6 +810,67 @@ async function doConnect(keyOverride){
     const allFlights = mergeRawLogs(primary.flights, extraPrimary);
     const allAirblyAircraft = [...primary.aircraft];
 
+    // Second Airbly account — G-BOTN (device moved from G-EGTB)
+    const SECOND_KEY = '6W9TZU5ECtrE3U1UeptzaNsCaXoWcQ';
+    const [p2w1, p2w2] = await Promise.allSettled([
+      fetchAirbly(SECOND_KEY),
+      fetchAirbly(SECOND_KEY, W_AFTER, W_BEFORE),
+    ]);
+
+    if(p2w1.status === 'fulfilled'){
+      const secondary = parseAirbly(p2w1.value);
+      // Find BOTN — device was previously on EGTB so accept whichever aircraft appears
+      const botn = secondary.aircraft.find(a=>a.reg==='G-BOTN') || secondary.aircraft[0];
+      if(botn){
+        // Override reg to G-BOTN in case Airbly still shows old ident
+        botn.reg = 'G-BOTN';
+        allAirblyAircraft.push(botn);
+
+        // Merge BOTN flights from both windows
+        const botnBase = { [botn.id]: secondary.flights[botn.id] || [] };
+        const extraBotn = {};
+        if(p2w2.status === 'fulfilled'){
+          const raw = extractFlightsFromRaw(p2w2.value);
+          Object.keys(raw).forEach(function(acId){
+            if(!extraBotn[acId]) extraBotn[acId] = [];
+            extraBotn[acId] = extraBotn[acId].concat(raw[acId]);
+          });
+        }
+        const botnMerged = mergeRawLogs(botnBase, extraBotn);
+        allFlights[botn.id] = botnMerged[botn.id] || [];
+
+        // Migrate manual aircraft entry for G-BOTN → new Airbly ID
+        const manIdx = ST.manualAircraft.findIndex(m=>(ST.cfg[m.id]?.reg||m.reg||'').toUpperCase()==='G-BOTN');
+        if(manIdx !== -1){
+          const manId = ST.manualAircraft[manIdx].id;
+          const airblyId = botn.id;
+          // Copy cfg from manual to Airbly ID
+          if(ST.cfg[manId]){
+            if(!ST.cfg[airblyId]) ST.cfg[airblyId]={};
+            const manCfg = ST.cfg[manId];
+            ['reg','type','base','maint_due','check_type','cofa_exp','annual_due','sheet_start'].forEach(k=>{
+              if(manCfg[k]) ST.cfg[airblyId][k]=manCfg[k];
+            });
+          }
+          // Migrate dailyLog entries to new Airbly ID
+          if(ST.dailyLog[manId] && ST.dailyLog[manId].length){
+            if(!ST.dailyLog[airblyId]) ST.dailyLog[airblyId]=[];
+            ST.dailyLog[airblyId] = [...ST.dailyLog[manId], ...ST.dailyLog[airblyId]];
+          }
+          // Remove manual aircraft
+          ST.manualAircraft.splice(manIdx, 1);
+          delete ST.cfg[manId];
+          delete ST.dailyLog[manId];
+          saveManual(); saveCfg(); saveDailyLog();
+          console.log('[BOTN] Migrated manual aircraft to Airbly ID', airblyId);
+        }
+      } else {
+        console.warn('G-BOTN not found on second Airbly account');
+      }
+    } else {
+      console.warn('Second Airbly account unavailable:', p2w1.reason?.message);
+    }
+
     if(!keyOverride) localStorage.setItem('tl_key', key);
     Object.assign(ST,{aircraft:allAirblyAircraft, flights:allFlights, selected:activeAircraft()[0]||allAirblyAircraft[0], isDemo:false});
     showApp();
