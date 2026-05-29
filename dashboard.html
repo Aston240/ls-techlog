@@ -294,6 +294,17 @@
   .loading-state { display:flex; align-items:center; justify-content:center; gap:10px; padding:24px 0; font-family:var(--mono); font-size:13.5px; color:var(--dim); letter-spacing:0.15em; }
   .spinner { width:20px; height:20px; border:2px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin 1s linear infinite; }
 
+  /* ── FLEET HOURS ── */
+  .fhours-grid { display:flex; flex-direction:column; gap:6px; }
+  .fhours-row { display:flex; align-items:center; gap:10px; padding:7px 0; border-bottom:1px solid var(--border); animation:fadeUp 0.4s ease both; }
+  .fhours-row:last-child { border-bottom:none; padding-bottom:0; }
+  .fhours-row:first-child { padding-top:0; }
+  .fhours-reg { font-family:var(--mono); font-size:13px; font-weight:700; letter-spacing:0.08em; color:var(--text); width:58px; flex-shrink:0; }
+  .fhours-bar-wrap { flex:1; height:8px; background:var(--border); border-radius:4px; overflow:hidden; }
+  .fhours-bar { height:100%; border-radius:4px; transition:width 0.6s ease; }
+  .fhours-hrs { font-family:var(--mono); font-size:12px; font-weight:700; width:52px; text-align:right; flex-shrink:0; }
+  .fhours-type { font-family:var(--mono); font-size:9px; color:var(--dim); letter-spacing:0.08em; width:38px; flex-shrink:0; text-align:right; }
+
   /* ── DEFECTS ── */
   .defect-item { display:flex; flex-direction:column; gap:4px; padding:9px 0; border-bottom:1px solid var(--border); animation:fadeUp 0.4s ease both; }
   .defect-item:last-child { border-bottom:none; padding-bottom:0; }
@@ -459,6 +470,21 @@
     <div class="section-body">
       <div class="panel amber-top">
         <div id="noticesWrap"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ FLEET HOURS ═══ -->
+  <div class="section half-width" data-id="fleethours">
+    <div class="slabel" onclick="toggleSection(this)">
+      <span class="drag-handle">⠿</span>
+      <span>🛩</span> Hours to Next Check
+      <button class="width-btn" onclick="toggleWidth(event,this)">⬜ HALF</button>
+      <span class="chevron">▼</span>
+    </div>
+    <div class="section-body">
+      <div class="panel amber-top">
+        <div id="fleetHoursWrap"><div style="font-family:var(--mono);font-size:10px;color:var(--dim);letter-spacing:.1em;text-align:center;padding:10px 0;">LOADING...</div></div>
       </div>
     </div>
   </div>
@@ -1542,6 +1568,100 @@ document.getElementById('resolvePasswordInput').addEventListener('keydown', func
   if (e.key === 'Enter') confirmResolve();
 });
 
+// ══════════════════════════════════════════════════════
+//  FLEET HOURS TO NEXT CHECK
+// ══════════════════════════════════════════════════════
+const TECHLOG_GAS = 'https://script.google.com/macros/s/AKfycbwX-3amJ-nmdCWPDZP7qBVnTb43e3v5Jav5LNMXTzKxx_oQ3s4YKQDjeNLlgEzLAJS4/exec';
+
+// Known Tier 1 PPL trainers — only show these on the ops dashboard
+const FLEET_REGS = ['G-BCGJ','G-PETR','G-MKAS','G-BTGO','G-FIAT','N150PK','G-EGTB','G-BOTN','G-HRYZ','G-SETG'];
+
+async function fetchFleetHours() {
+  try {
+    const res  = await fetch(TECHLOG_GAS);
+    const data = await res.json();
+    if (!data || data.error) throw new Error(data?.error || 'No data');
+
+    const cfg      = data.cfg      || {};
+    const dailyLog = data.dailyLog || {};
+    const manual   = data.manual   || [];
+
+    // Build a map of reg → { currentHours, maintDue, checkType }
+    const aircraft = [];
+
+    // Process all cfg entries
+    Object.keys(cfg).forEach(id => {
+      const c = cfg[id];
+      if (!c || c.departed) return;
+
+      // Get registration
+      const reg = (c.reg || '').toUpperCase();
+      if (!reg) return;
+
+      // Only include fleet regs we care about
+      if (!FLEET_REGS.includes(reg)) return;
+
+      // Get maintenance due hours
+      const maintDueRaw = c.maint_due || '';
+      // maint_due format: "01 Sep 2025 / 1300 hrs" — extract the number after "/"
+      const maintMatch  = maintDueRaw.match(/\/\s*([\d.]+)\s*hrs?/i);
+      if (!maintMatch) return; // skip if no hours target
+      const maintDue = parseFloat(maintMatch[1]);
+      const checkType = c.check_type || '50hr';
+
+      // Calculate current hours from daily log
+      const manualAc   = manual.find(m => m.id === id);
+      const baseline   = parseFloat(c.man_hours_baseline || c.man_hours || (manualAc?.hours) || '0');
+      const logEntries = dailyLog[id] || [];
+      const logged     = logEntries.reduce((s, e) => s + (e.added || e.tacho || 0), 0);
+      const currentHrs = parseFloat((baseline + logged).toFixed(1));
+
+      const hoursRemaining = Math.max(0, maintDue - currentHrs);
+
+      aircraft.push({ reg, currentHrs, maintDue, hoursRemaining, checkType });
+    });
+
+    // Sort by hours remaining ascending (most urgent first)
+    aircraft.sort((a, b) => a.hoursRemaining - b.hoursRemaining);
+
+    renderFleetHours(aircraft);
+  } catch(e) {
+    console.warn('Fleet hours fetch failed:', e.message);
+    document.getElementById('fleetHoursWrap').innerHTML =
+      '<div style="font-family:var(--mono);font-size:10px;color:var(--dim);letter-spacing:.1em;text-align:center;padding:10px 0;">UNAVAILABLE</div>';
+  }
+}
+
+function renderFleetHours(aircraft) {
+  const wrap = document.getElementById('fleetHoursWrap');
+  if (!aircraft || !aircraft.length) {
+    wrap.innerHTML = '<div style="font-family:var(--mono);font-size:10px;color:var(--dim);letter-spacing:.1em;text-align:center;padding:10px 0;">NO DATA</div>';
+    return;
+  }
+
+  // Find max hours remaining for bar scaling
+  const maxHrs = Math.max(...aircraft.map(a => a.maintDue), 100);
+
+  wrap.innerHTML = aircraft.map((a, i) => {
+    // Colour based on hours remaining
+    const col = a.hoursRemaining < 5  ? '#ff6060'
+              : a.hoursRemaining < 15 ? 'var(--amber)'
+              : 'var(--green)';
+
+    // Bar width as % of maintenance interval
+    const pct = Math.min(100, (a.hoursRemaining / a.maintDue) * 100).toFixed(1);
+
+    return `<div class="fhours-row" style="animation-delay:${i*0.06}s">
+      <span class="fhours-reg">${a.reg}</span>
+      <div class="fhours-bar-wrap">
+        <div class="fhours-bar" style="width:${pct}%;background:${col};"></div>
+      </div>
+      <span class="fhours-hrs" style="color:${col}">${a.hoursRemaining.toFixed(1)}</span>
+      <span class="fhours-type">${a.checkType}</span>
+    </div>`;
+  }).join('');
+}
+
 loadOrder();
 initDrag();
 fetchWeather();
@@ -1549,6 +1669,7 @@ fetchNotams();
 fetchNotices();
 fetchFlights();
 refreshSlots();
+fetchFleetHours();
 setInterval(updateElapsed, 60000);
 setInterval(init, 60000);
 setInterval(()=>{ if(cachedSlots) renderSlots(cachedSlots); }, 60000);
@@ -1556,6 +1677,7 @@ setInterval(fetchWeather,  600000);   // weather every 10 mins
 setInterval(fetchNotams,  1800000);   // NOTAMs every 30 mins
 setInterval(fetchNotices,  300000);   // defects every 5 mins
 setInterval(fetchFlights,  120000);   // flights every 2 mins
+setInterval(fetchFleetHours, 600000); // fleet hours every 10 mins
 setInterval(refreshSlots,  120000);   // slots every 2 mins
 </script>
 </body>
