@@ -3070,8 +3070,8 @@ function rSettings(){
     </div>`;
   }).join('');
 
-  // Manual aircraft cards (can be deleted)
-  const manualCards=ST.manualAircraft.map(m=>{
+  // Manual aircraft cards (can be deleted) — exclude departed/archived
+  const manualCards=ST.manualAircraft.filter(m=>!ST.cfg[m.id]?.departed).map(m=>{
     const ac=manToAc(m);
     const c=ST.cfg[m.id]||{};
     return`<div class="card" style="margin-bottom:16px;border-color:var(--amb)">
