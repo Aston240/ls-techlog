@@ -1579,14 +1579,8 @@ const FLEET_REGS = ['G-BCGJ','G-PETR','G-MKAS','G-BTGO','G-FIAT','N150PK','G-EGT
 
 async function fetchFleetHours() {
   try {
-    // Fetch cell A1 directly from the sheet using gviz
-    const url  = `https://docs.google.com/spreadsheets/d/${TECHLOG_SHEET_ID}/gviz/tq?tqx=out:json&gid=${TECHLOG_SHEET_GID}&range=A1`;
-    const res  = await fetch(url);
-    const text = await res.text();
-    const json = JSON.parse(text.replace(/^[^(]+\(/, '').replace(/\);?\s*$/, ''));
-    const raw  = json.table?.rows?.[0]?.c?.[0]?.v;
-    if (!raw) throw new Error('No data in cell A1');
-    const data = JSON.parse(raw);
+    const res  = await fetch(`${WEATHER_PROXY}?action=techlog`);
+    const data = await res.json();
     if (!data || data.error) throw new Error(data?.error || 'No data');
 
     const cfg            = data.cfg            || {};
