@@ -960,87 +960,87 @@ function elapsed(dep) {
 }
 
 // ══════════════════════════════════════════════════════
-//  FETCH LIVE WEATHER — CheckWX API
+//  FETCH LIVE WEATHER — AutoRouter API (via Apps Script proxy)
 // ══════════════════════════════════════════════════════
-const CHECKWX_KEY = '9bfe517e1a534efc93c7d9b205e62260';
+const WEATHER_PROXY = 'https://script.google.com/macros/s/AKfycbyPKEPMRbfRh-fQtTInqcoqiQ5wZKKLFSC7P_4fYyEL35dnzEvEQKDX6vuW_TAZOtc8/exec';
 
 async function fetchWeather() {
-  const icaoList = ALL_ICAOS.join(',');
-
   try {
-    const metarRes = await fetch(
-      `https://api.checkwx.com/metar/${icaoList}/decoded`,
-      { headers: { 'X-API-Key': CHECKWX_KEY } }
+    // Fetch all airfields in parallel
+    const results = await Promise.all(
+      ALL_ICAOS.map(icao =>
+        fetch(`${WEATHER_PROXY}?action=weather&icao=${icao}`)
+          .then(r => r.json())
+          .catch(() => ({ icao, error: true }))
+      )
     );
-    const metarJson = await metarRes.json();
 
-    if (metarJson.data) {
-      for (const m of metarJson.data) {
-        const icao = m.icao;
-        if (!icao) continue;
-        wxData[icao] = {
-          metar:  m.raw_text || '',
-          cat:    flightCat(m.raw_text || ''),
-          wind:   { txt: formatWind(m), pct: windPct(m) },
-          vis:    { txt: formatVis(m),  pct: visPct(m)  },
-          cloud:  formatCloud(m),
-        };
-      }
-    }
-
-    const tafRes = await fetch(
-      `https://api.checkwx.com/taf/${ALL_ICAOS.join(',')}/decoded`,
-      { headers: { 'X-API-Key': CHECKWX_KEY } }
-    );
-    const tafJson = await tafRes.json();
-    if (tafJson.data) {
-      for (const t of tafJson.data) {
-        if (!t.icao) continue;
-        if (!wxData[t.icao]) wxData[t.icao] = {};
-        wxData[t.icao].taf = t.raw_text || '';
-      }
+    for (const d of results) {
+      if (d.error || !d.icao) continue;
+      const metar = d.metar || '';
+      const taf   = d.taf   || '';
+      wxData[d.icao] = {
+        metar,
+        taf,
+        cat:   flightCat(metar),
+        wind:  parseWind(metar),
+        vis:   parseVis(metar),
+        cloud: parseCloud(metar),
+      };
     }
 
     renderHomeWx();
     renderNearby();
 
   } catch(e) {
-    console.warn('CheckWX fetch failed:', e.message);
+    console.warn('Weather fetch failed:', e.message);
     renderHomeWx();
     renderNearby();
   }
 }
 
-// ── FORMAT HELPERS using CheckWX decoded data ──
-function formatWind(m) {
-  if (!m.wind) return '--';
-  const dir = m.wind.degrees === 0 ? 'VRB' : String(m.wind.degrees).padStart(3,'0');
-  const spd = m.wind.speed_kts;
-  const gust = m.wind.gust_kts ? `G${m.wind.gust_kts}` : '';
-  return `${dir}/${spd}${gust}KT`;
+// ── FORMAT HELPERS — parse raw METAR strings ──────────
+function parseWind(metar) {
+  if (!metar) return { txt: '--', pct: 0 };
+  const m = metar.match(/\b(\d{3}|VRB)(\d{2,3})(G(\d{2,3}))?KT\b/);
+  if (!m) return { txt: '--', pct: 0 };
+  const dir  = m[1];
+  const spd  = parseInt(m[2]);
+  const gust = m[4] ? `G${m[4]}` : '';
+  return {
+    txt: `${dir}/${spd}${gust}KT`,
+    pct: Math.min(100, Math.round((spd / 40) * 100))
+  };
 }
-function windPct(m) {
-  if (!m.wind) return 0;
-  return Math.min(100, Math.round((m.wind.speed_kts / 40) * 100));
+function parseVis(metar) {
+  if (!metar) return { txt: '--', pct: 0 };
+  // CAVOK
+  if (/\bCAVOK\b/.test(metar)) return { txt: '9999M', pct: 100 };
+  // Metric visibility e.g. 9999 or 0800
+  const m = metar.match(/\b(\d{4})\b(?!Z)/);
+  if (m) {
+    const v = parseInt(m[1]);
+    if (v <= 9999) return { txt: v >= 9999 ? '9999M' : v+'M', pct: Math.min(100, Math.round((v/9999)*100)) };
+  }
+  return { txt: '--', pct: 0 };
 }
-function formatVis(m) {
-  if (!m.visibility) return '--';
-  const metres = m.visibility.meters;
-  if (!metres) return m.visibility.miles ? m.visibility.miles+'SM' : '--';
-  return metres >= 9999 ? '9999M' : metres + 'M';
+function parseCloud(metar) {
+  if (!metar) return '--';
+  if (/\bCAVOK\b/.test(metar)) return 'CAVOK';
+  if (/\bNSC\b/.test(metar))   return 'NSC';
+  if (/\bSKC\b/.test(metar))   return 'SKC';
+  if (/\bCLR\b/.test(metar))   return 'CLR';
+  const layers = [...metar.matchAll(/\b(FEW|SCT|BKN|OVC)(\d{3})\b/g)];
+  if (!layers.length) return '--';
+  const lowest = layers.reduce((a,b) => parseInt(a[2]) < parseInt(b[2]) ? a : b);
+  return `${lowest[1]}${lowest[2]}`;
 }
-function visPct(m) {
-  if (!m.visibility) return 0;
-  const metres = m.visibility.meters || 0;
-  return Math.min(100, Math.round((metres / 9999) * 100));
-}
-function formatCloud(m) {
-  if (!m.clouds || !m.clouds.length) return 'CAVOK';
-  const lowest = m.clouds.reduce((a,b) => (a.base_feet_agl||99999) < (b.base_feet_agl||99999) ? a : b);
-  if (lowest.code === 'CAVOK' || lowest.code === 'CLR' || lowest.code === 'SKC') return lowest.code;
-  const hundreds = Math.round((lowest.base_feet_agl||0) / 100);
-  return `${lowest.code}${String(hundreds).padStart(3,'0')}`;
-}
+// Keep old names as aliases — renderHomeWx/renderNearby call these
+function formatWind(m) { return parseWind(m?.raw_text||''); }
+function windPct(m)    { return parseWind(m?.raw_text||'').pct; }
+function formatVis(m)  { return parseVis(m?.raw_text||''); }
+function visPct(m)     { return parseVis(m?.raw_text||'').pct; }
+function formatCloud(m){ return parseCloud(m?.raw_text||''); }
 
 // ══════════════════════════════════════════════════════
 //  RENDER HOME WEATHER
