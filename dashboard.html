@@ -1589,9 +1589,10 @@ async function fetchFleetHours() {
     const data = JSON.parse(raw);
     if (!data || data.error) throw new Error(data?.error || 'No data');
 
-    const cfg      = data.cfg      || {};
-    const dailyLog = data.dailyLog || {};
-    const manual   = data.manual   || [];
+    const cfg            = data.cfg            || {};
+    const dailyLog       = data.dailyLog       || {};
+    const manual         = data.manual         || [];
+    const hoursSnapshots = data.hoursSnapshots || {};
 
     // Build a map of reg → { currentHours, maintDue, checkType }
     const aircraft = [];
@@ -1608,20 +1609,18 @@ async function fetchFleetHours() {
       // Only include fleet regs we care about
       if (!FLEET_REGS.includes(reg)) return;
 
-      // Get maintenance due hours
-      const maintDueRaw = c.maint_due || '';
-      // maint_due format: "01 Sep 2025 / 1300 hrs" — extract the number after "/"
-      const maintMatch  = maintDueRaw.match(/\/\s*([\d.]+)\s*hrs?/i);
-      if (!maintMatch) return; // skip if no hours target
-      const maintDue = parseFloat(maintMatch[1]);
+      // Get maintenance due hours — stored as plain number e.g. "17456.46"
+      const maintDue = parseFloat(c.maint_due || '0');
+      if (!maintDue) return; // skip if no hours target
       const checkType = c.check_type || '50hr';
 
-      // Calculate current hours from daily log
-      const manualAc   = manual.find(m => m.id === id);
-      const baseline   = parseFloat(c.man_hours_baseline || c.man_hours || (manualAc?.hours) || '0');
-      const logEntries = dailyLog[id] || [];
-      const logged     = logEntries.reduce((s, e) => s + (e.added || e.tacho || 0), 0);
-      const currentHrs = parseFloat((baseline + logged).toFixed(1));
+      // Get current hours from hoursSnapshots — use most recent entry
+      const snapshots  = hoursSnapshots[id] || {};
+      const snapDates  = Object.keys(snapshots).sort();
+      const currentHrs = snapDates.length
+        ? parseFloat(snapshots[snapDates[snapDates.length - 1]])
+        : 0;
+      if (!currentHrs) return;
 
       const hoursRemaining = Math.max(0, maintDue - currentHrs);
 
