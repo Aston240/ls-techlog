@@ -3561,10 +3561,12 @@ function debugAirblyFields(){
 // Built from Airbly flight logs: live (ST.flights) + GAS store
 // (ST.storeFlights), deduplicated by UUID. Manual daily-log hours
 // are intentionally NOT included (avoids double-counting migrated
-// aircraft). All day/hour stats use UTC (aviation standard).
+// aircraft). All days/times are UTC (aviation standard).
+// A user-selectable date range filters every figure on the page.
 // ══════════════════════════════════════════════════
-const HOME_BASE = 'EGTK';   // London Oxford — for local vs cross-country split
-const T2_TARGET_HRS = 15;   // leased-aircraft monthly utilisation target
+const HOME_BASE = 'EGTK';   // London Oxford — home base, excluded from "away" stats
+const T2_TARGET_HRS = 15;   // default leased-aircraft monthly target (first run only)
+const PLACEHOLDER_HOUR = 12; // CSV-backfilled flights have no time → sit at exactly 12:00
 
 const FLEET_TIERS = {
   1:['G-BCGJ','G-PETR','G-MKAS','G-BTGO','G-FIAT','N150PK'],
@@ -3589,20 +3591,114 @@ function secsToHM(secs){
   const h=Math.floor((secs||0)/3600), m=Math.floor(((secs||0)%3600)/60);
   return h+':'+String(m).padStart(2,'0');
 }
+function todayISO(){ return new Date().toISOString().slice(0,10); }
+
+// ── Editable per-tier monthly targets (synced via the existing cfg push) ──
+function getTierTargets(){
+  const s = ST.cfg && ST.cfg.__settings__ && ST.cfg.__settings__.tierTargets;
+  if(s) return {1:(s[1]!=null?s[1]:null), 2:(s[2]!=null?s[2]:null), 3:(s[3]!=null?s[3]:null)};
+  return {1:null, 2:T2_TARGET_HRS, 3:null}; // first-run default preserves prior behaviour
+}
+function setTierTarget(tier, valStr){
+  if(!ST.cfg.__settings__) ST.cfg.__settings__={};
+  if(!ST.cfg.__settings__.tierTargets){
+    const cur=getTierTargets();
+    ST.cfg.__settings__.tierTargets={1:cur[1],2:cur[2],3:cur[3]};
+  }
+  const v = (valStr==='' || valStr==null) ? null : parseFloat(valStr);
+  ST.cfg.__settings__.tierTargets[tier] = (v!=null && !isNaN(v) && v>0) ? v : null;
+  saveCfg();
+  syncPush();   // rides the existing cfg sync — no server change needed
+  render();
+}
+
+// ── Date range state (persisted locally; default = 1 Jan this year → today) ──
+function anRange(){
+  if(!ST._anRange){
+    const saved = localStorage.getItem('tl_an_range');
+    if(saved){ try{ ST._anRange = JSON.parse(saved); }catch(e){} }
+    if(!ST._anRange || !ST._anRange.from || !ST._anRange.to){
+      const y = new Date().getUTCFullYear();
+      ST._anRange = {from:y+'-01-01', to:todayISO()};
+    }
+  }
+  return ST._anRange;
+}
+function anApply(from,to){
+  if(!from||!to) return;
+  if(from>to){ const t=from; from=to; to=t; } // tolerate reversed entry
+  ST._anRange={from,to};
+  localStorage.setItem('tl_an_range', JSON.stringify(ST._anRange));
+  render();
+}
+function anFromInputs(){
+  const f=document.getElementById('an-from'), t=document.getElementById('an-to');
+  if(f&&t&&f.value&&t.value) anApply(f.value,t.value);
+}
+function earliestFlightMs(){
+  let min=null;
+  Object.values(ST.storeFlights||{}).forEach(o=>Object.values(o).forEach(f=>{ const v=Number(f.dep_ms); if(v&&(min===null||v<min)) min=v; }));
+  Object.values(ST.flights||{}).forEach(arr=>arr.forEach(f=>{ const v=Number(f.dep_ms); if(v&&(min===null||v<min)) min=v; }));
+  return min;
+}
+function anPreset(p){
+  const now=new Date(), y=now.getUTCFullYear(), t=todayISO();
+  const firstOf=(mOffset)=>{ const d=new Date(Date.UTC(now.getUTCFullYear(),now.getUTCMonth()+mOffset,1)); return d.toISOString().slice(0,10); };
+  if(p==='year')  return anApply(y+'-01-01', t);
+  if(p==='6m')    return anApply(firstOf(-5), t);
+  if(p==='3m')    return anApply(firstOf(-2), t);
+  if(p==='month') return anApply(firstOf(0),  t);
+  if(p==='all'){
+    const ms=earliestFlightMs();
+    const from = ms ? new Date(ms).toISOString().slice(0,10) : (y-1)+'-01-01';
+    return anApply(from, t);
+  }
+}
+function anPresetActive(p){
+  const r=anRange(), now=new Date(), y=now.getUTCFullYear(), t=todayISO();
+  if(r.to!==t) return false;
+  const firstOf=(mOffset)=>{ const d=new Date(Date.UTC(now.getUTCFullYear(),now.getUTCMonth()+mOffset,1)); return d.toISOString().slice(0,10); };
+  if(p==='year')  return r.from===y+'-01-01';
+  if(p==='6m')    return r.from===firstOf(-5);
+  if(p==='3m')    return r.from===firstOf(-2);
+  if(p==='month') return r.from===firstOf(0);
+  return false;
+}
+
+// Continuous month keys spanning the selected range (clamped to current month).
+function rangeMonths(){
+  const r=anRange();
+  const from=new Date(r.from+'T00:00:00Z');
+  let d=new Date(Date.UTC(from.getUTCFullYear(),from.getUTCMonth(),1));
+  const to=new Date(r.to+'T00:00:00Z');
+  let end=new Date(Date.UTC(to.getUTCFullYear(),to.getUTCMonth(),1));
+  const now=new Date(), cap=new Date(Date.UTC(now.getUTCFullYear(),now.getUTCMonth(),1));
+  if(end>cap) end=cap;
+  const out=[]; let g=0;
+  while(d<=end && g++<360){ out.push(d.getUTCFullYear()+'-'+String(d.getUTCMonth()+1).padStart(2,'0')); d=new Date(Date.UTC(d.getUTCFullYear(),d.getUTCMonth()+1,1)); }
+  if(!out.length) out.push(from.getUTCFullYear()+'-'+String(from.getUTCMonth()+1).padStart(2,'0'));
+  return out;
+}
+function ymLabel(ym){
+  const p=ym.split('-'); return new Date(+p[0],+p[1]-1,1).toLocaleDateString('en-GB',{month:'short',year:'2-digit'});
+}
 
 // Flatten + dedupe every flight across the whole fleet (incl. departed
-// aircraft, whose history is real). Returns normalised flight objects.
-function analyticsFlights(){
+// aircraft), filtered to the active date range. Returns normalised flights.
+function analyticsFlights(range){
+  const fromMs = range ? Date.parse(range.from+'T00:00:00Z') : null;
+  const toMs   = range ? Date.parse(range.to  +'T23:59:59.999Z') : null;
+  const inRange = ms => (fromMs===null || (ms>=fromMs && ms<=toMs));
   const byUuid = {};
   // 1. GAS store — historical bulk, keyed by reg (captures departed aircraft)
   Object.keys(ST.storeFlights||{}).forEach(function(reg){
-    const flsForReg = ST.storeFlights[reg]||{};
-    Object.values(flsForReg).forEach(function(f){
+    Object.values(ST.storeFlights[reg]||{}).forEach(function(f){
       if(!f || !f.uuid || !f.dep_ms || !f.air_sec) return;
+      const dep=Number(f.dep_ms);
+      if(!inRange(dep)) return;
       byUuid[f.uuid] = {
         uuid:f.uuid, reg:(reg||'').toUpperCase(),
-        dep_ms:Number(f.dep_ms),
-        arr_ms:f.arr_ms?Number(f.arr_ms):null,
+        dep_ms:dep, arr_ms:f.arr_ms?Number(f.arr_ms):null,
         air_sec:Number(f.air_sec)||0,
         from:(f.from||'').toUpperCase(), to:(f.to||'').toUpperCase(),
         cycles:Number(f.cycles)||1,
@@ -3617,10 +3713,11 @@ function analyticsFlights(){
     const reg = idToReg[acId] || '';
     (ST.flights[acId]||[]).forEach(function(f){
       if(!f.id || !f.dep_ms || !f.air_sec) return;
+      const dep=Number(f.dep_ms);
+      if(!inRange(dep)) return;
       byUuid[f.id] = {
         uuid:f.id, reg: reg || (byUuid[f.id]&&byUuid[f.id].reg) || '',
-        dep_ms:Number(f.dep_ms),
-        arr_ms:f.arr_ms?Number(f.arr_ms):null,
+        dep_ms:dep, arr_ms:f.arr_ms?Number(f.arr_ms):null,
         air_sec:Number(f.air_sec)||0,
         from:(f.from||'').toUpperCase(), to:(f.to||'').toUpperCase(),
         cycles:Number(f.cycles)||1,
@@ -3631,25 +3728,24 @@ function analyticsFlights(){
   return Object.values(byUuid);
 }
 
-// Aggregate every metric in a single pass.
+// Aggregate every metric in a single pass over the filtered flight set.
 function buildAnalytics(){
-  const flights = analyticsFlights();
+  const range = anRange();
+  const flights = analyticsFlights(range);
   const A = {
+    range:range,
+    months:rangeMonths(),
     totalFlights: flights.length,
     totalHours: 0, totalLandings: 0,
     minDep:null, maxDep:null,
-    byMonth:{},          // ym -> {flights,hours,landings}
-    byRegMonth:{},       // reg -> ym -> hours
+    byMonth:{}, byRegMonth:{},
     byDow:[0,0,0,0,0,0,0],
-    byHour:new Array(24).fill(0),
+    byHour:new Array(24).fill(0), hourTimed:0, hourPlaceholder:0,
     airfields:{},
-    xcFlights:0, localFlights:0,
-    byReg:{},
-    byDay:{},
+    byReg:{}, byDay:{},
     longest:null,
-    hasFuel:false, fuelTotal:0, fuelFlights:0,
-    earliestTod:null, earliestDay:null,
-    latestTod:null, latestDay:null,
+    hasFuel:false, fuelTotal:0,
+    earliestTod:null, latestTod:null,
     durTotal:0,
   };
   flights.forEach(function(f){
@@ -3657,7 +3753,7 @@ function buildAnalytics(){
     A.totalHours += hrs;
     A.totalLandings += f.cycles;
     A.durTotal += f.air_sec;
-    if(f.fuel!=null && f.fuel>0){ A.hasFuel=true; A.fuelTotal+=f.fuel; A.fuelFlights++; }
+    if(f.fuel!=null && f.fuel>0){ A.hasFuel=true; A.fuelTotal+=f.fuel; }
     if(A.minDep===null || f.dep_ms<A.minDep) A.minDep=f.dep_ms;
     if(A.maxDep===null || f.dep_ms>A.maxDep) A.maxDep=f.dep_ms;
     if(!A.longest || f.air_sec>A.longest.air_sec) A.longest=f;
@@ -3666,15 +3762,18 @@ function buildAnalytics(){
     if(!A.byMonth[ym]) A.byMonth[ym]={flights:0,hours:0,landings:0};
     A.byMonth[ym].flights++; A.byMonth[ym].hours+=hrs; A.byMonth[ym].landings+=f.cycles;
     A.byDow[d.getUTCDay()]++;
-    A.byHour[d.getUTCHours()]++;
+    // Hour-of-day: exclude CSV-backfilled flights with no recorded time (exactly 12:00:00)
+    const hh=d.getUTCHours(), mm=d.getUTCMinutes(), ss=d.getUTCSeconds();
+    if(hh===PLACEHOLDER_HOUR && mm===0 && ss===0){ A.hourPlaceholder++; }
+    else { A.byHour[hh]++; A.hourTimed++;
+      const tod = hh*60+mm;
+      if(A.earliestTod===null || tod<A.earliestTod) A.earliestTod=tod;
+      if(A.latestTod===null  || tod>A.latestTod ) A.latestTod=tod;
+    }
     const dayKey = d.toISOString().slice(0,10);
     if(!A.byDay[dayKey]) A.byDay[dayKey]={flights:0,landings:0};
     A.byDay[dayKey].flights++; A.byDay[dayKey].landings+=f.cycles;
-    const tod = d.getUTCHours()*60 + d.getUTCMinutes();
-    if(A.earliestTod===null || tod<A.earliestTod){ A.earliestTod=tod; A.earliestDay=dayKey; }
-    if(A.latestTod===null  || tod>A.latestTod ){ A.latestTod=tod;  A.latestDay=dayKey; }
     [f.from,f.to].forEach(function(id){ if(id) A.airfields[id]=(A.airfields[id]||0)+1; });
-    if(f.from && f.to && f.from!==f.to) A.xcFlights++; else A.localFlights++;
     if(f.reg){
       if(!A.byReg[f.reg]) A.byReg[f.reg]={flights:0,hours:0,landings:0,lastDep:0};
       A.byReg[f.reg].flights++; A.byReg[f.reg].hours+=hrs; A.byReg[f.reg].landings+=f.cycles;
@@ -3686,90 +3785,74 @@ function buildAnalytics(){
   return A;
 }
 
-// Continuous list of YYYY-MM keys from earliest data month to the current
-// month, so charts never silently compress a gap (e.g. Dec straight to Apr).
-function analyticsMonths(A){
-  const present = Object.keys(A.byMonth).sort();
-  if(!present.length) return [];
-  const out=[];
-  let d = new Date(present[0]+'-01T00:00:00Z');
-  const now = new Date();
-  const end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
-  // never run past the latest month that actually has data, if that's beyond "now"
-  const lastPresent = new Date(present[present.length-1]+'-01T00:00:00Z');
-  const stop = lastPresent>end ? lastPresent : end;
-  let guard=0;
-  while(d<=stop && guard++<240){
-    out.push(d.getUTCFullYear()+'-'+String(d.getUTCMonth()+1).padStart(2,'0'));
-    d = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth()+1, 1));
-  }
-  return out;
-}
-function ymLabel(ym){
-  const p=ym.split('-'); return new Date(+p[0],+p[1]-1,1).toLocaleDateString('en-GB',{month:'short',year:'2-digit'});
-}
-
-// ── Utilisation league (active aircraft) ──
+// ── Utilisation league (active aircraft, scoped to the selected range) ──
 function utilLeagueRows(A){
-  const now = new Date();
-  const curYM = now.getUTCFullYear()+'-'+String(now.getUTCMonth()+1).padStart(2,'0');
-  // last 3 COMPLETE calendar months (exclude current partial)
-  const complete = [];
-  for(let i=1;i<=3;i++){
-    const d=new Date(Date.UTC(now.getUTCFullYear(),now.getUTCMonth()-i,1));
-    complete.push(d.getUTCFullYear()+'-'+String(d.getUTCMonth()+1).padStart(2,'0'));
-  }
+  const targets = getTierTargets();
+  const monthsCount = Math.max(1, A.months.length);
   const grounded = new Set((ST.downtimeLog||[]).filter(function(e){return !e.end;}).map(function(e){return (e.reg||'').toUpperCase();}));
   return activeAircraft().map(function(ac){
     const reg=(ac.reg||'').toUpperCase();
-    const rm = A.byRegMonth[reg]||{};
-    const thisMonth = rm[curYM]||0;
-    const avg3 = complete.reduce(function(s,ym){return s+(rm[ym]||0);},0)/3;
-    const tier = acTierG(reg);
+    const tier=acTierG(reg);
+    const totalHrs=(A.byReg[reg]||{}).hours||0;
+    const avgMo=totalHrs/monthsCount;
+    const target=targets[tier];
     let rag='n', ragTxt='—';
-    if(tier===2){
-      if(thisMonth>=T2_TARGET_HRS){ rag='g'; ragTxt='On target'; }
-      else if(thisMonth>=T2_TARGET_HRS*0.66){ rag='a'; ragTxt='Below target'; }
+    if(target!=null){
+      if(avgMo>=target){ rag='g'; ragTxt='On target'; }
+      else if(avgMo>=target*0.66){ rag='a'; ragTxt='Below target'; }
       else { rag='r'; ragTxt='Well below'; }
     }
     return {
-      reg, tier, isManual:!!ac.isManual,
-      grounded:grounded.has(reg),
-      thisMonth, avg3,
-      target: tier===2? T2_TARGET_HRS : null,
-      rag, ragTxt,
-      totalFlights:(A.byReg[reg]||{}).flights||0,
+      reg, tier, isManual:!!ac.isManual, grounded:grounded.has(reg),
+      totalHrs, avgMo, target, rag, ragTxt,
       lastDep:(A.byReg[reg]||{}).lastDep||0,
     };
   }).sort(function(a,b){
     if(a.tier!==b.tier) return (a.tier||9)-(b.tier||9);
-    return b.thisMonth - a.thisMonth;
+    return b.avgMo - a.avgMo;
   });
+}
+
+// ── Date-range controls bar (always rendered, even when empty) ──
+function anControlsHtml(){
+  const r=anRange();
+  const presets=[['year','This Year'],['6m','Last 6 Mo'],['3m','Last 3 Mo'],['month','This Month'],['all','All Time']];
+  const btns=presets.map(function(p){
+    const on=anPresetActive(p[0]);
+    return '<button onclick="anPreset(\''+p[0]+'\')" style="font-size:11px;padding:5px 11px;border-radius:7px;cursor:pointer;border:1px solid '+(on?'var(--acc)':'var(--border)')+';background:'+(on?'#112240':'#0a1828')+';color:'+(on?'var(--acc)':'var(--mut)')+';font-weight:'+(on?'700':'400')+'">'+p[1]+'</button>';
+  }).join('');
+  const inS='background:#0a1828;border:1px solid var(--border);border-radius:6px;color:var(--txt);font-size:11px;padding:5px 8px;';
+  return '<div class="an-card" style="margin-bottom:16px;padding:14px 18px">'
+    +'<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">'
+    +'<span style="font-size:11px;color:var(--mut);font-weight:700;letter-spacing:.5px;text-transform:uppercase">📅 Date Range</span>'
+    + btns
+    +'<span style="width:1px;height:22px;background:var(--border);margin:0 4px"></span>'
+    +'<label style="font-size:11px;color:var(--mut)">From <input type="date" id="an-from" value="'+esc(r.from)+'" onchange="anFromInputs()" style="'+inS+'"></label>'
+    +'<label style="font-size:11px;color:var(--mut)">To <input type="date" id="an-to" value="'+esc(r.to)+'" onchange="anFromInputs()" style="'+inS+'"></label>'
+    +'</div></div>';
 }
 
 function rAnalytics(){
   const A = buildAnalytics();
   ST._analytics = A;
+  const controls = anControlsHtml();
 
   if(!A.totalFlights){
     const loading = !ST.storeLoaded;
-    return '<div class="empty">'
+    return controls + '<div class="empty">'
       + (loading
           ? '⏳ Loading flight history from the cloud store…<br><br><span style="font-size:12px">If this persists, the flight store may be empty or unreachable.</span>'
-          : 'No flight log data available yet.<br><br><span style="font-size:12px">Analytics are built from Airbly flight logs once flights have been recorded.</span>')
+          : 'No flights in the selected date range.<br><br><span style="font-size:12px">Try widening the range above (e.g. “All Time”).</span>')
       + '</div>';
   }
 
-  const months = analyticsMonths(A);
+  const months = A.months;
   const avgDurMin = A.totalFlights ? (A.durTotal/A.totalFlights)/60 : 0;
-  const uniqueAirfields = Object.keys(A.airfields).length;
-  const xcPct = A.totalFlights ? Math.round(A.xcFlights/A.totalFlights*100) : 0;
+  const awayAirfields = Object.keys(A.airfields).filter(k=>k!==HOME_BASE).length;
   const days = Object.keys(A.byDay).length;
   const avgFlightsPerActiveDay = days ? (A.totalFlights/days) : 0;
   const landingsPerFlight = A.totalFlights ? (A.totalLandings/A.totalFlights) : 0;
-  const rangeTxt = (A.minDep&&A.maxDep)
-    ? fmtDate(A.minDep)+' → '+fmtDate(A.maxDep)
-    : '—';
+  const rangeTxt = (A.minDep&&A.maxDep) ? fmtDate(A.minDep)+' → '+fmtDate(A.maxDep) : '—';
 
   // ── Records ──
   let busiestDay=null, mostLdgDay=null;
@@ -3785,8 +3868,7 @@ function rAnalytics(){
     {v:A.totalHours.toFixed(0), l:'Hours Flown', s:'Air time across the fleet'},
     {v:A.totalLandings.toLocaleString(), l:'Landings', s:landingsPerFlight.toFixed(1)+' per flight'},
     {v:minsToHHMM(avgDurMin), l:'Avg Flight', s:'Hours:minutes'},
-    {v:xcPct+'%', l:'Cross-Country', s:A.xcFlights.toLocaleString()+' of '+A.totalFlights.toLocaleString()+' flights'},
-    {v:uniqueAirfields, l:'Airfields Touched', s:'Distinct idents in routes'},
+    {v:awayAirfields, l:'Away Airfields', s:'Distinct, excl. Oxford'},
     {v:avgFlightsPerActiveDay.toFixed(1), l:'Flights / Flying Day', s:days+' active days'},
   ];
   if(A.hasFuel){
@@ -3802,9 +3884,10 @@ function rAnalytics(){
     '<div class="an-rec"><div class="rl">Busiest Day</div><div class="rv">'+(busiestDay?A.byDay[busiestDay].flights+' flights':'—')+'</div><div class="rs">'+fmtDay(busiestDay)+'</div></div>'
    +'<div class="an-rec"><div class="rl">Most Landings (1 day)</div><div class="rv">'+(mostLdgDay?A.byDay[mostLdgDay].landings+' landings':'—')+'</div><div class="rs">'+fmtDay(mostLdgDay)+'</div></div>'
    +'<div class="an-rec"><div class="rl">Longest Flight</div><div class="rv">'+(A.longest?secsToHM(A.longest.air_sec):'—')+'</div><div class="rs">'+(A.longest?((A.longest.from||'?')+' → '+(A.longest.to||'?')+' · '+A.longest.reg):'')+'</div></div>'
-   +'<div class="an-rec"><div class="rl">Earliest / Latest Off</div><div class="rv">'+minsToHHMM(A.earliestTod)+' / '+minsToHHMM(A.latestTod)+'</div><div class="rs">UTC times of day</div></div>';
+   +'<div class="an-rec"><div class="rl">Earliest / Latest Off</div><div class="rv">'+minsToHHMM(A.earliestTod)+' / '+minsToHHMM(A.latestTod)+'</div><div class="rs">UTC · timed flights only</div></div>';
 
-  // ── Utilisation league ──
+  // ── Utilisation league (with editable per-tier targets) ──
+  const tt = getTierTargets();
   const rows = utilLeagueRows(A);
   let leagueBody='';
   rows.forEach(function(r){
@@ -3813,73 +3896,83 @@ function rAnalytics(){
       '<tr>'
       +'<td><strong style="color:#fff">'+esc(r.reg)+'</strong>'+(r.isManual?' <span class="an-tier">[M]</span>':'')+(r.grounded?' <span class="an-rag r">U/S</span>':'')+'</td>'
       +'<td class="an-tier">T'+(r.tier||'?')+' · '+TIER_LABEL[r.tier]+'</td>'
-      +'<td class="num">'+r.thisMonth.toFixed(1)+'</td>'
-      +'<td class="num">'+r.avg3.toFixed(1)+'</td>'
+      +'<td class="num">'+r.totalHrs.toFixed(1)+'</td>'
+      +'<td class="num">'+r.avgMo.toFixed(1)+'</td>'
       +'<td class="num">'+(r.target!=null?r.target.toFixed(0):'—')+'</td>'
       +'<td><span class="an-rag '+r.rag+'">'+esc(r.ragTxt)+'</span></td>'
       +'<td class="num an-tier">'+last+'</td>'
       +'</tr>';
   });
+  const tIn=(tier,val)=>'<input type="number" min="0" step="1" value="'+(val!=null?val:'')+'" placeholder="—" onchange="setTierTarget('+tier+',this.value)" style="width:54px;background:#0a1828;border:1px solid var(--border);border-radius:5px;color:var(--txt);font-size:11px;padding:3px 6px;text-align:right">';
   const leagueHtml =
     '<div class="an-card an-full"><h3>🏆 Utilisation League — Active Fleet</h3>'
-    +'<div class="csub">Hours this calendar month and 3-month average. Target/RAG shown for leased (Tier&nbsp;2) aircraft only — see note below.</div>'
+    +'<div class="csub">Total hours and average per month over the selected range. Status is the monthly average vs the tier target below.</div>'
+    +'<div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin-bottom:12px;font-size:11px;color:var(--mut)">'
+    +'<span style="font-weight:700;letter-spacing:.5px;text-transform:uppercase">🎯 Monthly Targets (hrs):</span>'
+    +'<span>Tier 1 '+tIn(1,tt[1])+'</span>'
+    +'<span>Tier 2 '+tIn(2,tt[2])+'</span>'
+    +'<span>Tier 3 '+tIn(3,tt[3])+'</span>'
+    +'<span style="color:var(--dim)">Leave blank for no target / no status.</span>'
+    +'</div>'
     +'<div style="overflow-x:auto"><table class="an-lt"><thead><tr>'
-    +'<th>Aircraft</th><th>Tier</th><th style="text-align:right">This Month</th><th style="text-align:right">3-Mo Avg</th><th style="text-align:right">Target</th><th>Status</th><th style="text-align:right">Last Flight</th>'
+    +'<th>Aircraft</th><th>Tier</th><th style="text-align:right">Total Hrs</th><th style="text-align:right">Avg / Month</th><th style="text-align:right">Target</th><th>Status</th><th style="text-align:right">Latest Flight</th>'
     +'</tr></thead><tbody>'+leagueBody+'</tbody></table></div></div>';
 
-  // ── Destinations (top airfields list) ──
-  const afSorted = Object.keys(A.airfields).map(function(k){return {id:k,n:A.airfields[k]};}).sort(function(a,b){return b.n-a.n;});
+  // ── Most-visited airfields (Oxford excluded) ──
+  const afSorted = Object.keys(A.airfields).filter(k=>k!==HOME_BASE)
+    .map(function(k){return {id:k,n:A.airfields[k]};}).sort(function(a,b){return b.n-a.n;});
   const afTop = afSorted.slice(0,10);
   const afMax = afTop.length ? afTop[0].n : 1;
-  let afRows='';
+  let afRows = afTop.length ? '' : '<div style="font-size:12px;color:var(--mut);padding:8px 0">No away airfields recorded in this range.</div>';
   afTop.forEach(function(a){
     const pct = Math.round(a.n/afMax*100);
-    const home = a.id===HOME_BASE;
     afRows +=
       '<div class="an-bar-row">'
-      +'<div class="lbl">'+esc(a.id)+(home?' <span class="an-tier">🏠</span>':'')+'</div>'
-      +'<div class="track"><div class="fill" style="width:'+pct+'%'+(home?';background:var(--grn)':'')+'"></div></div>'
+      +'<div class="lbl">'+esc(a.id)+'</div>'
+      +'<div class="track"><div class="fill" style="width:'+pct+'%"></div></div>'
       +'<div class="cnt">'+a.n+'</div>'
       +'</div>';
   });
   const destHtml =
     '<div class="an-card"><h3>🗺️ Most-Visited Airfields</h3>'
-    +'<div class="csub">Appearances across departure + arrival fields. '+esc(HOME_BASE)+' (🏠) is home base, so it leads by design.</div>'
-    +afRows
+    +'<div class="csub">Away airfields only — Oxford (home) is excluded. Counts departures + arrivals at each field.</div>'
+    + afRows
     +'</div>';
 
   // ── Charts grid ──
+  const hourSub = A.hourPlaceholder>0
+    ? 'Take-off hour, UTC · '+A.hourTimed.toLocaleString()+' timed flights ('+A.hourPlaceholder.toLocaleString()+' historical flights without a recorded time excluded)'
+    : 'Take-off hour, UTC';
   const chartsHtml =
     '<div class="an-card"><h3>📈 Hours per Month</h3><div class="csub">Total fleet air time</div><div class="an-chart-wrap"><canvas id="an-c-hours"></canvas></div></div>'
    +'<div class="an-card"><h3>✈️ Movements & Landings per Month</h3><div class="csub">Flights flown vs landings recorded</div><div class="an-chart-wrap"><canvas id="an-c-moves"></canvas></div></div>'
    +'<div class="an-card"><h3>📅 Flights by Day of Week</h3><div class="csub">All flights, UTC</div><div class="an-chart-wrap"><canvas id="an-c-dow"></canvas></div></div>'
-   +'<div class="an-card"><h3>🕑 Flights by Hour of Day</h3><div class="csub">Take-off hour, UTC</div><div class="an-chart-wrap"><canvas id="an-c-hour"></canvas></div></div>';
+   +'<div class="an-card"><h3>🕑 Flights by Hour of Day</h3><div class="csub">'+esc(hourSub)+'</div><div class="an-chart-wrap"><canvas id="an-c-hour"></canvas></div></div>';
 
   const note =
     '<div class="an-note">'
-    +'<strong>How this is calculated:</strong> built from Airbly flight logs — live data plus the cloud flight store (≈6 months of history). Deduplicated by flight UUID. '
-    +'Manual daily-log hours are not included here, so fleet totals may differ slightly from the Maintenance Planner utilisation table (which does include them). '
-    +'All days and times are UTC. Local-vs-cross-country uses departure ≠ arrival airfield.<br>'
-    +'<strong>Not yet included (next iteration):</strong> a geographic map and distance-flown stats (need an accurate UK airfield coordinate set); per-tier utilisation targets for Tier&nbsp;1/3; and any pilot/student breakdown (Airbly does not record who flew).'
+    +'<strong>How this is calculated:</strong> built from Airbly flight logs — live data plus the cloud flight store (historical backfill). Deduplicated by flight UUID and filtered to the date range above. '
+    +'Manual daily-log hours are not included, so fleet totals can differ slightly from the Maintenance Planner utilisation table (which does include them). All days/times are UTC.<br>'
+    +'<strong>Hour-of-day:</strong> historical flights imported without a recorded take-off time appear at exactly 12:00 and are excluded from that chart and the earliest/latest figures, so it reflects only properly timed flights.<br>'
+    +'<strong>Not yet included (next iteration):</strong> a geographic map and distance-flown stats (need an accurate UK airfield coordinate set), and any pilot/student breakdown (Airbly does not record who flew).'
     + (A.hasFuel?'':' <br><strong>Fuel:</strong> your Airbly devices are returning zero fuel on flights, so fuel stats are unavailable.')
     +'</div>';
 
-  return ''
+  return controls
     + '<div class="an-intro">Operational analytics for the flying school, built live from Airbly flight logs. '
-    + 'Showing <strong>'+A.totalFlights.toLocaleString()+'</strong> flights over <strong>'+months.length+'</strong> month'+(months.length===1?'':'s')+'.</div>'
+    + 'Showing <strong>'+A.totalFlights.toLocaleString()+'</strong> flights across <strong>'+months.length+'</strong> month'+(months.length===1?'':'s')+' '
+    + '('+esc(A.range.from)+' → '+esc(A.range.to)+').</div>'
     + '<div class="an-stats">'+statsHtml+'</div>'
     + '<div class="an-recbar">'+recHtml+'</div>'
     + '<div class="an-grid">'+leagueHtml+'</div>'
     + '<div class="an-grid">'+chartsHtml+'</div>'
-    + '<div class="an-grid">'+destHtml
-    +   '<div class="an-card"><h3>📊 Local vs Cross-Country</h3><div class="csub">Circuit/local training (departure = arrival) vs nav flights</div><div class="an-chart-wrap"><canvas id="an-c-xc"></canvas></div></div>'
-    + '</div>'
+    + '<div class="an-grid">'+destHtml+'</div>'
     + note;
 }
 
 // Build/refresh all Chart.js charts for the analytics view.
-// Guards on Chart availability (CDN may still be loading) and on
-// canvas presence; destroys previous instances to avoid leaks/errors.
+// Guards on Chart availability (CDN may still be loading) and canvas
+// presence; destroys previous instances to avoid leaks/errors.
 function drawAnalyticsCharts(_tries){
   _tries = _tries||0;
   if(typeof Chart==='undefined'){
@@ -3894,7 +3987,6 @@ function drawAnalyticsCharts(_tries){
   const A = ST._analytics;
   if(!A) return;
 
-  // Destroy any prior instances
   Object.values(ST._charts||{}).forEach(function(c){ try{ c.destroy(); }catch(e){} });
   ST._charts = {};
 
@@ -3910,7 +4002,7 @@ function drawAnalyticsCharts(_tries){
     },
   }, opts||{});
 
-  const months = analyticsMonths(A);
+  const months = A.months;
   const mLabels = months.map(ymLabel);
   const mm = m => A.byMonth[m] || {flights:0,hours:0,landings:0};
 
@@ -3943,28 +4035,15 @@ function drawAnalyticsCharts(_tries){
     options:baseOpts(),
   });
 
-  // 4. Hour of day (00-23)
+  // 4. Hour of day (00-23) — placeholder-noon flights already excluded upstream
   const hrLabels=A.byHour.map((_,i)=>String(i).padStart(2,'0'));
   ST._charts.hour = new Chart(document.getElementById('an-c-hour'), {
     type:'bar',
     data:{ labels:hrLabels, datasets:[{ data:A.byHour, backgroundColor:'#ba68c8', borderRadius:3, maxBarThickness:22 }]},
     options:baseOpts({ scales:{ x:{grid:{color:GRID,drawTicks:false},ticks:{font:{size:9},maxRotation:0,autoSkip:true}}, y:{beginAtZero:true,grid:{color:GRID,drawTicks:false},ticks:{font:{size:10}}} } }),
   });
-
-  // 5. Local vs cross-country (doughnut)
-  const xcCanvas=document.getElementById('an-c-xc');
-  if(xcCanvas){
-    ST._charts.xc = new Chart(xcCanvas, {
-      type:'doughnut',
-      data:{ labels:['Local / Circuit','Cross-Country'], datasets:[{
-        data:[A.localFlights, A.xcFlights],
-        backgroundColor:['#3a6080','#4a9eff'], borderColor:'#0f2035', borderWidth:2,
-      }]},
-      options:{ responsive:true, maintainAspectRatio:false, cutout:'62%',
-        plugins:{ legend:{position:'bottom', labels:{boxWidth:12,font:{size:11},padding:14}} } },
-    });
-  }
 }
+
 
 // ══ INIT ══════════════════════════════════════════
 initPassword();
