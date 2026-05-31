@@ -3685,23 +3685,26 @@ function ymLabel(ym){
   const p=ym.split('-'); return new Date(+p[0],+p[1]-1,1).toLocaleDateString('en-GB',{month:'short',year:'2-digit'});
 }
 
-// Flatten + dedupe every flight across the whole fleet (incl. departed
-// aircraft), filtered to the active date range. Returns normalised flights.
+// Flatten + dedupe flights for every fleet aircraft, filtered to the active
+// date range. Mirrors the Hours Tracker scope exactly — only aircraft returned
+// by allAircraft() are included, so non-fleet regs in the store (departed
+// aircraft no longer on the Airbly account, shared-group visitors, etc.) are
+// naturally excluded. Live data (ST.flights) overlays the store by UUID.
 function analyticsFlights(range){
   const fromMs = range ? Date.parse(range.from+'T00:00:00Z') : null;
   const toMs   = range ? Date.parse(range.to  +'T23:59:59.999Z') : null;
   const inRange = ms => (fromMs===null || (ms>=fromMs && ms<=toMs));
   const byUuid = {};
-  // 1. GAS store — historical bulk, keyed by reg (captures departed aircraft)
-  Object.keys(ST.storeFlights||{}).forEach(function(reg){
-    const REG=(reg||'').toUpperCase();
-    if(EXCLUDED_REGS.indexOf(REG)>=0) return;
+  allAircraft().forEach(function(ac){
+    const reg=(ac.reg||'').toUpperCase();
+    if(EXCLUDED_REGS.indexOf(reg)>=0) return;
+    // Store flights first (historical bulk)
     Object.values(ST.storeFlights[reg]||{}).forEach(function(f){
       if(!f || !f.uuid || !f.dep_ms || !f.air_sec) return;
       const dep=Number(f.dep_ms);
       if(!inRange(dep)) return;
       byUuid[f.uuid] = {
-        uuid:f.uuid, reg:REG,
+        uuid:f.uuid, reg:reg,
         dep_ms:dep, arr_ms:f.arr_ms?Number(f.arr_ms):null,
         air_sec:Number(f.air_sec)||0,
         from:(f.from||'').toUpperCase(), to:(f.to||'').toUpperCase(),
@@ -3709,19 +3712,13 @@ function analyticsFlights(range){
         fuel:(f.fuel!=null && f.fuel!=='')?Number(f.fuel):null,
       };
     });
-  });
-  // 2. Live Airbly — most current; overlay/replace by UUID
-  const idToReg = {};
-  allAircraft().forEach(function(ac){ idToReg[ac.id]=(ac.reg||'').toUpperCase(); });
-  Object.keys(ST.flights||{}).forEach(function(acId){
-    const reg = idToReg[acId] || '';
-    if(EXCLUDED_REGS.indexOf(reg)>=0) return;
-    (ST.flights[acId]||[]).forEach(function(f){
+    // Live flights overlay — UUID matches store UUID so dedup is automatic
+    (ST.flights[ac.id]||[]).forEach(function(f){
       if(!f.id || !f.dep_ms || !f.air_sec) return;
       const dep=Number(f.dep_ms);
       if(!inRange(dep)) return;
       byUuid[f.id] = {
-        uuid:f.id, reg: reg || (byUuid[f.id]&&byUuid[f.id].reg) || '',
+        uuid:f.id, reg:reg,
         dep_ms:dep, arr_ms:f.arr_ms?Number(f.arr_ms):null,
         air_sec:Number(f.air_sec)||0,
         from:(f.from||'').toUpperCase(), to:(f.to||'').toUpperCase(),
@@ -3787,6 +3784,38 @@ function buildAnalytics(){
       A.byRegMonth[f.reg][ym]=(A.byRegMonth[f.reg][ym]||0)+hrs;
     }
   });
+
+  // ── dailyLog pass — mirrors buildMonthlyTable's third data source exactly ──
+  // Hours Tracker adds ST.dailyLog on top of flight data for every aircraft.
+  // These are pre-Airbly hours (e.g. from before a device was installed).
+  // Only hours are added; flight counts, day/hour patterns etc. are unaffected.
+  const fromMs = Date.parse(range.from+'T00:00:00Z');
+  const toMs   = Date.parse(range.to  +'T23:59:59.999Z');
+  allAircraft().forEach(function(ac){
+    const reg=(ac.reg||'').toUpperCase();
+    if(EXCLUDED_REGS.indexOf(reg)>=0) return;
+    (ST.dailyLog[ac.id]||[]).forEach(function(e){
+      if(!e.added || e.added<=0) return;
+      let dateStr=null;
+      if(e.date && e.date.match(/^\d{4}-\d{2}-\d{2}$/)) dateStr=e.date;
+      else if(e.date){ const d=new Date(e.date); if(!isNaN(d)) dateStr=d.toISOString().slice(0,10); }
+      if(!dateStr) return;
+      const depMs=Date.parse(dateStr+'T12:00:00Z');
+      if(depMs<fromMs || depMs>toMs) return;
+      const ym=dateStr.slice(0,7);
+      const hrs=Number(e.added)||0;
+      A.totalHours+=hrs;
+      if(!A.byMonth[ym]) A.byMonth[ym]={flights:0,hours:0,landings:0};
+      A.byMonth[ym].hours+=hrs;
+      if(reg){
+        if(!A.byReg[reg]) A.byReg[reg]={flights:0,hours:0,landings:0,lastDep:0};
+        A.byReg[reg].hours+=hrs;
+        if(!A.byRegMonth[reg]) A.byRegMonth[reg]={};
+        A.byRegMonth[reg][ym]=(A.byRegMonth[reg][ym]||0)+hrs;
+      }
+    });
+  });
+
   return A;
 }
 
