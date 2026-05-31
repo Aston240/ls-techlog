@@ -965,20 +965,18 @@ const WEATHER_PROXY = 'https://script.google.com/macros/s/AKfycbwKtjtdt1qFzX99gn
 
 async function fetchWeather() {
   try {
-    // Fetch all airfields in parallel
-    const results = await Promise.all(
-      ALL_ICAOS.map(icao =>
-        fetch(`${WEATHER_PROXY}?action=weather&icao=${icao}`)
-          .then(r => r.json())
-          .catch(() => ({ icao, error: true }))
-      )
-    );
+    // Single call fetches all airfields with one auth token
+    const res     = await fetch(`${WEATHER_PROXY}?action=weather&icaos=${ALL_ICAOS.join(',')}`);
+    const results = await res.json();
 
-    for (const d of results) {
-      if (d.error || !d.icao) continue;
+    if (results.error) throw new Error(results.error);
+
+    for (const icao of ALL_ICAOS) {
+      const d = results[icao];
+      if (!d || d.error) continue;
       const metar = d.metar || '';
       const taf   = d.taf   || '';
-      wxData[d.icao] = {
+      wxData[icao] = {
         metar,
         taf,
         cat:   flightCat(metar),
