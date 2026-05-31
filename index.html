@@ -3565,6 +3565,8 @@ function debugAirblyFields(){
 // A user-selectable date range filters every figure on the page.
 // ══════════════════════════════════════════════════
 const HOME_BASE = 'EGTK';   // London Oxford — home base, excluded from "away" stats
+const EXCLUDED_REGS = ['G-CLDK'];        // not our aircraft — visible in shared Airbly data, excluded from analytics
+const EXCLUDED_AIRFIELDS = ['EGTK','EGTR']; // home (Oxford) + Elstree — hidden from most-visited / away counts
 const T2_TARGET_HRS = 15;   // default leased-aircraft monthly target (first run only)
 const PLACEHOLDER_HOUR = 12; // CSV-backfilled flights have no time → sit at exactly 12:00
 
@@ -3692,12 +3694,14 @@ function analyticsFlights(range){
   const byUuid = {};
   // 1. GAS store — historical bulk, keyed by reg (captures departed aircraft)
   Object.keys(ST.storeFlights||{}).forEach(function(reg){
+    const REG=(reg||'').toUpperCase();
+    if(EXCLUDED_REGS.indexOf(REG)>=0) return;
     Object.values(ST.storeFlights[reg]||{}).forEach(function(f){
       if(!f || !f.uuid || !f.dep_ms || !f.air_sec) return;
       const dep=Number(f.dep_ms);
       if(!inRange(dep)) return;
       byUuid[f.uuid] = {
-        uuid:f.uuid, reg:(reg||'').toUpperCase(),
+        uuid:f.uuid, reg:REG,
         dep_ms:dep, arr_ms:f.arr_ms?Number(f.arr_ms):null,
         air_sec:Number(f.air_sec)||0,
         from:(f.from||'').toUpperCase(), to:(f.to||'').toUpperCase(),
@@ -3711,6 +3715,7 @@ function analyticsFlights(range){
   allAircraft().forEach(function(ac){ idToReg[ac.id]=(ac.reg||'').toUpperCase(); });
   Object.keys(ST.flights||{}).forEach(function(acId){
     const reg = idToReg[acId] || '';
+    if(EXCLUDED_REGS.indexOf(reg)>=0) return;
     (ST.flights[acId]||[]).forEach(function(f){
       if(!f.id || !f.dep_ms || !f.air_sec) return;
       const dep=Number(f.dep_ms);
@@ -3773,7 +3778,7 @@ function buildAnalytics(){
     const dayKey = d.toISOString().slice(0,10);
     if(!A.byDay[dayKey]) A.byDay[dayKey]={flights:0,landings:0};
     A.byDay[dayKey].flights++; A.byDay[dayKey].landings+=f.cycles;
-    [f.from,f.to].forEach(function(id){ if(id) A.airfields[id]=(A.airfields[id]||0)+1; });
+    if(f.to) A.airfields[f.to]=(A.airfields[f.to]||0)+1;  // arrivals only — counts where flights landed
     if(f.reg){
       if(!A.byReg[f.reg]) A.byReg[f.reg]={flights:0,hours:0,landings:0,lastDep:0};
       A.byReg[f.reg].flights++; A.byReg[f.reg].hours+=hrs; A.byReg[f.reg].landings+=f.cycles;
@@ -3790,7 +3795,7 @@ function utilLeagueRows(A){
   const targets = getTierTargets();
   const monthsCount = Math.max(1, A.months.length);
   const grounded = new Set((ST.downtimeLog||[]).filter(function(e){return !e.end;}).map(function(e){return (e.reg||'').toUpperCase();}));
-  return activeAircraft().map(function(ac){
+  return activeAircraft().filter(function(ac){ return EXCLUDED_REGS.indexOf((ac.reg||'').toUpperCase())<0; }).map(function(ac){
     const reg=(ac.reg||'').toUpperCase();
     const tier=acTierG(reg);
     const totalHrs=(A.byReg[reg]||{}).hours||0;
@@ -3848,7 +3853,7 @@ function rAnalytics(){
 
   const months = A.months;
   const avgDurMin = A.totalFlights ? (A.durTotal/A.totalFlights)/60 : 0;
-  const awayAirfields = Object.keys(A.airfields).filter(k=>k!==HOME_BASE).length;
+  const awayAirfields = Object.keys(A.airfields).filter(k=>EXCLUDED_AIRFIELDS.indexOf(k)<0).length;
   const days = Object.keys(A.byDay).length;
   const avgFlightsPerActiveDay = days ? (A.totalFlights/days) : 0;
   const landingsPerFlight = A.totalFlights ? (A.totalLandings/A.totalFlights) : 0;
@@ -3868,7 +3873,7 @@ function rAnalytics(){
     {v:A.totalHours.toFixed(0), l:'Hours Flown', s:'Air time across the fleet'},
     {v:A.totalLandings.toLocaleString(), l:'Landings', s:landingsPerFlight.toFixed(1)+' per flight'},
     {v:minsToHHMM(avgDurMin), l:'Avg Flight', s:'Hours:minutes'},
-    {v:awayAirfields, l:'Away Airfields', s:'Distinct, excl. Oxford'},
+    {v:awayAirfields, l:'Away Airfields', s:'Distinct arrivals, excl. Oxford & Elstree'},
     {v:avgFlightsPerActiveDay.toFixed(1), l:'Flights / Flying Day', s:days+' active days'},
   ];
   if(A.hasFuel){
@@ -3919,7 +3924,7 @@ function rAnalytics(){
     +'</tr></thead><tbody>'+leagueBody+'</tbody></table></div></div>';
 
   // ── Most-visited airfields (Oxford excluded) ──
-  const afSorted = Object.keys(A.airfields).filter(k=>k!==HOME_BASE)
+  const afSorted = Object.keys(A.airfields).filter(k=>EXCLUDED_AIRFIELDS.indexOf(k)<0)
     .map(function(k){return {id:k,n:A.airfields[k]};}).sort(function(a,b){return b.n-a.n;});
   const afTop = afSorted.slice(0,10);
   const afMax = afTop.length ? afTop[0].n : 1;
@@ -3935,7 +3940,7 @@ function rAnalytics(){
   });
   const destHtml =
     '<div class="an-card"><h3>🗺️ Most-Visited Airfields</h3>'
-    +'<div class="csub">Away airfields only — Oxford (home) is excluded. Counts departures + arrivals at each field.</div>'
+    +'<div class="csub">Arrival airfields only — where flights landed. Oxford (home) and Elstree are excluded.</div>'
     + afRows
     +'</div>';
 
