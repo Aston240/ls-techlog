@@ -3785,37 +3785,6 @@ function buildAnalytics(){
     }
   });
 
-  // ── dailyLog pass — mirrors buildMonthlyTable's third data source exactly ──
-  // Hours Tracker adds ST.dailyLog on top of flight data for every aircraft.
-  // These are pre-Airbly hours (e.g. from before a device was installed).
-  // Only hours are added; flight counts, day/hour patterns etc. are unaffected.
-  const fromMs = Date.parse(range.from+'T00:00:00Z');
-  const toMs   = Date.parse(range.to  +'T23:59:59.999Z');
-  allAircraft().forEach(function(ac){
-    const reg=(ac.reg||'').toUpperCase();
-    if(EXCLUDED_REGS.indexOf(reg)>=0) return;
-    (ST.dailyLog[ac.id]||[]).forEach(function(e){
-      if(!e.added || e.added<=0) return;
-      let dateStr=null;
-      if(e.date && e.date.match(/^\d{4}-\d{2}-\d{2}$/)) dateStr=e.date;
-      else if(e.date){ const d=new Date(e.date); if(!isNaN(d)) dateStr=d.toISOString().slice(0,10); }
-      if(!dateStr) return;
-      const depMs=Date.parse(dateStr+'T12:00:00Z');
-      if(depMs<fromMs || depMs>toMs) return;
-      const ym=dateStr.slice(0,7);
-      const hrs=Number(e.added)||0;
-      A.totalHours+=hrs;
-      if(!A.byMonth[ym]) A.byMonth[ym]={flights:0,hours:0,landings:0};
-      A.byMonth[ym].hours+=hrs;
-      if(reg){
-        if(!A.byReg[reg]) A.byReg[reg]={flights:0,hours:0,landings:0,lastDep:0};
-        A.byReg[reg].hours+=hrs;
-        if(!A.byRegMonth[reg]) A.byRegMonth[reg]={};
-        A.byRegMonth[reg][ym]=(A.byRegMonth[reg][ym]||0)+hrs;
-      }
-    });
-  });
-
   return A;
 }
 
@@ -3986,7 +3955,7 @@ function rAnalytics(){
   const note =
     '<div class="an-note">'
     +'<strong>How this is calculated:</strong> built from Airbly flight logs — live data plus the cloud flight store (historical backfill). Deduplicated by flight UUID and filtered to the date range above. '
-    +'Manual daily-log hours are not included, so fleet totals can differ slightly from the Maintenance Planner utilisation table (which does include them). All days/times are UTC.<br>'
+    +'Manual daily-log hours are not included — this page reflects Airbly flight data only, which matches the raw Airbly figures. The Hours Tracker page adds daily-log entries on top, so it can read slightly higher for aircraft (e.g. G-BOTN) that still carry pre-Airbly manual hours. All days/times are UTC.<br>'
     +'<strong>Hour-of-day:</strong> historical flights imported without a recorded take-off time appear at exactly 12:00 and are excluded from that chart and the earliest/latest figures, so it reflects only properly timed flights.<br>'
     +'<strong>Not yet included (next iteration):</strong> a geographic map and distance-flown stats (need an accurate UK airfield coordinate set), and any pilot/student breakdown (Airbly does not record who flew).'
     + (A.hasFuel?'':' <br><strong>Fuel:</strong> your Airbly devices are returning zero fuel on flights, so fuel stats are unavailable.')
