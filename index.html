@@ -885,66 +885,8 @@ async function doConnect(keyOverride){
     const allFlights = mergeRawLogs(primary.flights, extraPrimary);
     const allAirblyAircraft = [...primary.aircraft];
 
-    // Second Airbly account — G-BOTN (device moved from G-EGTB)
-    const SECOND_KEY = '6W9TZU5ECtrE3U1UeptzaNsCaXoWcQ';
-    const [p2w1, p2w2] = await Promise.allSettled([
-      fetchAirbly(SECOND_KEY),
-      fetchAirbly(SECOND_KEY, W_AFTER, W_BEFORE),
-    ]);
-
-    if(p2w1.status === 'fulfilled'){
-      const secondary = parseAirbly(p2w1.value);
-      // Find BOTN — device was previously on EGTB so accept whichever aircraft appears
-      const botn = secondary.aircraft.find(a=>a.reg==='G-BOTN') || secondary.aircraft[0];
-      if(botn){
-        // Override reg to G-BOTN in case Airbly still shows old ident
-        botn.reg = 'G-BOTN';
-        allAirblyAircraft.push(botn);
-
-        // Merge BOTN flights from both windows
-        const botnBase = { [botn.id]: secondary.flights[botn.id] || [] };
-        const extraBotn = {};
-        if(p2w2.status === 'fulfilled'){
-          const raw = extractFlightsFromRaw(p2w2.value);
-          Object.keys(raw).forEach(function(acId){
-            if(!extraBotn[acId]) extraBotn[acId] = [];
-            extraBotn[acId] = extraBotn[acId].concat(raw[acId]);
-          });
-        }
-        const botnMerged = mergeRawLogs(botnBase, extraBotn);
-        allFlights[botn.id] = botnMerged[botn.id] || [];
-
-        // Migrate manual aircraft entry for G-BOTN → new Airbly ID
-        const manIdx = ST.manualAircraft.findIndex(m=>(ST.cfg[m.id]?.reg||m.reg||'').toUpperCase()==='G-BOTN');
-        if(manIdx !== -1){
-          const manId = ST.manualAircraft[manIdx].id;
-          const airblyId = botn.id;
-          // Copy cfg from manual to Airbly ID
-          if(ST.cfg[manId]){
-            if(!ST.cfg[airblyId]) ST.cfg[airblyId]={};
-            const manCfg = ST.cfg[manId];
-            ['reg','type','base','maint_due','check_type','cofa_exp','annual_due','sheet_start'].forEach(k=>{
-              if(manCfg[k]) ST.cfg[airblyId][k]=manCfg[k];
-            });
-          }
-          // Migrate dailyLog entries to new Airbly ID
-          if(ST.dailyLog[manId] && ST.dailyLog[manId].length){
-            if(!ST.dailyLog[airblyId]) ST.dailyLog[airblyId]=[];
-            ST.dailyLog[airblyId] = [...ST.dailyLog[manId], ...ST.dailyLog[airblyId]];
-          }
-          // Remove manual aircraft
-          ST.manualAircraft.splice(manIdx, 1);
-          delete ST.cfg[manId];
-          delete ST.dailyLog[manId];
-          saveManual(); saveCfg(); saveDailyLog();
-          console.log('[BOTN] Migrated manual aircraft to Airbly ID', airblyId);
-        }
-      } else {
-        console.warn('G-BOTN not found on second Airbly account');
-      }
-    } else {
-      console.warn('Second Airbly account unavailable:', p2w1.reason?.message);
-    }
+    // (Second Airbly account for G-BOTN removed — aircraft left the fleet July 2026.
+    //  G-BHFE joined on the main account and arrives via the primary fetch above.)
 
     if(!keyOverride) localStorage.setItem('tl_key', key);
     Object.assign(ST,{aircraft:allAirblyAircraft, flights:allFlights, selected:activeAircraft()[0]||allAirblyAircraft[0], isDemo:false});
@@ -2274,8 +2216,8 @@ function mxHelpPanel(){
   // Fleet tiers
   +'<div style="font-size:12px;font-weight:700;color:var(--acc);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px">Fleet Tiers</div>'
   +'<p style="margin:0 0 4px 0"><span style="color:#4a90d9;font-weight:700">Tier 1 — PPL Trainers:</span> G-BCGJ, G-PETR, G-MKAS, G-BTGO, G-FIAT, N150PK. Fly these first. Hours burned down first.</p>'
-  +'<p style="margin:0 0 4px 0"><span style="color:#a070d0;font-weight:700">Tier 2 — Leased:</span> G-BOTN. Fly when Tier 1 is fully used or specifically requested. Target 15 hrs/month each.</p>'
-  +'<p style="margin:0 0 16px 0"><span style="color:#d09040;font-weight:700">Tier 3 — Advanced:</span> G-HRYZ, G-SETG. Instrument training only. Never assigned as standby.</p>'
+  +'<p style="margin:0 0 4px 0"><span style="color:#a070d0;font-weight:700">Tier 2 — Leased:</span> none currently. (G-BOTN left the fleet July 2026.)</p>'
+  +'<p style="margin:0 0 16px 0"><span style="color:#d09040;font-weight:700">Tier 3 — Advanced:</span> G-HRYZ, G-SETG, G-BHFE. Instrument training only. Never assigned as standby.</p>'
 
   // Status labels
   +'<div style="font-size:12px;font-weight:700;color:var(--acc);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">Card Status Labels</div>'
@@ -2310,8 +2252,8 @@ function mxHelpPanel(){
 
   // Standby
   +'<div style="font-size:12px;font-weight:700;color:var(--acc);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px">Today\'s Standby</div>'
-  +'<p style="margin:0 0 4px 0">Only <strong>ON TRACK</strong> aircraft can be standby. G-HRYZ and G-SETG are never standby.</p>'
-  +'<p style="margin:0 0 4px 0">G-BOTN is preferred as standby — it flies last anyway, so holding it back has less impact. But if it is behind on its 15 hr/month target, it is excluded and should be flying. The banner flags this in amber and falls back to the Tier 1 aircraft furthest from its check.</p>'
+  +'<p style="margin:0 0 4px 0">Only <strong>ON TRACK</strong> aircraft can be standby. G-HRYZ, G-SETG and G-BHFE are never standby.</p>'
+  +'<p style="margin:0 0 4px 0">There are currently no Tier 2 leased aircraft, so standby always falls to the Tier 1 aircraft furthest from its next check.</p>'
   +'<p style="margin:0 0 16px 0">The standby banner shows how many hours the aircraft has flown this month so you can check its pace.</p>'
 
   // Downtime
@@ -2339,10 +2281,10 @@ function rMxPlanner(){
 
   // Fleet tier definitions
   const TIER1 = ['G-BCGJ','G-PETR','G-MKAS','G-BTGO','G-FIAT','N150PK'];
-  const TIER2 = ['G-BOTN'];
-  const TIER3 = ['G-HRYZ','G-SETG'];
-  const NO_STANDBY = ['G-HRYZ','G-SETG'];
-  const MONTHLY_TARGET = {'G-BOTN':15};
+  const TIER2 = [];
+  const TIER3 = ['G-HRYZ','G-SETG','G-BHFE'];
+  const NO_STANDBY = ['G-HRYZ','G-SETG','G-BHFE'];
+  const MONTHLY_TARGET = {};
 
   function acTier(ac){
     const r = ac.reg;
@@ -2918,7 +2860,7 @@ function buildMonthlyTable(){
     if(reg && !acList.find(function(x){return x.reg===reg;})) acList.push({id:a.id, reg:reg, isManual:true});
   });
 
-  const tierOrder = {'G-BCGJ':1,'G-PETR':1,'G-MKAS':1,'G-BTGO':1,'G-FIAT':1,'N150PK':1,'G-BOTN':2,'G-HRYZ':3,'G-SETG':3};
+  const tierOrder = {'G-BCGJ':1,'G-PETR':1,'G-MKAS':1,'G-BTGO':1,'G-FIAT':1,'N150PK':1,'G-HRYZ':3,'G-SETG':3,'G-BHFE':3};
   acList.sort(function(a,b){
     const ta=tierOrder[a.reg]||9, tb=tierOrder[b.reg]||9;
     return ta!==tb ? ta-tb : a.reg.localeCompare(b.reg);
@@ -3572,8 +3514,8 @@ const PLACEHOLDER_HOUR = 12; // CSV-backfilled flights have no time → sit at e
 
 const FLEET_TIERS = {
   1:['G-BCGJ','G-PETR','G-MKAS','G-BTGO','G-FIAT','N150PK'],
-  2:['G-BOTN'],
-  3:['G-HRYZ','G-SETG'],
+  2:[],
+  3:['G-HRYZ','G-SETG','G-BHFE'],
 };
 function acTierG(reg){
   reg=(reg||'').toUpperCase();
@@ -3955,7 +3897,7 @@ function rAnalytics(){
   const note =
     '<div class="an-note">'
     +'<strong>How this is calculated:</strong> built from Airbly flight logs — live data plus the cloud flight store (historical backfill). Deduplicated by flight UUID and filtered to the date range above. '
-    +'Manual daily-log hours are not included — this page reflects Airbly flight data only, which matches the raw Airbly figures. The Hours Tracker page adds daily-log entries on top, so it can read slightly higher for aircraft (e.g. G-BOTN) that still carry pre-Airbly manual hours. All days/times are UTC.<br>'
+    +'Manual daily-log hours are not included — this page reflects Airbly flight data only, which matches the raw Airbly figures. The Hours Tracker page adds daily-log entries on top, so it can read slightly higher for any aircraft that still carries pre-Airbly manual hours. All days/times are UTC.<br>'
     +'<strong>Hour-of-day:</strong> historical flights imported without a recorded take-off time appear at exactly 12:00 and are excluded from that chart and the earliest/latest figures, so it reflects only properly timed flights.<br>'
     +'<strong>Not yet included (next iteration):</strong> a geographic map and distance-flown stats (need an accurate UK airfield coordinate set), and any pilot/student breakdown (Airbly does not record who flew).'
     + (A.hasFuel?'':' <br><strong>Fuel:</strong> your Airbly devices are returning zero fuel on flights, so fuel stats are unavailable.')
@@ -4059,8 +4001,8 @@ function openFleetAnalysis() {
 
   const TIERS = {
     1: ['G-BCGJ','G-PETR','G-MKAS','G-BTGO','G-FIAT','N150PK'],
-    2: ['G-BOTN'],
-    3: ['G-HRYZ','G-SETG']
+    2: [],
+    3: ['G-HRYZ','G-SETG','G-BHFE']
   };
   const TIER_NAMES = { 1: 'Tier 1 — PPL Trainers', 2: 'Tier 2 — Leased', 3: 'Tier 3 — Advanced' };
 
