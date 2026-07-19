@@ -2846,14 +2846,14 @@ function rMxPlanner(){
       const md  = due ? predictDays(ac,due) : null;
       if(md!==null && md>=0 && md<=200){
         const conf = forecastConfidence(ac, md);
-        out.push({reg:ac.reg, kind:'hrs', mid:new Date(now.getTime()+md*DAY),
+        out.push({reg:ac.reg, kind:'hrs', mid:new Date(now+md*DAY),
                   conf:conf?conf.days:2, weak:conf?conf.weak:true,
                   note:(cfg.check_type?cfg.check_type+'hr check':'Hours check')});
       }
       const ad = daysUntilDate(cfg.annual_due);
-      if(ad!==null && ad>=0 && ad<=200) out.push({reg:ac.reg, kind:'ann', mid:new Date(now.getTime()+ad*DAY), conf:0, note:'Annual'});
+      if(ad!==null && ad>=0 && ad<=200) out.push({reg:ac.reg, kind:'ann', mid:new Date(now+ad*DAY), conf:0, note:'Annual'});
       const rd = daysUntilDate(cfg.cofa_exp);
-      if(rd!==null && rd>=0 && rd<=200) out.push({reg:ac.reg, kind:'arc', mid:new Date(now.getTime()+rd*DAY), conf:0, note:'ARC expiry'});
+      if(rd!==null && rd>=0 && rd<=200) out.push({reg:ac.reg, kind:'arc', mid:new Date(now+rd*DAY), conf:0, note:'ARC expiry'});
     });
     out.forEach(function(it){
       it.mid = new Date(Date.UTC(it.mid.getFullYear(), it.mid.getMonth(), it.mid.getDate()));
@@ -2937,12 +2937,13 @@ function rMxPlanner(){
 
   const _calItems = calItems();
   const _calCL = calClashes(_calItems);
-  const _todayKey = new Date(Date.UTC(now.getFullYear(),now.getMonth(),now.getDate())).toISOString().slice(0,10);
+  const _nowD = new Date(now);
+  const _todayKey = new Date(Date.UTC(_nowD.getFullYear(),_nowD.getMonth(),_nowD.getDate())).toISOString().slice(0,10);
 
   // Plain-text export for engineering
   (function(){
     const L=['LS AIRMOTIVE \u2014 FORECAST CHECK SCHEDULE',
-             'Generated '+now.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'})+' \u00b7 London Oxford (EGTK)',''];
+             'Generated '+_nowD.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'})+' \u00b7 London Oxford (EGTK)',''];
     const srt=_calItems.slice().sort(function(a,b){return a.mid-b.mid;});
     var cur='';
     srt.forEach(function(it){
@@ -2960,8 +2961,8 @@ function rMxPlanner(){
     ST._calExport = L.join('\n');
   })();
 
-  const _m1=new Date(now.getFullYear(),now.getMonth(),1);
-  const _m2=new Date(now.getFullYear(),now.getMonth()+1,1);
+  const _m1=new Date(_nowD.getFullYear(),_nowD.getMonth(),1);
+  const _m2=new Date(_nowD.getFullYear(),_nowD.getMonth()+1,1);
   const calendarPanel =
     '<div id="mxcal-panel" style="position:sticky;top:16px;background:var(--panel);border:1px solid var(--border);border-radius:11px;padding:14px 15px">'
     +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:11px;gap:8px">'
