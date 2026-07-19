@@ -2859,6 +2859,18 @@ function buildMonthlyTable(){
     const reg = (ST.cfg[a.id]&&ST.cfg[a.id].reg)||a.reg||'';
     if(reg && !acList.find(function(x){return x.reg===reg;})) acList.push({id:a.id, reg:reg, isManual:true});
   });
+  // Historical aircraft — registrations that still have flights in the GAS cloud
+  // store but are no longer on the Airbly account (sold/left the fleet). Adding
+  // them back as rows means the month-on-month view reflects the fleet as it
+  // actually was at the time, rather than only today's aircraft.
+  Object.keys(ST.storeFlights||{}).forEach(function(storeReg){
+    if(!storeReg) return;
+    const REG = storeReg.toUpperCase();
+    if(typeof EXCLUDED_REGS !== 'undefined' && EXCLUDED_REGS.indexOf(REG) >= 0) return;
+    if(acList.find(function(x){ return (x.reg||'').toUpperCase() === REG; })) return;
+    if(!Object.keys(ST.storeFlights[storeReg]||{}).length) return;
+    acList.push({id:'hist:'+storeReg, reg:storeReg, isManual:false, isHistoric:true});
+  });
 
   const tierOrder = {'G-BCGJ':1,'G-PETR':1,'G-MKAS':1,'G-BTGO':1,'G-FIAT':1,'N150PK':1,'G-HRYZ':3,'G-SETG':3,'G-BHFE':3};
   acList.sort(function(a,b){
@@ -2984,7 +2996,7 @@ function buildMonthlyTable(){
     const col = colours[ai%colours.length];
     const row = data[ac.reg];
     const total = row.reduce(function(s,v){return s+(v||0);},0);
-    const departed = !!ST.cfg[ac.id]?.departed;
+    const departed = !!ST.cfg[ac.id]?.departed || !!ac.isHistoric;
     const regDisplay = departed ? '<span style="text-decoration:line-through;opacity:0.6">'+ac.reg+'</span>' : ac.reg;
     tbody+='<tr>';
     tbody+='<td style="'+tdR+';color:'+col+'">'+regDisplay+'</td>';
@@ -3006,7 +3018,7 @@ function buildMonthlyTable(){
   return '<div style="overflow-x:auto;margin-bottom:4px">'
     +'<table style="border-collapse:collapse;font-size:12px;min-width:100%">'
     +'<thead>'+thead+'</thead><tbody>'+tbody+'</tbody></table></div>'
-    +'<div style="font-size:10px;color:var(--mut);margin-bottom:16px">Click any column header to sort ⇅&nbsp;&nbsp;·&nbsp;&nbsp;Airbly aircraft: from flight logs&nbsp;&nbsp;·&nbsp;&nbsp;Manual aircraft: from daily log entries</div>';
+    +'<div style="font-size:10px;color:var(--mut);margin-bottom:16px">Click any column header to sort ⇅&nbsp;&nbsp;·&nbsp;&nbsp;Airbly aircraft: from flight logs&nbsp;&nbsp;·&nbsp;&nbsp;Manual aircraft: from daily log entries&nbsp;&nbsp;·&nbsp;&nbsp;<span style="text-decoration:line-through;opacity:0.6">Struck through</span> = departed, historical data retained</div>';
 }
 
 function setUtilSort(col){
