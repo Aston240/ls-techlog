@@ -3639,21 +3639,19 @@ function ymLabel(ym){
   const p=ym.split('-'); return new Date(+p[0],+p[1]-1,1).toLocaleDateString('en-GB',{month:'short',year:'2-digit'});
 }
 
-// Flatten + dedupe flights for every fleet aircraft, filtered to the active
-// date range. Mirrors the Hours Tracker scope exactly — only aircraft returned
-// by allAircraft() are included, so non-fleet regs in the store (departed
-// aircraft no longer on the Airbly account, shared-group visitors, etc.) are
-// naturally excluded. Live data (ST.flights) overlays the store by UUID.
+// Flatten + dedupe flights across the fleet, filtered to the active date range.
+// Includes BOTH current Airbly aircraft AND departed aircraft that still have
+// flights in the GAS store, so historical months reflect what the school
+// actually flew at the time. EXCLUDED_REGS (non-fleet aircraft seen via a
+// shared Airbly group) are kept out of both. Live data overlays store by UUID.
 function analyticsFlights(range){
   const fromMs = range ? Date.parse(range.from+'T00:00:00Z') : null;
   const toMs   = range ? Date.parse(range.to  +'T23:59:59.999Z') : null;
   const inRange = ms => (fromMs===null || (ms>=fromMs && ms<=toMs));
   const byUuid = {};
-  allAircraft().forEach(function(ac){
-    const reg=(ac.reg||'').toUpperCase();
-    if(EXCLUDED_REGS.indexOf(reg)>=0) return;
-    // Store flights first (historical bulk)
-    Object.values(ST.storeFlights[reg]||{}).forEach(function(f){
+  const seenRegs = {};
+  const addStore = function(storeKey, reg){
+    Object.values(ST.storeFlights[storeKey]||{}).forEach(function(f){
       if(!f || !f.uuid || !f.dep_ms || !f.air_sec) return;
       const dep=Number(f.dep_ms);
       if(!inRange(dep)) return;
@@ -3666,6 +3664,13 @@ function analyticsFlights(range){
         fuel:(f.fuel!=null && f.fuel!=='')?Number(f.fuel):null,
       };
     });
+  };
+  // 1. Current fleet — store history plus live overlay
+  allAircraft().forEach(function(ac){
+    const reg=(ac.reg||'').toUpperCase();
+    if(EXCLUDED_REGS.indexOf(reg)>=0) return;
+    seenRegs[reg]=true;
+    addStore(reg, reg);
     // Live flights overlay — UUID matches store UUID so dedup is automatic
     (ST.flights[ac.id]||[]).forEach(function(f){
       if(!f.id || !f.dep_ms || !f.air_sec) return;
@@ -3680,6 +3685,14 @@ function analyticsFlights(range){
         fuel:(f.fuel!=null && f.fuel!=='')?Number(f.fuel):null,
       };
     });
+  });
+  // 2. Departed aircraft — in the store but no longer on the Airbly account
+  Object.keys(ST.storeFlights||{}).forEach(function(storeKey){
+    if(!storeKey) return;
+    const REG = storeKey.toUpperCase();
+    if(EXCLUDED_REGS.indexOf(REG)>=0) return;
+    if(seenRegs[REG]) return;
+    addStore(storeKey, REG);
   });
   return Object.values(byUuid);
 }
@@ -3747,8 +3760,12 @@ function utilLeagueRows(A){
   const targets = getTierTargets();
   const monthsCount = Math.max(1, A.months.length);
   const grounded = new Set((ST.downtimeLog||[]).filter(function(e){return !e.end;}).map(function(e){return (e.reg||'').toUpperCase();}));
-  return activeAircraft().filter(function(ac){ return EXCLUDED_REGS.indexOf((ac.reg||'').toUpperCase())<0; }).map(function(ac){
+  const rows = [];
+  const seen = {};
+  // Current fleet — RAG status applies
+  activeAircraft().filter(function(ac){ return EXCLUDED_REGS.indexOf((ac.reg||'').toUpperCase())<0; }).forEach(function(ac){
     const reg=(ac.reg||'').toUpperCase();
+    seen[reg]=true;
     const tier=acTierG(reg);
     const totalHrs=(A.byReg[reg]||{}).hours||0;
     const avgMo=totalHrs/monthsCount;
@@ -3759,12 +3776,26 @@ function utilLeagueRows(A){
       else if(avgMo>=target*0.66){ rag='a'; ragTxt='Below target'; }
       else { rag='r'; ragTxt='Well below'; }
     }
-    return {
-      reg, tier, isManual:!!ac.isManual, grounded:grounded.has(reg),
+    rows.push({
+      reg, tier, isManual:!!ac.isManual, grounded:grounded.has(reg), departed:false,
       totalHrs, avgMo, target, rag, ragTxt,
       lastDep:(A.byReg[reg]||{}).lastDep||0,
-    };
-  }).sort(function(a,b){
+    });
+  });
+  // Departed aircraft that flew in this range — hours shown, no target/RAG
+  Object.keys(A.byReg||{}).forEach(function(reg){
+    const REG=(reg||'').toUpperCase();
+    if(!REG || seen[REG]) return;
+    if(EXCLUDED_REGS.indexOf(REG)>=0) return;
+    const totalHrs=(A.byReg[REG]||{}).hours||0;
+    rows.push({
+      reg:REG, tier:acTierG(REG), isManual:false, grounded:false, departed:true,
+      totalHrs, avgMo:totalHrs/monthsCount, target:null, rag:'n', ragTxt:'Departed',
+      lastDep:(A.byReg[REG]||{}).lastDep||0,
+    });
+  });
+  return rows.sort(function(a,b){
+    if(a.departed!==b.departed) return a.departed?1:-1;   // departed always last
     if(a.tier!==b.tier) return (a.tier||9)-(b.tier||9);
     return b.avgMo - a.avgMo;
   });
@@ -3849,10 +3880,13 @@ function rAnalytics(){
   let leagueBody='';
   rows.forEach(function(r){
     const last = r.lastDep ? fmtDate(r.lastDep) : '—';
+    const regTxt = r.departed
+      ? '<span style="text-decoration:line-through;opacity:0.65;color:#fff;font-weight:700">'+esc(r.reg)+'</span>'
+      : '<strong style="color:#fff">'+esc(r.reg)+'</strong>';
     leagueBody +=
-      '<tr>'
-      +'<td><strong style="color:#fff">'+esc(r.reg)+'</strong>'+(r.isManual?' <span class="an-tier">[M]</span>':'')+(r.grounded?' <span class="an-rag r">U/S</span>':'')+'</td>'
-      +'<td class="an-tier">T'+(r.tier||'?')+' · '+TIER_LABEL[r.tier]+'</td>'
+      '<tr'+(r.departed?' style="opacity:0.75"':'')+'>'
+      +'<td>'+regTxt+(r.isManual?' <span class="an-tier">[M]</span>':'')+(r.grounded?' <span class="an-rag r">U/S</span>':'')+'</td>'
+      +'<td class="an-tier">'+(r.tier?('T'+r.tier+' · '+TIER_LABEL[r.tier]):'—')+'</td>'
       +'<td class="num">'+r.totalHrs.toFixed(1)+'</td>'
       +'<td class="num">'+r.avgMo.toFixed(1)+'</td>'
       +'<td class="num">'+(r.target!=null?r.target.toFixed(0):'—')+'</td>'
@@ -3862,8 +3896,8 @@ function rAnalytics(){
   });
   const tIn=(tier,val)=>'<input type="number" min="0" step="1" value="'+(val!=null?val:'')+'" placeholder="—" onchange="setTierTarget('+tier+',this.value)" style="width:54px;background:#0a1828;border:1px solid var(--border);border-radius:5px;color:var(--txt);font-size:11px;padding:3px 6px;text-align:right">';
   const leagueHtml =
-    '<div class="an-card an-full"><h3>🏆 Utilisation League — Active Fleet</h3>'
-    +'<div class="csub">Total hours and average per month over the selected range. Status is the monthly average vs the tier target below.</div>'
+    '<div class="an-card an-full"><h3>🏆 Utilisation League</h3>'
+    +'<div class="csub">Total hours and average per month over the selected range. Status is the monthly average vs the tier target below. Departed aircraft appear struck through, with hours but no target or status.</div>'
     +'<div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin-bottom:12px;font-size:11px;color:var(--mut)">'
     +'<span style="font-weight:700;letter-spacing:.5px;text-transform:uppercase">🎯 Monthly Targets (hrs):</span>'
     +'<span>Tier 1 '+tIn(1,tt[1])+'</span>'
@@ -3909,6 +3943,7 @@ function rAnalytics(){
   const note =
     '<div class="an-note">'
     +'<strong>How this is calculated:</strong> built from Airbly flight logs — live data plus the cloud flight store (historical backfill). Deduplicated by flight UUID and filtered to the date range above. '
+    +'<strong>Departed aircraft are included</strong> — if an aircraft flew during the selected range it counts toward every total, chart and record, so each month reflects the fleet as it actually was at the time. Aircraft not operated by LS Airmotive are excluded throughout.<br>'
     +'Manual daily-log hours are not included — this page reflects Airbly flight data only, which matches the raw Airbly figures. The Hours Tracker page adds daily-log entries on top, so it can read slightly higher for any aircraft that still carries pre-Airbly manual hours. All days/times are UTC.<br>'
     +'<strong>Hour-of-day:</strong> historical flights imported without a recorded take-off time appear at exactly 12:00 and are excluded from that chart and the earliest/latest figures, so it reflects only properly timed flights.<br>'
     +'<strong>Not yet included (next iteration):</strong> a geographic map and distance-flown stats (need an accurate UK airfield coordinate set), and any pilot/student breakdown (Airbly does not record who flew).'
