@@ -238,6 +238,16 @@ tfoot td{padding:11px;background:#112240;font-weight:700;}
 @keyframes sp{from{transform:rotate(0)}to{transform:rotate(360deg)}}
 .empty{text-align:center;color:var(--dim);padding:60px;font-size:14px;}
 
+/* ── MAINTENANCE PLANNER LAYOUT ─────────────────── */
+.mxwrap{display:block;}
+.mxleft{max-width:980px;}
+.mxright{margin-top:22px;max-width:980px;}
+@media(min-width:1800px){
+  .mxwrap{display:grid;grid-template-columns:980px 600px;gap:24px;align-items:start;}
+  .mxleft{max-width:980px;min-width:0;}
+  .mxright{margin-top:0;max-width:none;min-width:0;}
+}
+
 /* ── FLIGHT ANALYTICS ───────────────────────────── */
 .an-intro{font-size:12px;color:var(--mut);margin-bottom:16px;line-height:1.6;}
 .an-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:20px;}
@@ -2344,6 +2354,39 @@ function rMxPlanner(){
     return isNaN(d) ? null : d;
   }
 
+  // ── Forecast confidence ────────────────────────────────────────────
+  // Spread of an aircraft's own weekly burn rate over the snapshot history.
+  // Returns days of uncertainty on the predicted check date. Scales with how
+  // far out the forecast is AND how erratic that aircraft's flying has been.
+  // Floor 1 day (hours readings aren't finer than that), cap 10 days.
+  // Falls back to 2 days when there isn't enough history to measure spread.
+  function forecastConfidence(ac, daysOut){
+    if(daysOut==null) return null;
+    const snaps = ST.hoursSnapshots[ac.id]||{};
+    const dates = Object.keys(snaps).sort();
+    if(dates.length<5) return {days:2, weak:true};
+    // Build weekly hour deltas across the available history (max 12 weeks back)
+    const cutoff = new Date(now-84*DAY).toISOString().slice(0,10);
+    const recent = dates.filter(function(d){return d>=cutoff;});
+    if(recent.length<5) return {days:2, weak:true};
+    const rates=[];
+    for(var i=1;i<recent.length;i++){
+      const gap = (new Date(recent[i])-new Date(recent[i-1]))/DAY;
+      if(gap<=0) continue;
+      const hrs = Math.max(0,(snaps[recent[i]]||0)-(snaps[recent[i-1]]||0));
+      rates.push(hrs/gap);
+    }
+    if(rates.length<3) return {days:2, weak:true};
+    const mean = rates.reduce(function(s,v){return s+v;},0)/rates.length;
+    if(mean<=0) return {days:2, weak:true};
+    const varc = rates.reduce(function(s,v){return s+(v-mean)*(v-mean);},0)/rates.length;
+    const sd = Math.sqrt(varc);
+    const cv = Math.min(0.9, sd/mean);           // clamp — avoid runaway spread
+    var d = Math.round(daysOut*cv);
+    d = Math.max(1, Math.min(10, d));
+    return {days:d, weak:false};
+  }
+
   function daysUntilDate(str){
     const d = parseUKDate(str);
     if(!d || isNaN(d)) return null;
@@ -2785,11 +2828,165 @@ function rMxPlanner(){
       +'</tr>';
   }).join('') : '<tr><td colspan="6" style="color:var(--mut);text-align:center;padding:14px">No downtime recorded</td></tr>';
 
+  // ══ FORECAST CHECK CALENDAR ═══════════════════════════════════════
+  // Two-month view. Hours checks render as uniform 3-day bars (predicted day
+  // ±1) with a confidence figure; annual/ARC render as fixed single-day pills.
+  // Bars spanning week/month boundaries are clipped with square edges.
+  const CAL_MON = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const CAL_MS  = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const CAL_DOW = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  const CAL_COL = {hrs:'#f0a020', ann:'#e24b4a', arc:'#7f77dd'};
+
+  function calItems(){
+    const out=[];
+    _all.forEach(function(ac){
+      if(grounded.has(ac.reg)) return;
+      const cfg = ST.cfg[ac.id]||{};
+      const due = parseFloat(cfg.maint_due)||null;
+      const md  = due ? predictDays(ac,due) : null;
+      if(md!==null && md>=0 && md<=200){
+        const conf = forecastConfidence(ac, md);
+        out.push({reg:ac.reg, kind:'hrs', mid:new Date(now.getTime()+md*DAY),
+                  conf:conf?conf.days:2, weak:conf?conf.weak:true,
+                  note:(cfg.check_type?cfg.check_type+'hr check':'Hours check')});
+      }
+      const ad = daysUntilDate(cfg.annual_due);
+      if(ad!==null && ad>=0 && ad<=200) out.push({reg:ac.reg, kind:'ann', mid:new Date(now.getTime()+ad*DAY), conf:0, note:'Annual'});
+      const rd = daysUntilDate(cfg.cofa_exp);
+      if(rd!==null && rd>=0 && rd<=200) out.push({reg:ac.reg, kind:'arc', mid:new Date(now.getTime()+rd*DAY), conf:0, note:'ARC expiry'});
+    });
+    out.forEach(function(it){
+      it.mid = new Date(Date.UTC(it.mid.getFullYear(), it.mid.getMonth(), it.mid.getDate()));
+      const sp = it.kind==='hrs' ? 1 : 0;
+      it.s = new Date(it.mid.getTime()-sp*DAY);
+      it.e = new Date(it.mid.getTime()+sp*DAY);
+    });
+    return out;
+  }
+
+  function calClashes(items){
+    const c={};
+    for(var i=0;i<items.length;i++)for(var j=i+1;j<items.length;j++){
+      if(items[i].reg===items[j].reg) continue;
+      if(Math.abs((items[i].mid-items[j].mid)/DAY)<=3){ c[items[i].reg]=1; c[items[j].reg]=1; }
+    }
+    return c;
+  }
+
+  function calWeeks(y,m){
+    const dim=new Date(Date.UTC(y,m+1,0)).getUTCDate();
+    const lead=(new Date(Date.UTC(y,m,1)).getUTCDay()+6)%7;
+    const W=[]; var c=[];
+    for(var i=0;i<lead;i++) c.push(null);
+    for(var d=1;d<=dim;d++){ c.push(new Date(Date.UTC(y,m,d))); if(c.length===7){W.push(c);c=[];} }
+    if(c.length){ while(c.length<7) c.push(null); W.push(c); }
+    return W;
+  }
+
+  function calMonth(y,m,items,CL,todayKey){
+    var h='<div style="font-size:11px;color:var(--txt);letter-spacing:.5px;margin:0 0 6px 2px">'+CAL_MON[m]+' '+y+'</div>';
+    h+='<div style="display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:3px;margin-bottom:3px">';
+    CAL_DOW.forEach(function(d,i){ h+='<div style="font-size:9px;color:'+(i>4?'#4a5f78':'var(--mut)')+';text-align:center">'+d+'</div>'; });
+    h+='</div>';
+    calWeeks(y,m).forEach(function(wk){
+      const segs=[];
+      items.forEach(function(it){
+        var a=-1,b=-1;
+        wk.forEach(function(d,i){ if(d&&d>=it.s&&d<=it.e){ if(a<0)a=i; b=i; } });
+        if(a>=0) segs.push({it:it,a:a,b:b});
+      });
+      const lanes=[];
+      segs.forEach(function(s){
+        var L=0;
+        while(lanes[L]&&lanes[L].some(function(o){return !(s.b<o.a||s.a>o.b);})) L++;
+        (lanes[L]=lanes[L]||[]).push(s);
+      });
+      h+='<div style="display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:3px;margin-bottom:2px">';
+      wk.forEach(function(d){
+        const td = d && d.toISOString().slice(0,10)===todayKey;
+        h+='<div style="height:15px;background:'+(d?'rgba(255,255,255,0.02)':'transparent')+';border-radius:4px 4px 0 0;'
+         +'border-top:2px solid '+(td?'var(--acc)':'transparent')+';display:flex;align-items:center;justify-content:center">'
+         +(d?'<span style="font-size:9px;color:'+(td?'var(--acc)':'var(--mut)')+'">'+d.getUTCDate()+'</span>':'')+'</div>';
+      });
+      h+='</div>';
+      const nl=Math.max(lanes.length,1);
+      for(var L=0;L<nl;L++){
+        h+='<div style="display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:3px;margin-bottom:2px;min-height:'+(lanes[L]?17:4)+'px">';
+        const row=(lanes[L]||[]).slice().sort(function(x,y){return x.a-y.a;});
+        var cur=0;
+        row.forEach(function(s){
+          if(s.a>cur) h+='<div style="grid-column:span '+(s.a-cur)+'"></div>';
+          const it=s.it, c=CAL_COL[it.kind], span=s.b-s.a+1;
+          const sh=it.s>=wk[s.a], eh=it.e<=wk[s.b];
+          const bg = it.kind==='hrs'?'rgba(240,160,32,0.16)':(it.kind==='ann'?'rgba(226,75,74,0.18)':'rgba(127,119,221,0.18)');
+          const bd = CL[it.reg] ? '#e24b4a' : c;
+          const lbl = esc(it.reg) + ((it.kind==='hrs'&&span>=3)
+            ? '<span style="color:var(--mut);font-size:9px;margin-left:4px">\u00b1'+it.conf+'d</span>' : '');
+          h+='<div title="'+esc(it.reg+' \u2014 '+it.note+(it.kind==='hrs'?' (forecast \u00b1'+it.conf+' days)':' (fixed date)'))+'" '
+           +'style="grid-column:span '+span+';height:17px;border-radius:'+(sh?'9px':'0')+' '+(eh?'9px':'0')+' '+(eh?'9px':'0')+' '+(sh?'9px':'0')
+           +';background:'+bg+';border:1px solid '+bd+';display:flex;align-items:center;justify-content:center;overflow:hidden">'
+           +'<span style="font-size:10px;letter-spacing:.3px;color:'+c+';white-space:nowrap">'+lbl+'</span></div>';
+          cur=s.b+1;
+        });
+        if(cur<7) h+='<div style="grid-column:span '+(7-cur)+'"></div>';
+        h+='</div>';
+      }
+    });
+    return h;
+  }
+
+  const _calItems = calItems();
+  const _calCL = calClashes(_calItems);
+  const _todayKey = new Date(Date.UTC(now.getFullYear(),now.getMonth(),now.getDate())).toISOString().slice(0,10);
+
+  // Plain-text export for engineering
+  (function(){
+    const L=['LS AIRMOTIVE \u2014 FORECAST CHECK SCHEDULE',
+             'Generated '+now.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'})+' \u00b7 London Oxford (EGTK)',''];
+    const srt=_calItems.slice().sort(function(a,b){return a.mid-b.mid;});
+    var cur='';
+    srt.forEach(function(it){
+      const mk=CAL_MS[it.mid.getUTCMonth()]+' '+it.mid.getUTCFullYear();
+      if(mk!==cur){ cur=mk; L.push(mk.toUpperCase()); }
+      L.push('  '+CAL_DOW[(it.mid.getUTCDay()+6)%7]+' '+String(it.mid.getUTCDate()).padStart(2,'0')+' '+CAL_MS[it.mid.getUTCMonth()]
+        +'   '+it.reg+'   '+it.note+'   '
+        +(it.kind==='hrs' ? ('forecast \u00b1'+it.conf+' days'+(it.weak?' (limited history)':'')) : 'fixed date')
+        +(_calCL[it.reg] ? '   ** within 3 days of another check' : ''));
+    });
+    if(!srt.length) L.push('  No forecast checks in the next 6 months.');
+    L.push('','Hours-check dates are forecasts from current burn rate and move as flying changes.',
+           'Annual and ARC dates are fixed and cannot slip.',
+           'Marked ** = two or more aircraft due within 3 days of each other.');
+    ST._calExport = L.join('\n');
+  })();
+
+  const _m1=new Date(now.getFullYear(),now.getMonth(),1);
+  const _m2=new Date(now.getFullYear(),now.getMonth()+1,1);
+  const calendarPanel =
+    '<div id="mxcal-panel" style="position:sticky;top:16px;background:var(--panel);border:1px solid var(--border);border-radius:11px;padding:14px 15px">'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:11px;gap:8px">'
+    +'<div style="font-size:12px;font-weight:700;color:#fff">\u{1F4C5} Forecast Check Calendar</div>'
+    +'<button onclick="copyCalSchedule(this)" style="font-size:10px;padding:4px 10px;background:#0d1a2a;border:1px solid #1e3a5a;color:var(--acc);border-radius:6px;cursor:pointer;font-weight:700;white-space:nowrap">Copy for engineering</button>'
+    +'</div>'
+    + (_calItems.length
+        ? calMonth(_m1.getFullYear(),_m1.getMonth(),_calItems,_calCL,_todayKey)
+          +'<div style="height:11px"></div>'
+          + calMonth(_m2.getFullYear(),_m2.getMonth(),_calItems,_calCL,_todayKey)
+        : '<div style="font-size:11px;color:var(--mut);padding:16px 0;text-align:center">No forecast checks yet \u2014 needs burn-rate history.</div>')
+    +'<div style="border-top:1px solid var(--border);margin-top:10px;padding-top:9px;display:flex;flex-wrap:wrap;gap:9px;font-size:9px;color:var(--mut)">'
+    +'<span><span style="display:inline-block;width:18px;height:8px;border-radius:4px;background:rgba(240,160,32,0.16);border:1px solid #f0a020;vertical-align:-1px;margin-right:3px"></span>hours check</span>'
+    +'<span><span style="display:inline-block;width:8px;height:8px;border-radius:4px;background:rgba(226,75,74,0.18);border:1px solid #e24b4a;vertical-align:-1px;margin-right:3px"></span>annual</span>'
+    +'<span><span style="display:inline-block;width:8px;height:8px;border-radius:4px;background:rgba(127,119,221,0.18);border:1px solid #7f77dd;vertical-align:-1px;margin-right:3px"></span>ARC</span>'
+    +'<span><span style="display:inline-block;width:18px;height:8px;border-radius:4px;border:1px solid #e24b4a;vertical-align:-1px;margin-right:3px"></span>clash</span>'
+    +'<span style="color:var(--dim)">\u00b1Nd = forecast confidence</span>'
+    +'</div></div>';
+
   const acOptions = _all.map(function(ac){return '<option value="'+esc(ac.reg)+'">'+esc(ac.reg)+'</option>';}).join('');
   const today = new Date().toISOString().slice(0,10);
   const inp = 'width:100%;background:var(--bg);border:1px solid var(--border);border-radius:7px;color:#fff;padding:8px 10px;font-size:12px;outline:none;box-sizing:border-box';
 
-  return '<div style="padding:18px 22px;max-width:980px">'
+  return '<div class="mxwrap" style="padding:18px 22px">'
+    +'<div class="mxleft">'
 
     // subtitle + help button
     +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">'
@@ -2813,7 +3010,13 @@ function rMxPlanner(){
     // cards
     +cards
 
-    // downtime log
+    // ── close left column, right column holds the calendar ──
+    +'</div>'
+    +'<div class="mxright">'+calendarPanel+'</div>'
+    +'</div>'
+
+    // downtime log — full width beneath both columns
+    +'<div style="padding:0 22px 18px">'
     +'<div style="height:28px"></div>'
     +'<div style="font-size:11px;font-weight:700;color:var(--mut);letter-spacing:2px;text-transform:uppercase;'
     +'margin-bottom:12px;padding-bottom:6px;border-bottom:1px solid var(--border)">Downtime Log</div>'
@@ -2845,6 +3048,26 @@ function rMxPlanner(){
     +'</div>'
 
     +'</div>';
+}
+
+// Copy the forecast check schedule to the clipboard for emailing engineering.
+function copyCalSchedule(btn){
+  const txt = ST._calExport || '';
+  if(!txt){ return; }
+  const done = function(ok){
+    const orig = btn.textContent;
+    btn.textContent = ok ? 'Copied \u2713' : 'Copy failed';
+    setTimeout(function(){ btn.textContent = orig; }, 2200);
+  };
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(txt).then(function(){done(true);}, function(){done(false);});
+  } else {
+    const ta=document.createElement('textarea');
+    ta.value=txt; ta.style.position='fixed'; ta.style.opacity='0';
+    document.body.appendChild(ta); ta.select();
+    var ok=false; try{ ok=document.execCommand('copy'); }catch(e){}
+    document.body.removeChild(ta); done(ok);
+  }
 }
 
 function buildMonthlyTable(){
