@@ -2940,26 +2940,16 @@ function rMxPlanner(){
   const _nowD = new Date(now);
   const _todayKey = new Date(Date.UTC(_nowD.getFullYear(),_nowD.getMonth(),_nowD.getDate())).toISOString().slice(0,10);
 
-  // Plain-text export for engineering
-  (function(){
-    const L=['LS AIRMOTIVE \u2014 FORECAST CHECK SCHEDULE',
-             'Generated '+_nowD.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'})+' \u00b7 London Oxford (EGTK)',''];
-    const srt=_calItems.slice().sort(function(a,b){return a.mid-b.mid;});
-    var cur='';
-    srt.forEach(function(it){
-      const mk=CAL_MS[it.mid.getUTCMonth()]+' '+it.mid.getUTCFullYear();
-      if(mk!==cur){ cur=mk; L.push(mk.toUpperCase()); }
-      L.push('  '+CAL_DOW[(it.mid.getUTCDay()+6)%7]+' '+String(it.mid.getUTCDate()).padStart(2,'0')+' '+CAL_MS[it.mid.getUTCMonth()]
-        +'   '+it.reg+'   '+it.note+'   '
-        +(it.kind==='hrs' ? ('forecast \u00b1'+it.conf+' days'+(it.weak?' (limited history)':'')) : 'fixed date')
-        +(_calCL[it.reg] ? '   ** within 3 days of another check' : ''));
-    });
-    if(!srt.length) L.push('  No forecast checks in the next 6 months.');
-    L.push('','Hours-check dates are forecasts from current burn rate and move as flying changes.',
-           'Annual and ARC dates are fixed and cannot slip.',
-           'Marked ** = two or more aircraft due within 3 days of each other.');
-    ST._calExport = L.join('\n');
-  })();
+  // Structured data for the shareable PNG (rendered on demand by copyCalImage)
+  ST._calData = {
+    gen: _nowD.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}),
+    today: _todayKey,
+    clash: _calCL,
+    items: _calItems.map(function(it){
+      return {reg:it.reg, kind:it.kind, conf:it.conf, weak:!!it.weak, note:it.note,
+              mid:it.mid.getTime(), s:it.s.getTime(), e:it.e.getTime()};
+    })
+  };
 
   const _m1=new Date(_nowD.getFullYear(),_nowD.getMonth(),1);
   const _m2=new Date(_nowD.getFullYear(),_nowD.getMonth()+1,1);
@@ -2967,7 +2957,7 @@ function rMxPlanner(){
     '<div id="mxcal-panel" style="position:sticky;top:16px;background:var(--panel);border:1px solid var(--border);border-radius:11px;padding:14px 15px">'
     +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:11px;gap:8px">'
     +'<div style="font-size:12px;font-weight:700;color:#fff">\u{1F4C5} Forecast Check Calendar</div>'
-    +'<button onclick="copyCalSchedule(this)" style="font-size:10px;padding:4px 10px;background:#0d1a2a;border:1px solid #1e3a5a;color:var(--acc);border-radius:6px;cursor:pointer;font-weight:700;white-space:nowrap">Copy for engineering</button>'
+    +'<button onclick="copyCalImage(this)" style="font-size:10px;padding:4px 10px;background:#0d1a2a;border:1px solid #1e3a5a;color:var(--acc);border-radius:6px;cursor:pointer;font-weight:700;white-space:nowrap">\u{1F4CB} Copy image</button>'
     +'</div>'
     + (_calItems.length
         ? calMonth(_m1.getFullYear(),_m1.getMonth(),_calItems,_calCL,_todayKey)
@@ -3051,24 +3041,191 @@ function rMxPlanner(){
     +'</div>';
 }
 
-// Copy the forecast check schedule to the clipboard for emailing engineering.
-function copyCalSchedule(btn){
-  const txt = ST._calExport || '';
-  if(!txt){ return; }
-  const done = function(ok){
-    const orig = btn.textContent;
-    btn.textContent = ok ? 'Copied \u2713' : 'Copy failed';
-    setTimeout(function(){ btn.textContent = orig; }, 2200);
+// ══ SHAREABLE CALENDAR IMAGE ══════════════════════════════════════
+// Draws the forecast calendar to a canvas and copies it to the clipboard as
+// a PNG for pasting into an email. Falls back to a download where the browser
+// won't accept image writes (Firefox). Drawn fresh rather than screenshotting
+// the DOM, so the output is identical every time and sized for email.
+function _calWeeksG(y,m){
+  const dim=new Date(Date.UTC(y,m+1,0)).getUTCDate();
+  const lead=(new Date(Date.UTC(y,m,1)).getUTCDay()+6)%7;
+  const W=[]; let c=[];
+  for(let i=0;i<lead;i++) c.push(null);
+  for(let d=1;d<=dim;d++){ c.push(new Date(Date.UTC(y,m,d))); if(c.length===7){W.push(c);c=[];} }
+  if(c.length){ while(c.length<7) c.push(null); W.push(c); }
+  return W;
+}
+function _calLanes(wk, items){
+  const segs=[];
+  items.forEach(function(it){
+    let a=-1,b=-1;
+    wk.forEach(function(d,i){ if(d && d>=it.s && d<=it.e){ if(a<0)a=i; b=i; } });
+    if(a>=0) segs.push({it:it,a:a,b:b});
+  });
+  const lanes=[];
+  segs.forEach(function(s){
+    let L=0;
+    while(lanes[L] && lanes[L].some(function(o){return !(s.b<o.a||s.a>o.b);})) L++;
+    (lanes[L]=lanes[L]||[]).push(s);
+  });
+  return lanes;
+}
+function _rr(ctx,x,y,w,h,rl,rr){
+  rl=Math.min(rl,h/2); rr=Math.min(rr,h/2);
+  ctx.beginPath();
+  ctx.moveTo(x+rl,y);
+  ctx.lineTo(x+w-rr,y);
+  if(rr) ctx.arcTo(x+w,y,x+w,y+rr,rr); else ctx.lineTo(x+w,y);
+  ctx.lineTo(x+w,y+h-rr);
+  if(rr) ctx.arcTo(x+w,y+h,x+w-rr,y+h,rr); else ctx.lineTo(x+w,y+h);
+  ctx.lineTo(x+rl,y+h);
+  if(rl) ctx.arcTo(x,y+h,x,y+h-rl,rl); else ctx.lineTo(x,y+h);
+  ctx.lineTo(x,y+rl);
+  if(rl) ctx.arcTo(x,y,x+rl,y,rl); else ctx.lineTo(x,y);
+  ctx.closePath();
+}
+function renderCalendarPNG(){
+  const D = ST._calData;
+  if(!D) return null;
+  const MONF=['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const DOW=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  const COL={hrs:'#f0a020', ann:'#e24b4a', arc:'#7f77dd'};
+  const FILL={hrs:'rgba(240,160,32,0.18)', ann:'rgba(226,75,74,0.2)', arc:'rgba(127,119,221,0.2)'};
+  const items = D.items.map(function(it){
+    return {reg:it.reg,kind:it.kind,conf:it.conf,note:it.note,
+            mid:new Date(it.mid), s:new Date(it.s), e:new Date(it.e)};
+  });
+  const nd = new Date();
+  const months=[[nd.getFullYear(),nd.getMonth()],
+                [new Date(nd.getFullYear(),nd.getMonth()+1,1).getFullYear(),
+                 new Date(nd.getFullYear(),nd.getMonth()+1,1).getMonth()]];
+  const PAD=30, GAP=34, MW=430, CW=MW/7;
+  const HDR=74, DOWH=22, MTH=26, DAYH=20, LANE=22, WKPAD=5, LEGH=54;
+  // measure
+  let maxBody=0;
+  months.forEach(function(ym){
+    let hgt=MTH+DOWH;
+    _calWeeksG(ym[0],ym[1]).forEach(function(wk){
+      const lanes=_calLanes(wk,items);
+      hgt += DAYH + Math.max(lanes.length,1)*LANE + WKPAD;
+    });
+    if(hgt>maxBody) maxBody=hgt;
+  });
+  const W = PAD*2 + MW*2 + GAP;
+  const H = HDR + maxBody + LEGH + PAD;
+  const SC = 2;
+  const cv=document.createElement('canvas');
+  cv.width=W*SC; cv.height=H*SC;
+  const ctx=cv.getContext('2d');
+  ctx.scale(SC,SC);
+  const F=function(sz,w){ ctx.font=(w||'')+' '+sz+'px "Segoe UI",Arial,sans-serif'; };
+  // background
+  ctx.fillStyle='#0f1621'; ctx.fillRect(0,0,W,H);
+  ctx.strokeStyle='#1e2a3a'; ctx.lineWidth=1; ctx.strokeRect(0.5,0.5,W-1,H-1);
+  // header
+  ctx.fillStyle='#ffffff'; F(19,'600'); ctx.textBaseline='alphabetic';
+  ctx.fillText('LS Airmotive \u2014 Forecast Check Calendar', PAD, PAD+16);
+  ctx.fillStyle='#7f9ab8'; F(12,'');
+  ctx.fillText('Generated '+D.gen+'  \u00b7  London Oxford (EGTK)', PAD, PAD+36);
+  ctx.strokeStyle='#1e2a3a'; ctx.beginPath();
+  ctx.moveTo(PAD,PAD+48); ctx.lineTo(W-PAD,PAD+48); ctx.stroke();
+  // months
+  months.forEach(function(ym,mi){
+    const ox = PAD + mi*(MW+GAP);
+    let oy = HDR;
+    ctx.fillStyle='#dbe5f0'; F(14,'600');
+    ctx.fillText(MONF[ym[1]]+' '+ym[0], ox, oy+14);
+    oy += MTH;
+    F(11,'');
+    DOW.forEach(function(d,i){
+      ctx.fillStyle = i>4 ? '#4a5f78' : '#7f9ab8';
+      ctx.textAlign='center';
+      ctx.fillText(d, ox+i*CW+CW/2, oy+12);
+    });
+    ctx.textAlign='left';
+    oy += DOWH;
+    _calWeeksG(ym[0],ym[1]).forEach(function(wk){
+      const lanes=_calLanes(wk,items);
+      // day numbers
+      wk.forEach(function(d,i){
+        if(!d) return;
+        const isTd = d.toISOString().slice(0,10)===D.today;
+        const x=ox+i*CW, y=oy;
+        ctx.fillStyle='rgba(255,255,255,0.025)';
+        _rr(ctx,x+1,y,CW-2,DAYH,4,4); ctx.fill();
+        if(isTd){ ctx.strokeStyle='#4a9eff'; ctx.lineWidth=1.5;
+          ctx.beginPath(); ctx.moveTo(x+2,y+0.5); ctx.lineTo(x+CW-2,y+0.5); ctx.stroke(); }
+        ctx.fillStyle = isTd ? '#4a9eff' : '#7f9ab8';
+        F(11,''); ctx.textAlign='center';
+        ctx.fillText(String(d.getUTCDate()), x+CW/2, y+14);
+        ctx.textAlign='left';
+      });
+      let ly = oy+DAYH;
+      const nl=Math.max(lanes.length,1);
+      for(let L=0;L<nl;L++){
+        (lanes[L]||[]).forEach(function(s){
+          const it=s.it, span=s.b-s.a+1;
+          const x=ox+s.a*CW+1.5, y=ly+1, w=span*CW-3, h=LANE-4;
+          const sh = it.s>=wk[s.a], eh = it.e<=wk[s.b];
+          _rr(ctx,x,y,w,h, sh?h/2:0, eh?h/2:0);
+          ctx.fillStyle=FILL[it.kind]; ctx.fill();
+          ctx.strokeStyle = D.clash[it.reg] ? '#e24b4a' : COL[it.kind];
+          ctx.lineWidth=1; ctx.stroke();
+          ctx.save(); ctx.beginPath();
+          _rr(ctx,x,y,w,h, sh?h/2:0, eh?h/2:0); ctx.clip();
+          ctx.fillStyle=COL[it.kind]; F(11,'600'); ctx.textAlign='center';
+          const lbl = it.reg + ((it.kind==='hrs'&&span>=3) ? '  \u00b1'+it.conf+'d' : '');
+          ctx.fillText(lbl, x+w/2, y+h-4.5);
+          ctx.restore(); ctx.textAlign='left';
+        });
+        ly += LANE;
+      }
+      oy = ly + WKPAD;
+    });
+  });
+  // legend
+  const ly = H-PAD-LEGH+30;
+  ctx.strokeStyle='#1e2a3a'; ctx.beginPath();
+  ctx.moveTo(PAD,ly-16); ctx.lineTo(W-PAD,ly-16); ctx.stroke();
+  let lx=PAD;
+  const key=function(label,fill,stroke,wide){
+    const bw=wide?26:11, bh=11;
+    _rr(ctx,lx,ly-9,bw,bh,bh/2,bh/2);
+    ctx.fillStyle=fill; ctx.fill();
+    ctx.strokeStyle=stroke; ctx.lineWidth=1; ctx.stroke();
+    ctx.fillStyle='#7f9ab8'; F(11,'');
+    ctx.fillText(label, lx+bw+7, ly);
+    lx += bw+7+ctx.measureText(label).width+20;
   };
-  if(navigator.clipboard && navigator.clipboard.writeText){
-    navigator.clipboard.writeText(txt).then(function(){done(true);}, function(){done(false);});
-  } else {
-    const ta=document.createElement('textarea');
-    ta.value=txt; ta.style.position='fixed'; ta.style.opacity='0';
-    document.body.appendChild(ta); ta.select();
-    var ok=false; try{ ok=document.execCommand('copy'); }catch(e){}
-    document.body.removeChild(ta); done(ok);
-  }
+  key('Hours check', FILL.hrs, COL.hrs, true);
+  key('Annual (fixed)', FILL.ann, COL.ann, false);
+  key('ARC (fixed)', FILL.arc, COL.arc, false);
+  key('Clash \u2014 within 3 days', 'rgba(0,0,0,0)', '#e24b4a', true);
+  ctx.fillStyle='#5f7a97'; F(11,'');
+  ctx.fillText('\u00b1Nd = forecast confidence. Hours checks move with flying; annual and ARC dates are fixed.', PAD, ly+21);
+  return cv;
+}
+function copyCalImage(btn){
+  const orig = btn.innerHTML;
+  const done = function(msg){ btn.innerHTML=msg; setTimeout(function(){btn.innerHTML=orig;},2400); };
+  let cv;
+  try{ cv = renderCalendarPNG(); }catch(e){ console.warn('[cal] render failed',e); done('Render failed'); return; }
+  if(!cv){ done('No data'); return; }
+  const dl = function(blob){
+    const u=URL.createObjectURL(blob), a=document.createElement('a');
+    a.href=u; a.download='ls-airmotive-check-calendar.png';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function(){URL.revokeObjectURL(u);},1500);
+    done('\u2713 Downloaded');
+  };
+  cv.toBlob(function(blob){
+    if(!blob){ done('Failed'); return; }
+    if(window.ClipboardItem && navigator.clipboard && navigator.clipboard.write){
+      navigator.clipboard.write([new ClipboardItem({'image/png':blob})])
+        .then(function(){ done('\u2713 Copied'); })
+        .catch(function(){ dl(blob); });
+    } else { dl(blob); }
+  },'image/png');
 }
 
 function buildMonthlyTable(){
