@@ -391,19 +391,6 @@
     </div>
   </div>
 
-  <!-- ═══ NEARBY AIRFIELDS ═══ -->
-  <div class="section half-width" data-id="airfields">
-    <div class="slabel" onclick="toggleSection(this)">
-      <span class="drag-handle">⠿</span>
-      <span>🗺</span> Nearby Airfields
-      <button class="width-btn" onclick="toggleWidth(event,this)">⬜ HALF</button>
-      <span class="chevron">▼</span>
-    </div>
-    <div class="section-body">
-      <div class="airfields-grid" id="airfieldsGrid"></div>
-    </div>
-  </div>
-
   <!-- ═══ NOTAMs ═══ -->
   <div class="section half-width" data-id="notams">
     <div class="slabel" onclick="toggleSection(this)">
@@ -531,14 +518,7 @@
 // ══════════════════════════════════════════════════════
 
 // ── AIRFIELD CONFIG ──
-const HOME_ICAO    = 'EGTK';
-const NEARBY_ICAOS = [
-  { icao:'EGVN', name:'Brize Norton' },
-  { icao:'EGBJ', name:'Gloucester' },
-  { icao:'EGHI', name:'Southampton' },
-  { icao:'EGBB', name:'Birmingham' },
-];
-const ALL_ICAOS = [HOME_ICAO, ...NEARBY_ICAOS.map(a=>a.icao)];
+const HOME_ICAO = 'EGTK';
 
 // ════════════════════════════════════════════════════════════════
 //  ✏️  MANUAL NOTAMs — edit these while AutoRouter API is pending
@@ -959,42 +939,11 @@ function elapsed(dep) {
 }
 
 // ══════════════════════════════════════════════════════
-//  FETCH LIVE WEATHER — AutoRouter API (via Apps Script proxy)
+//  WEATHER — no data source currently connected
+//  (AutoRouter removed; EGTK card shows NO DATA until a
+//   replacement METAR/TAF source is wired in)
 // ══════════════════════════════════════════════════════
-const WEATHER_PROXY = 'https://script.google.com/macros/s/AKfycbwKtjtdt1qFzX99gn-acyWGakzmoOxR3ozfhfUsLe9Z_DH2tEpiVvncPHxgsDMGkQcwrA/exec';
-
-async function fetchWeather() {
-  try {
-    // Single call fetches all airfields with one auth token
-    const res     = await fetch(`${WEATHER_PROXY}?action=weather&icaos=${ALL_ICAOS.join(',')}`);
-    const results = await res.json();
-
-    if (results.error) throw new Error(results.error);
-
-    for (const icao of ALL_ICAOS) {
-      const d = results[icao];
-      if (!d || d.error) continue;
-      const metar = d.metar || '';
-      const taf   = d.taf   || '';
-      wxData[icao] = {
-        metar,
-        taf,
-        cat:   flightCat(metar),
-        wind:  parseWind(metar),
-        vis:   parseVis(metar),
-        cloud: parseCloud(metar),
-      };
-    }
-
-    renderHomeWx();
-    renderNearby();
-
-  } catch(e) {
-    console.warn('Weather fetch failed:', e.message);
-    renderHomeWx();
-    renderNearby();
-  }
-}
+const APPS_SCRIPT_PROXY = 'https://script.google.com/macros/s/AKfycbwKtjtdt1qFzX99gn-acyWGakzmoOxR3ozfhfUsLe9Z_DH2tEpiVvncPHxgsDMGkQcwrA/exec';
 
 // ── FORMAT HELPERS — parse raw METAR strings ──────────
 function parseWind(metar) {
@@ -1032,7 +981,7 @@ function parseCloud(metar) {
   const lowest = layers.reduce((a,b) => parseInt(a[2]) < parseInt(b[2]) ? a : b);
   return `${lowest[1]}${lowest[2]}`;
 }
-// Keep old names as aliases — renderHomeWx/renderNearby call these
+// Legacy aliases — kept for when a new METAR/TAF source is wired in
 function formatWind(m) { return parseWind(m?.raw_text||''); }
 function windPct(m)    { return parseWind(m?.raw_text||'').pct; }
 function formatVis(m)  { return parseVis(m?.raw_text||''); }
@@ -1061,34 +1010,6 @@ function renderHomeWx() {
   document.getElementById('tafText').innerHTML = taf ? highlightMetar(taf) : 'NO DATA';
 }
 
-// ══════════════════════════════════════════════════════
-//  RENDER NEARBY
-// ══════════════════════════════════════════════════════
-function renderNearby() {
-  document.getElementById('airfieldsGrid').innerHTML = NEARBY_ICAOS.map(a => {
-    const d   = wxData[a.icao] || {};
-    const cat = d.cat   || '---';
-    const raw = d.metar || '';
-    const taf = d.taf   || '';
-    const catClass = ['VFR','MVFR','IFR','LIFR'].includes(cat) ? cat : '';
-    const id = 'taf-' + a.icao;
-    return `
-      <div class="af-card">
-        <div class="af-row">
-          <div class="af-icao">${a.icao}</div>
-          <div class="af-name">${a.name}</div>
-          <div class="af-spacer"></div>
-          <div class="af-cat ${catClass}" style="${!catClass?'color:var(--dim);border-color:var(--border)':''}">${cat}</div>
-        </div>
-        <div class="af-metar">${raw ? highlightMetar(raw) : '<span style="color:var(--dim)">NO DATA</span>'}</div>
-        ${taf ? `
-        <div class="af-taf-toggle" onclick="this.nextElementSibling.classList.toggle('open');this.querySelector('.taf-chev').textContent=this.nextElementSibling.classList.contains('open')?'▲':'▼'">
-          <span>TAF</span><span class="taf-chev">▲</span>
-        </div>
-        <div class="af-taf-body open" id="${id}">${highlightMetar(taf)}</div>` : ''}
-      </div>`;
-  }).join('');
-}
 
 // ══════════════════════════════════════════════════════
 //  RENDER NOTAMs
@@ -1506,7 +1427,6 @@ async function refreshSlots() {
 // ══════════════════════════════════════════════════════
 function init() {
   renderHomeWx();
-  renderNearby();
   updateStamp();
 }
 
@@ -1576,7 +1496,7 @@ const FLEET_REGS = ['G-BCGJ','G-PETR','G-MKAS','G-BTGO','G-FIAT','N150PK','G-BOT
 
 async function fetchFleetHours() {
   try {
-    const res  = await fetch(`${WEATHER_PROXY}?action=techlog`);
+    const res  = await fetch(`${APPS_SCRIPT_PROXY}?action=techlog`);
     const data = await res.json();
     if (!data || data.error) throw new Error(data?.error || 'No data');
 
@@ -1673,7 +1593,6 @@ function drawFleetHours() {
 
 loadOrder();
 initDrag();
-fetchWeather();
 fetchNotams();
 fetchNotices();
 fetchFlights();
@@ -1682,7 +1601,6 @@ fetchFleetHours();
 setInterval(updateElapsed, 60000);
 setInterval(init, 60000);
 setInterval(()=>{ if(cachedSlots) renderSlots(cachedSlots); }, 60000);
-setInterval(fetchWeather,  600000);   // weather every 10 mins
 setInterval(fetchNotams,  1800000);   // NOTAMs every 30 mins
 setInterval(fetchNotices,  300000);   // defects every 5 mins
 setInterval(fetchFlights,  120000);   // flights every 2 mins
