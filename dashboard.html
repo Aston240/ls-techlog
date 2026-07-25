@@ -939,11 +939,37 @@ function elapsed(dep) {
 }
 
 // ══════════════════════════════════════════════════════
-//  WEATHER — no data source currently connected
-//  (AutoRouter removed; EGTK card shows NO DATA until a
-//   replacement METAR/TAF source is wired in)
+//  WEATHER — EGTK only, via token-cached Apps Script proxy
+//  The proxy authenticates with AutoRouter once per hour and
+//  reuses the token; the dashboard just asks for EGTK METAR/TAF.
 // ══════════════════════════════════════════════════════
 const APPS_SCRIPT_PROXY = 'https://script.google.com/macros/s/AKfycbwKtjtdt1qFzX99gn-acyWGakzmoOxR3ozfhfUsLe9Z_DH2tEpiVvncPHxgsDMGkQcwrA/exec';
+
+async function fetchWeather() {
+  try {
+    const res     = await fetch(`${APPS_SCRIPT_PROXY}?action=weather&icaos=${HOME_ICAO}`);
+    const results = await res.json();
+    if (results.error) throw new Error(results.error);
+
+    const d = results[HOME_ICAO];
+    if (d && !d.error) {
+      const metar = d.metar || '';
+      const taf   = d.taf   || '';
+      wxData[HOME_ICAO] = {
+        metar,
+        taf,
+        cat:   flightCat(metar),
+        wind:  parseWind(metar),
+        vis:   parseVis(metar),
+        cloud: parseCloud(metar),
+      };
+    }
+    renderHomeWx();
+  } catch(e) {
+    console.warn('Weather fetch failed:', e.message);
+    renderHomeWx();
+  }
+}
 
 // ── FORMAT HELPERS — parse raw METAR strings ──────────
 function parseWind(metar) {
@@ -993,7 +1019,8 @@ function formatCloud(m){ return parseCloud(m?.raw_text||''); }
 // ══════════════════════════════════════════════════════
 function renderHomeWx() {
   const d = wxData[HOME_ICAO] || {};
-  const cat   = d.cat   || 'VFR';
+  const hasData = !!d.metar;
+  const cat   = hasData ? (d.cat || '---') : '---';
   const wind  = d.wind  || { txt:'--', pct:0 };
   const vis   = d.vis   || { txt:'--', pct:0 };
   const cloud = d.cloud || '--';
@@ -1002,7 +1029,9 @@ function renderHomeWx() {
 
   const catEl = document.getElementById('homeCat');
   catEl.textContent = cat;
-  catEl.className   = 'flt-cat ' + cat;
+  // Only apply a colour category class when we actually have data;
+  // otherwise show a neutral grey dash so nobody reads a stale green VFR.
+  catEl.className   = 'flt-cat ' + (hasData && ['VFR','MVFR','IFR','LIFR'].includes(cat) ? cat : '');
 
   document.getElementById('metarText').innerHTML = metar
     ? highlightMetar(metar)
@@ -1593,6 +1622,7 @@ function drawFleetHours() {
 
 loadOrder();
 initDrag();
+fetchWeather();
 fetchNotams();
 fetchNotices();
 fetchFlights();
@@ -1601,7 +1631,8 @@ fetchFleetHours();
 setInterval(updateElapsed, 60000);
 setInterval(init, 60000);
 setInterval(()=>{ if(cachedSlots) renderSlots(cachedSlots); }, 60000);
-setInterval(fetchNotams,  1800000);   // NOTAMs every 30 mins
+setInterval(fetchWeather, 1800000);   // EGTK weather every 30 mins
+setInterval(fetchNotams,  1800000);   // NOTAMs every 30 mins (sheet read only)
 setInterval(fetchNotices,  300000);   // defects every 5 mins
 setInterval(fetchFlights,  120000);   // flights every 2 mins
 setInterval(fetchFleetHours, 600000); // fleet hours every 10 mins
