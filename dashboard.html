@@ -782,8 +782,7 @@ async function fetchNotices() {
 const FLEET = [
   { reg:'G-BCGJ', type:'PA-28-140' },
   { reg:'G-BTGO', type:'PA-28-140' },
-  { reg:'G-BOTN', type:'PA-28-140' },
-  { reg:'G-EGTB', type:'PA-28-161' },
+  { reg:'G-BHFE', type:'PA-44-180' },
   { reg:'G-FIAT', type:'PA-28-161' },
   { reg:'G-HRYZ', type:'PA-28-161' },
   { reg:'G-MKAS', type:'PA-28-181' },
@@ -1531,48 +1530,47 @@ const TECHLOG_SHEET_ID  = '1KP5wGmSc2TI8kogZVH-wDtx95Mmqtlb8YwhHDrzyGnI';
 const TECHLOG_SHEET_GID = '0';
 
 // Known Tier 1 PPL trainers — only show these on the ops dashboard
-const FLEET_REGS = ['G-BCGJ','G-PETR','G-MKAS','G-BTGO','G-FIAT','N150PK','G-BOTN','G-HRYZ','G-SETG'];
-
 async function fetchFleetHours() {
   try {
     const res  = await fetch(`${APPS_SCRIPT_PROXY}?action=techlog`);
     const data = await res.json();
     if (!data || data.error) throw new Error(data?.error || 'No data');
 
-    const cfg            = data.cfg            || {};
-    const dailyLog       = data.dailyLog       || {};
-    const manual         = data.manual         || [];
-    const hoursSnapshots = data.hoursSnapshots || {};
+    const cfg = data.cfg || {};
 
-    // Build a map of reg → { currentHours, maintDue, checkType }
-    const aircraft = [];
-
-    // Process all cfg entries
+    // Build reg → maint_due / check_type from the tech log cfg.
+    // If a reg has more than one cfg entry, prefer one that is NOT departed
+    // and has a maint_due, so a stale duplicate can't shadow the live config.
+    const cfgByReg = {};
     Object.keys(cfg).forEach(id => {
       const c = cfg[id];
-      if (!c || c.departed) return;
-
-      // Get registration
+      if (!c) return;
       const reg = (c.reg || '').toUpperCase();
       if (!reg) return;
-
-      // Only include fleet regs we care about
-      if (!FLEET_REGS.includes(reg)) return;
-
-      // Get maintenance due hours — stored as plain number e.g. "17456.46"
       const maintDue = parseFloat(c.maint_due || '0');
-      if (!maintDue) return; // skip if no hours target
-      const checkType = c.check_type || '50hr';
+      const existing = cfgByReg[reg];
+      // Take this entry if we have none yet, or if the existing one lacks a
+      // usable maint_due and this one has it.
+      if (!existing || (!existing.maintDue && maintDue)) {
+        cfgByReg[reg] = { maintDue, checkType: c.check_type || '50hr' };
+      }
+    });
 
-      // Current hours: use LIVE Airbly airframe hours (air_seconds/3600),
-      // captured by fetchFlights. This is the same figure the tech log uses
-      // and stays current through the day, unlike the once-daily snapshot.
+    // Which aircraft to show is driven ENTIRELY by live Airbly presence —
+    // an aircraft appears only if Airbly is currently tracking it. Departed
+    // aircraft (e.g. BOTN) simply have no live reading, so they never show,
+    // with no manual list to maintain. New Airbly aircraft (e.g. BHFE) appear
+    // automatically once they have a maint_due in the tech log.
+    const aircraft = [];
+    Object.keys(liveAirframeHrs).forEach(reg => {
       const currentHrs = liveAirframeHrs[reg];
-      if (!currentHrs) return; // no live Airbly reading yet — skip this aircraft
+      if (!currentHrs) return;
 
-      const hoursRemaining = Math.max(0, maintDue - currentHrs);
+      const c = cfgByReg[reg];
+      if (!c || !c.maintDue) return; // no check target in tech log — omit rather than guess
 
-      aircraft.push({ reg, currentHrs, maintDue, hoursRemaining, checkType });
+      const hoursRemaining = Math.max(0, c.maintDue - currentHrs);
+      aircraft.push({ reg, currentHrs, maintDue: c.maintDue, hoursRemaining, checkType: c.checkType });
     });
 
     // Sort by hours remaining ascending (most urgent first)
