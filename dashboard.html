@@ -663,6 +663,7 @@ async function fetchNotams() {
 const AIRBLY_KEY  = 'AamCntOnk72udRQvYYiX4oUlcpHcgg';
 const AIRBLY_KEY2 = '6W9TZU5ECtrE3U1UeptzaNsCaXoWcQ';
 let liveFlights = [];
+let liveAirframeHrs = {};  // reg → live airframe hours from Airbly (air_seconds/3600)
 
 async function fetchFlights() {
   // Start with all fleet aircraft as grounded
@@ -687,6 +688,12 @@ async function fetchFlights() {
       if (match) {
         const isAirborne = a.operational_status === 'airborne' || a.operational_status === 'inflight';
         fleetStatus[match.reg] = isAirborne;
+        // Capture live airframe hours (air_seconds ÷ 3600) — the same figure
+        // the tech log uses for check calcs. Lets the fleet hours card read
+        // live hours instead of a lagging once-a-day snapshot.
+        if (a.usage && a.usage.air_seconds) {
+          liveAirframeHrs[match.reg] = a.usage.air_seconds / 3600;
+        }
         if (isAirborne && a.logs && a.logs[0] && a.logs[0].usage && a.logs[0].usage.engine_start_at) {
           const d = new Date(a.logs[0].usage.engine_start_at);
           fleetDepTimes[match.reg] = d.getUTCHours().toString().padStart(2,'0') + ':' + d.getUTCMinutes().toString().padStart(2,'0');
@@ -703,6 +710,9 @@ async function fetchFlights() {
     depTime:  fleetDepTimes[ac.reg] || null,
   }));
   renderFlights();
+
+  // Recompute fleet check-hours now that live Airbly airframe hours are fresh
+  fetchFleetHours();
 }
 
 const JSONBIN_KEY = '$2a$10$wjZldGseV25iurze/grlbOQ1ZxUVCugh.kmmRH3LOo3zEiUF4RKPS';
@@ -1554,13 +1564,11 @@ async function fetchFleetHours() {
       if (!maintDue) return; // skip if no hours target
       const checkType = c.check_type || '50hr';
 
-      // Get current hours from hoursSnapshots — use most recent entry
-      const snapshots  = hoursSnapshots[id] || {};
-      const snapDates  = Object.keys(snapshots).sort();
-      const currentHrs = snapDates.length
-        ? parseFloat(snapshots[snapDates[snapDates.length - 1]])
-        : 0;
-      if (!currentHrs) return;
+      // Current hours: use LIVE Airbly airframe hours (air_seconds/3600),
+      // captured by fetchFlights. This is the same figure the tech log uses
+      // and stays current through the day, unlike the once-daily snapshot.
+      const currentHrs = liveAirframeHrs[reg];
+      if (!currentHrs) return; // no live Airbly reading yet — skip this aircraft
 
       const hoursRemaining = Math.max(0, maintDue - currentHrs);
 
@@ -1627,15 +1635,13 @@ fetchNotams();
 fetchNotices();
 fetchFlights();
 refreshSlots();
-fetchFleetHours();
 setInterval(updateElapsed, 60000);
 setInterval(init, 60000);
 setInterval(()=>{ if(cachedSlots) renderSlots(cachedSlots); }, 60000);
 setInterval(fetchWeather, 1800000);   // EGTK weather every 30 mins
 setInterval(fetchNotams,  1800000);   // NOTAMs every 30 mins (sheet read only)
 setInterval(fetchNotices,  300000);   // defects every 5 mins
-setInterval(fetchFlights,  120000);   // flights every 2 mins
-setInterval(fetchFleetHours, 600000); // fleet hours every 10 mins
+setInterval(fetchFlights,  120000);   // flights + fleet check-hours every 2 mins
 setInterval(refreshSlots,  120000);   // slots every 2 mins
 </script>
 </body>
