@@ -2100,7 +2100,7 @@ function forcePushDailyLog(){
 
 // ── HOURS TRACKER ────────────────────────────────
 function rHours(){
-  const _all=allAircraft();
+  const _all=activeAircraft();
   const totH=_all.reduce((a,x)=>a+x.totalHobbs,0);
   const totFl=Object.values(ST.flights).reduce((a,x)=>a+x.length,0);
   const rows=_all.map(ac=>{
@@ -2135,7 +2135,7 @@ function rHours(){
     <tfoot><tr>
       <td colspan="2" style="color:#fff">FLEET TOTAL</td>
       <td style="color:var(--acc)">${totH.toFixed(1)}</td>
-      <td>${ST.aircraft.reduce((a,x)=>a+(x.totalCycles||0),0)||'—'}</td>
+      <td>${_all.reduce((a,x)=>a+(x.totalCycles||0),0)||'—'}</td>
       <td colspan="5"></td>
     </tr></tfoot>
   </table></div>
