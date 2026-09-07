@@ -1214,6 +1214,7 @@ async function showApp(){
   }
 }
 function buildAcList(){
+  seedTiers();
   const all=activeAircraft();
   $('ac-list').innerHTML=all.map(ac=>`
     <button class="acb ${ST.selected?.id===ac.id?'act':''}" onclick="selAc('${ac.id}')">
@@ -2171,6 +2172,15 @@ function settingsCardFields(id, ac, c, isManual){
         <input id="f_${id}_check_type" value="${esc(c.check_type||'')}" placeholder="e.g. 50hr / 100hr / Annual">
       </div>
       <div class="sf">
+        <label>FLEET TIER</label>
+        <select id="f_${id}_tier" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:7px;color:#fff;padding:8px 10px;font-size:13px;outline:none;box-sizing:border-box">
+          <option value=""${!c.tier?' selected':''}>Untiered</option>
+          <option value="1"${String(c.tier)==='1'?' selected':''}>Tier 1 — PPL Trainer</option>
+          <option value="2"${String(c.tier)==='2'?' selected':''}>Tier 2 — Leased</option>
+          <option value="3"${String(c.tier)==='3'?' selected':''}>Tier 3 — Advanced</option>
+        </select>
+      </div>
+      <div class="sf">
         <label>ARC DUE</label>
         <input id="f_${id}_cofa_exp" value="${esc(c.cofa_exp||'')}" placeholder="e.g. 14 Nov 2025">
       </div>
@@ -2289,19 +2299,12 @@ function rMxPlanner(){
   const DAY = 86400*1000;
   const dt = ST.downtimeLog||[];
 
-  // Fleet tier definitions
-  const TIER1 = ['G-BCGJ','G-PETR','G-MKAS','G-BTGO','G-FIAT','N150PK'];
-  const TIER2 = [];
-  const TIER3 = ['G-HRYZ','G-SETG','G-BHFE'];
-  const NO_STANDBY = ['G-HRYZ','G-SETG','G-BHFE'];
-  const MONTHLY_TARGET = {};
-
-  function acTier(ac){
-    const r = ac.reg;
-    if(TIER1.indexOf(r)>=0) return 1;
-    if(TIER2.indexOf(r)>=0) return 2;
-    if(TIER3.indexOf(r)>=0) return 3;
-    return 2;
+  // Fleet tiers now resolve from ST.cfg[id].tier (see tierOfId/seedTiers).
+  // Helper kept as a thin local alias so the rest of the planner is unchanged.
+  function acTier(ac){ return tierOfId(ac.id); }
+  function acMonthlyTarget(ac){
+    const t = getTierTargets()[tierOfId(ac.id)];
+    return (t!=null) ? t : 15;
   }
 
   // Set of grounded regs
@@ -2468,7 +2471,7 @@ function rMxPlanner(){
     const minDays = candidates.length ? Math.min.apply(null,candidates) : 9000;
     // Tier offset: tier1=0, tier2=500, tier3=1000 — so tier1 aircraft sort first
     // But urgency overrides tier: if minDays<30, ignore tier offset
-    const tierOffset = minDays<30 ? 0 : (acTier(ac)-1)*500;
+    const tierOffset = minDays<30 ? 0 : ((acTier(ac)||9)-1)*500;
     return minDays + tierOffset;
   }
 
@@ -2482,7 +2485,7 @@ function rMxPlanner(){
 
   // Sort by predicted days to check (ascending) within each tier for sequencing
   const seqSorted = nonGrounded.slice().sort(function(a,b){
-    const tierDiff = acTier(a)-acTier(b);
+    const tierDiff = (acTier(a)||9)-(acTier(b)||9);
     if(tierDiff!==0) return tierDiff;
     const cfg_a = ST.cfg[a.id]||{}, cfg_b = ST.cfg[b.id]||{};
     const due_a = parseFloat(cfg_a.maint_due)||null;
@@ -2517,7 +2520,7 @@ function rMxPlanner(){
   var standbyAc = null, standbyNote = '', standbyWarn = false;
   const standbyPool = _all.filter(function(ac){
     if(grounded.has(ac.reg)) return false;
-    if(NO_STANDBY.indexOf(ac.reg)>=0) return false;
+    if(acTier(ac)===3) return false;
     // Only ON TRACK aircraft can be standby
     const cfg = ST.cfg[ac.id]||{};
     const due = parseFloat(cfg.maint_due)||null;
@@ -2529,9 +2532,9 @@ function rMxPlanner(){
   });
 
   // Check TIER2 monthly progress
-  const tier2candidates = standbyPool.filter(function(ac){ return TIER2.indexOf(ac.reg)>=0; });
+  const tier2candidates = standbyPool.filter(function(ac){ return acTier(ac)===2; });
   var tier2OnTrack = tier2candidates.filter(function(ac){
-    const target = MONTHLY_TARGET[ac.reg]||15;
+    const target = acMonthlyTarget(ac);
     const flown = monthlyHrsFlown(ac);
     const now_d = new Date();
     const daysInMonth = new Date(now_d.getFullYear(), now_d.getMonth()+1, 0).getDate();
@@ -2551,13 +2554,13 @@ function rMxPlanner(){
     });
     standbyAc = tier2OnTrack[0];
     const flown = monthlyHrsFlown(standbyAc).toFixed(1);
-    const target = MONTHLY_TARGET[standbyAc.reg]||15;
+    const target = acMonthlyTarget(standbyAc);
     standbyNote = flown+' hrs flown this month · on track for '+target+' hr target';
     standbyWarn = false;
   } else {
     // Check if tier2 exists but behind on hours
     const tier2Behind = tier2candidates.filter(function(ac){
-      const target = MONTHLY_TARGET[ac.reg]||15;
+      const target = acMonthlyTarget(ac);
       const flown = monthlyHrsFlown(ac);
       const now_d = new Date();
       const daysInMonth = new Date(now_d.getFullYear(), now_d.getMonth()+1, 0).getDate();
@@ -2568,11 +2571,11 @@ function rMxPlanner(){
     if(tier2Behind.length>0){
       // Flag that tier2 should be flying, fall back to tier1
       const behind = tier2Behind.map(function(ac){
-        return ac.reg+' ('+monthlyHrsFlown(ac).toFixed(1)+'hrs of '+(MONTHLY_TARGET[ac.reg]||15)+' this month)';
+        return ac.reg+' ('+monthlyHrsFlown(ac).toFixed(1)+'hrs of '+(acMonthlyTarget(ac))+' this month)';
       }).join(', ');
       standbyWarn = true;
       // Fall back to tier1 furthest from check
-      const tier1pool = standbyPool.filter(function(ac){ return TIER1.indexOf(ac.reg)>=0; });
+      const tier1pool = standbyPool.filter(function(ac){ return acTier(ac)===1; });
       tier1pool.sort(function(a,b){
         const cfg_a=ST.cfg[a.id]||{}, cfg_b=ST.cfg[b.id]||{};
         const due_a=parseFloat(cfg_a.maint_due)||null, due_b=parseFloat(cfg_b.maint_due)||null;
@@ -2584,7 +2587,7 @@ function rMxPlanner(){
       standbyNote = 'Behind on monthly hrs: '+behind+' — should be flying today, not on standby';
     } else {
       // No tier2 at all, use tier1
-      const tier1pool = standbyPool.filter(function(ac){ return TIER1.indexOf(ac.reg)>=0; });
+      const tier1pool = standbyPool.filter(function(ac){ return acTier(ac)===1; });
       tier1pool.sort(function(a,b){
         const cfg_a=ST.cfg[a.id]||{}, cfg_b=ST.cfg[b.id]||{};
         const due_a=parseFloat(cfg_a.maint_due)||null, due_b=parseFloat(cfg_b.maint_due)||null;
@@ -3253,9 +3256,8 @@ function buildMonthlyTable(){
     acList.push({id:'hist:'+storeReg, reg:storeReg, isManual:false, isHistoric:true});
   });
 
-  const tierOrder = {'G-BCGJ':1,'G-PETR':1,'G-MKAS':1,'G-BTGO':1,'G-FIAT':1,'N150PK':1,'G-HRYZ':3,'G-SETG':3,'G-BHFE':3};
   acList.sort(function(a,b){
-    const ta=tierOrder[a.reg]||9, tb=tierOrder[b.reg]||9;
+    const ta=tierOfReg(a.reg)||9, tb=tierOfReg(b.reg)||9;
     return ta!==tb ? ta-tb : a.reg.localeCompare(b.reg);
   });
 
@@ -3672,7 +3674,7 @@ function deleteManualAc(id){
 }
 
 function saveAcCfg(id){
-  const fields=['reg','type','base','maint_due','check_type','cofa_exp','annual_due','sheet_start','man_hours','man_landings','man_last_flight'];
+  const fields=['reg','type','base','maint_due','check_type','tier','cofa_exp','annual_due','sheet_start','man_hours','man_landings','man_last_flight'];
   if(!ST.cfg[id]) ST.cfg[id]={};
   fields.forEach(f=>{
     const el=document.getElementById(`f_${id}_${f}`);
@@ -3905,18 +3907,44 @@ const EXCLUDED_AIRFIELDS = ['EGTK','EGTR']; // home (Oxford) + Elstree — hidde
 const T2_TARGET_HRS = 15;   // default leased-aircraft monthly target (first run only)
 const PLACEHOLDER_HOUR = 12; // CSV-backfilled flights have no time → sit at exactly 12:00
 
-const FLEET_TIERS = {
-  1:['G-BCGJ','G-PETR','G-MKAS','G-BTGO','G-FIAT','N150PK'],
-  2:[],
-  3:['G-HRYZ','G-SETG','G-BHFE'],
+// ── FLEET TIERS — single source of truth ────────────────────────────
+// Tier now lives per-aircraft in ST.cfg[id].tier (1/2/3, or unset = untiered).
+// TIER_SEED migrates the existing fleet on first run and is the fallback for
+// a registration that can't be resolved to a current aircraft (e.g. a departed
+// aircraft appearing in historical analytics). New aircraft start untiered
+// until a tier is set in Aircraft Settings.
+const TIER_SEED = {
+  'G-BCGJ':1,'G-PETR':1,'G-MKAS':1,'G-BTGO':1,'G-FIAT':1,'N150PK':1,
+  'G-HRYZ':3,'G-SETG':3,'G-BHFE':3
 };
-function acTierG(reg){
-  reg=(reg||'').toUpperCase();
-  if(FLEET_TIERS[1].indexOf(reg)>=0) return 1;
-  if(FLEET_TIERS[2].indexOf(reg)>=0) return 2;
-  if(FLEET_TIERS[3].indexOf(reg)>=0) return 3;
-  return 0;
+function tierOfId(id){
+  const t = parseInt(ST.cfg[id] && ST.cfg[id].tier, 10);
+  return (t===1||t===2||t===3) ? t : 0;
 }
+function tierOfReg(reg){
+  reg=(reg||'').toUpperCase();
+  if(typeof allAircraft==='function'){
+    const ac=allAircraft().find(function(a){return (a.reg||'').toUpperCase()===reg;});
+    if(ac){ const t=tierOfId(ac.id); if(t) return t; }
+  }
+  return TIER_SEED[reg]||0;
+}
+// One-time migration: give any current aircraft without a stored tier its seed
+// value. Never overwrites a tier the user has set. Persists + syncs if changed.
+function seedTiers(){
+  if(typeof allAircraft!=='function') return;
+  let changed=false;
+  allAircraft().forEach(function(ac){
+    if(!ST.cfg[ac.id]) ST.cfg[ac.id]={};
+    const cur=parseInt(ST.cfg[ac.id].tier,10);
+    if(cur!==1&&cur!==2&&cur!==3){
+      const s=TIER_SEED[(ac.reg||'').toUpperCase()];
+      if(s){ ST.cfg[ac.id].tier=s; changed=true; }
+    }
+  });
+  if(changed){ saveCfg(); }
+}
+function acTierG(reg){ return tierOfReg(reg); }
 const TIER_LABEL = {1:'PPL Trainer',2:'Leased',3:'Advanced',0:'—'};
 
 function minsToHHMM(mins){
@@ -4427,18 +4455,10 @@ function openFleetAnalysis() {
   const existing = document.getElementById('fleetAnalysisModal');
   if (existing) { existing.remove(); return; }
 
-  const TIERS = {
-    1: ['G-BCGJ','G-PETR','G-MKAS','G-BTGO','G-FIAT','N150PK'],
-    2: [],
-    3: ['G-HRYZ','G-SETG','G-BHFE']
-  };
   const TIER_NAMES = { 1: 'Tier 1 — PPL Trainers', 2: 'Tier 2 — Leased', 3: 'Tier 3 — Advanced' };
 
   function getTier(reg) {
-    for (const [t, regs] of Object.entries(TIERS)) {
-      if (regs.includes(reg)) return parseInt(t);
-    }
-    return null;
+    return tierOfReg(reg) || null;
   }
 
   function daysBetween(dateStr) {
