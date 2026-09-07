@@ -1563,7 +1563,7 @@ function drawHoursGraph(id){
 
 // ── DASHBOARD ────────────────────────────────────
 function rDash(){
-  const _all=allAircraft();
+  const _all=activeAircraft();
   const totH=_all.reduce((a,x)=>a+x.totalHobbs,0);
   const totFl=Object.values(ST.flights).reduce((a,x)=>a+x.length,0);
   // ── Top 3 stat boxes ─────────────────────────────
@@ -1586,7 +1586,7 @@ function rDash(){
 
   const stats=[
     {v: airborne,         l:'Aircraft Airborne',      c: airborne>0?'var(--grn)':'var(--mut)', bg: airborne>0?'#0d2e1a':'',  sub: airborneNames||'All on ground'},
-    {v: _all.length,      l:'Aircraft in Fleet',      c:'var(--amb)',                          bg:'',                         sub: ST.aircraft.length+' Airbly · '+ST.manualAircraft.length+' manual'},
+    {v: _all.length,      l:'Aircraft in Fleet',      c:'var(--amb)',                          bg:'',                         sub: _all.filter(a=>!a.isManual).length+' Airbly · '+_all.filter(a=>a.isManual).length+' manual'},
     {v: maintWarn,        l:'Maintenance Warnings',    c: maintWarn>0?'#ff4444':'var(--grn)',   bg: maintWarn>0?'#2a0a0a':'', sub: warnNames||'All checks OK'},
   ];
   const cards=_all.map(ac=>{
@@ -2294,7 +2294,7 @@ function mxHelpPanel(){
 }
 
 function rMxPlanner(){
-  const _all = allAircraft();
+  const _all = activeAircraft();
   const now = Date.now();
   const DAY = 86400*1000;
   const dt = ST.downtimeLog||[];
