@@ -198,32 +198,6 @@
   .af-taf-body .hr { color:var(--red); }
   .af-taf-body.open { display:block; }
 
-  /* ── NOTAMs ── */
-  .notam-item { display:flex; flex-direction:column; gap:3px; padding:9px 0; border-bottom:1px solid var(--border); animation:fadeUp 0.4s ease both; }
-  .notam-item:last-child { border-bottom:none; padding-bottom:0; }
-  .notam-item:first-child { padding-top:0; }
-  .notam-header { display:flex; align-items:center; gap:8px; }
-  .notam-airfield { font-family:var(--mono); font-size:11px; letter-spacing:0.1em; color:var(--accent); }
-  .notam-text  { font-size:13px; color:var(--text); line-height:1.4; font-family:var(--mono); white-space:pre-wrap; word-break:break-word; }
-  .notam-valid { font-family:var(--mono); font-size:11px; color:var(--dim); }
-  .notam-footer { display:flex; align-items:center; justify-content:space-between; }
-  .notam-hide-btn { font-family:var(--mono); font-size:10px; letter-spacing:0.08em; padding:2px 8px; border-radius:2px; border:1px solid var(--border); background:transparent; color:var(--dim); cursor:pointer; transition:all 0.15s; }
-  .notam-hide-btn:hover { border-color:var(--red); color:var(--red); }
-
-  /* ── NOTAM HIDE MODAL ── */
-  #notamHideModal { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:999; align-items:center; justify-content:center; }
-  #notamHideModal.open { display:flex; }
-  #notamHideModalBox { background:var(--card); border:1px solid var(--border); border-radius:6px; padding:24px; min-width:300px; display:flex; flex-direction:column; gap:14px; }
-  #notamHideModalBox h3 { font-family:var(--mono); font-size:13px; letter-spacing:0.1em; color:var(--text); margin:0; }
-  #notamHideModalBox p { font-family:var(--mono); font-size:10px; color:var(--dim); margin:0; white-space:pre-wrap; max-height:80px; overflow:hidden; }
-  #notamHidePwInput { background:var(--bg); border:1px solid var(--border); border-radius:3px; color:var(--text); font-family:var(--mono); font-size:13px; padding:8px 10px; width:100%; box-sizing:border-box; }
-  #notamHidePwInput:focus { outline:none; border-color:var(--accent); }
-  #notamHideError { font-family:var(--mono); font-size:11px; color:#ff6060; display:none; }
-  .notam-modal-btns { display:flex; gap:10px; justify-content:flex-end; }
-  .notam-modal-btns button { font-family:var(--mono); font-size:11px; letter-spacing:0.08em; padding:6px 14px; border-radius:3px; cursor:pointer; border:1px solid var(--border); background:transparent; color:var(--dim); }
-  .notam-modal-btns button.confirm { background:var(--red); color:#fff; border-color:var(--red); font-weight:700; }
-  .notam-modal-btns button.confirm:hover { opacity:0.85; }
-
   /* ── FLYING NOW ── */
   .flight-card { background:var(--panel2); border:1px solid var(--border); border-radius:6px; padding:12px 13px; display:flex; flex-direction:column; gap:7px; position:relative; margin-bottom:8px; animation:fadeUp 0.4s ease both; }
   .flight-card:last-child { margin-bottom:0; }
@@ -333,6 +307,28 @@
   .resolve-modal-btns button.confirm { background:var(--green); color:#000; border-color:var(--green); font-weight:700; }
   .resolve-modal-btns button.confirm:hover { opacity:0.85; }
 
+
+  /* ── MANAGE AIRCRAFT MODAL ── */
+  .manage-btn { font-family:var(--mono); font-size:11px; letter-spacing:0.1em; padding:3px 10px; border-radius:2px; border:1px solid var(--border); background:transparent; color:var(--dim); cursor:pointer; margin-left:8px; }
+  .manage-btn:hover { border-color:var(--accent); color:var(--accent); }
+  #manageModal { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:999; align-items:center; justify-content:center; }
+  #manageModal.open { display:flex; }
+  #manageModalBox { background:var(--panel); border:1px solid var(--border); border-radius:6px; padding:24px; width:min(420px, 92vw); max-height:85vh; display:flex; flex-direction:column; gap:12px; }
+  #manageModalBox h3 { font-family:var(--mono); font-size:13px; letter-spacing:0.1em; color:var(--text); margin:0; }
+  #manageModalBox p { font-family:var(--mono); font-size:11px; color:var(--dim); margin:0; line-height:1.5; }
+  #managePwInput { background:var(--bg); border:1px solid var(--border); border-radius:3px; color:var(--text); font-family:var(--mono); font-size:13px; padding:8px 10px; width:100%; box-sizing:border-box; }
+  #managePwInput:focus { outline:none; border-color:var(--accent); }
+  #manageStatus { font-family:var(--mono); font-size:11px; min-height:14px; color:var(--dim); }
+  #manageStatus.err { color:#ff6060; }
+  #manageList { overflow-y:auto; display:flex; flex-direction:column; gap:6px; }
+  .manage-row { display:flex; align-items:center; justify-content:space-between; padding:8px 10px; background:var(--panel2); border:1px solid var(--border); border-radius:4px; }
+  .manage-reg { font-family:var(--head); font-weight:900; font-size:20px; letter-spacing:0.07em; color:var(--text); }
+  .manage-row.is-hidden .manage-reg { color:var(--dim); text-decoration:line-through; }
+  .manage-toggle { font-family:var(--mono); font-size:11px; letter-spacing:0.08em; padding:5px 12px; border-radius:3px; cursor:pointer; border:1px solid var(--green); background:transparent; color:var(--green); min-width:80px; }
+  .manage-row.is-hidden .manage-toggle { border-color:var(--dim); color:var(--dim); }
+  .manage-toggle:disabled { opacity:0.5; cursor:wait; }
+  .manage-close { align-self:flex-end; font-family:var(--mono); font-size:11px; letter-spacing:0.08em; padding:6px 14px; border-radius:3px; cursor:pointer; border:1px solid var(--border); background:transparent; color:var(--dim); }
+
   /* ── FOOTER ── */
   .collapse-hint { font-family:var(--mono); font-size:11px; color:var(--dim); text-align:center; letter-spacing:0.1em; opacity:0.5; padding:2px 0 0; }
   .footer { text-align:center; font-family:var(--mono); font-size:12px; color:var(--dim); letter-spacing:0.1em; padding-top:4px; }
@@ -378,7 +374,7 @@
           </div>
           <div class="wx-inline-text">
             <div class="raw-box">
-              <div class="raw-label">METAR</div>
+              <div class="raw-label">METAR <span id="metarAge"></span></div>
               <div class="raw-text" id="metarText"></div>
             </div>
             <div class="raw-box" style="margin-top:6px;">
@@ -387,21 +383,6 @@
             </div>
           </div>
         </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- ═══ NOTAMs ═══ -->
-  <div class="section half-width" data-id="notams">
-    <div class="slabel" onclick="toggleSection(this)">
-      <span class="drag-handle">⠿</span>
-      <span>⚠️</span> NOTAMs · Local Area
-      <button class="width-btn" onclick="toggleWidth(event,this)">⬜ HALF</button>
-      <span class="chevron">▼</span>
-    </div>
-    <div class="section-body">
-      <div class="panel red-top">
-        <div id="notamsWrap"></div>
       </div>
     </div>
   </div>
@@ -475,17 +456,15 @@
     </div>
   </div>
 
-  <!-- ═══ NOTAM HIDE MODAL ═══ -->
-  <div id="notamHideModal">
-    <div id="notamHideModalBox">
-      <h3>✕ HIDE NOTAM</h3>
-      <p id="notamHideDesc"></p>
-      <input type="password" id="notamHidePwInput" placeholder="Enter password…" autocomplete="off" />
-      <div id="notamHideError">Incorrect password</div>
-      <div class="notam-modal-btns">
-        <button onclick="closeNotamHideModal()">CANCEL</button>
-        <button class="confirm" onclick="confirmNotamHide()">HIDE</button>
-      </div>
+  <!-- ═══ MANAGE AIRCRAFT MODAL ═══ -->
+  <div id="manageModal">
+    <div id="manageModalBox">
+      <h3>⚙ MANAGE AIRCRAFT</h3>
+      <p>Every aircraft in Airbly is listed. Hidden aircraft are removed from Flying Now, Circuit Slots and Hours to Next Check. Enter the password, then tap to hide or show.</p>
+      <input type="password" id="managePwInput" placeholder="Enter password…" autocomplete="off" />
+      <div id="manageStatus"></div>
+      <div id="manageList"></div>
+      <button class="manage-close" onclick="closeManageModal()">CLOSE</button>
     </div>
   </div>
 
@@ -508,6 +487,7 @@
   <div class="footer">
     <div class="rbar"><div class="rfill"></div></div>
     AUTO-REFRESH 60s &nbsp;·&nbsp; <span id="lastUp">UPDATED --:--</span>
+    <button class="manage-btn" onclick="openManageModal()">⚙ MANAGE AIRCRAFT</button>
   </div>
 
 </div>
@@ -519,13 +499,6 @@
 
 // ── AIRFIELD CONFIG ──
 const HOME_ICAO = 'EGTK';
-
-// ════════════════════════════════════════════════════════════════
-//  ✏️  MANUAL NOTAMs — edit these while AutoRouter API is pending
-//  type options: 'rwy' (yellow) | 'nav' (blue) | 'obst' (red)
-//  Remove items by deleting the { } block. Add new ones at the top.
-// ════════════════════════════════════════════════════════════════
-const MANUAL_NOTAMS = []; // now sourced from JSONBin via fetchNotices
 
 // ── FLIGHT CATEGORY CALCULATION ──
 function flightCat(metarText) {
@@ -620,103 +593,102 @@ function parseCloud(metar) {
 // ── LIVE WEATHER STATE ──
 let wxData = {};
 
-// ── NOTAM SHEET CONFIG ─────────────────────────────────
-const NOTAM_SHEET_ID   = '1aoavAzPkpi9bvD8IDNz1flxWYb-5WJeUtPePS1uVgHw';
-const NOTAM_SHEET_GID  = '386587258';   // ← paste NOTAMs tab GID after creating it
-const NOTAM_WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbwKtjtdt1qFzX99gn-acyWGakzmoOxR3ozfhfUsLe9Z_DH2tEpiVvncPHxgsDMGkQcwrA/exec'; // ← paste Apps Script web app URL
-// ──────────────────────────────────────────────────────
-
-async function fetchNotams() {
-  try {
-    const url  = `https://docs.google.com/spreadsheets/d/${NOTAM_SHEET_ID}/gviz/tq?tqx=out:json&gid=${NOTAM_SHEET_GID}`;
-    const res  = await fetch(url);
-    const text = await res.text();
-    const json = JSON.parse(text.replace(/^[^(]+\(/, '').replace(/\);?\s*$/, ''));
-    const rows = json.table?.rows || [];
-    const now  = Date.now() / 1000;
-
-    // cols: 0=ID, 1=Airfield, 2=Text, 3=StartValidity, 4=EndValidity, 5=Hidden
-    const endOfToday = new Date();
-    endOfToday.setUTCHours(23, 59, 59, 999);
-    const endOfTodaySec = endOfToday.getTime() / 1000;
-
-    const notams = rows.map(r => ({
-      id           : String(r.c?.[0]?.v ?? ''),
-      airfield     : String(r.c?.[1]?.v ?? ''),
-      text         : String(r.c?.[2]?.v ?? ''),
-      startValidity: Number(r.c?.[3]?.v ?? 0),
-      endValidity  : Number(r.c?.[4]?.v ?? 9999999999),
-      hidden       : String(r.c?.[5]?.v ?? '').toLowerCase() === 'yes'
-    })).filter(n => n.id && !n.hidden
-      && n.endValidity > now
-      && n.startValidity <= endOfTodaySec
-    );
-
-    window.liveNotamsActive = notams.length > 0;
-    renderNotams(notams);
-  } catch(e) {
-    console.warn('NOTAM sheet fetch failed:', e.message);
-    renderNotams([]);
-  }
-}
-
 const AIRBLY_KEY  = 'AamCntOnk72udRQvYYiX4oUlcpHcgg';
 const AIRBLY_KEY2 = '6W9TZU5ECtrE3U1UeptzaNsCaXoWcQ';
 let liveFlights = [];
-let liveAirframeHrs = {};  // reg → live airframe hours from Airbly (air_seconds/3600)
+let liveAirframeHrs = {};  // normReg → live airframe hours from Airbly (air_seconds/3600)
+
+// ══════════════════════════════════════════════════════
+//  FLEET: taken straight from Airbly. No fixed list.
+//  Any aircraft in either Airbly group shows on the dashboard
+//  unless it has been hidden via MANAGE AIRCRAFT.
+//  The hidden list is stored in the Apps Script (password protected).
+// ══════════════════════════════════════════════════════
+let airblyFleet = [];          // [{ reg:'G-BCGJ', norm:'GBCGJ', type:'' }] every aircraft Airbly reports
+let hiddenRegs  = new Set();   // normalised regs hidden from the dashboard
+let hiddenLoaded = false;
+
+function normReg(r) { return String(r || '').toUpperCase().replace(/[\s-]/g, ''); }
+function displayReg(ident) {
+  const s = String(ident || '').toUpperCase().trim();
+  if (s.includes('-')) return s;
+  if (/^G[A-Z]{4}$/.test(s)) return 'G-' + s.slice(1);   // UK regs: GBCGJ → G-BCGJ
+  return s;
+}
+// Aircraft shown on the dashboard = Airbly fleet minus hidden ones
+function visibleFleet() { return airblyFleet.filter(ac => !hiddenRegs.has(ac.norm)); }
+
+async function fetchHidden() {
+  try {
+    const res  = await fetch(`${APPS_SCRIPT_PROXY}?action=hidden`);
+    const data = await res.json();
+    if (data && Array.isArray(data.hidden)) {
+      hiddenRegs = new Set(data.hidden.map(normReg));
+      hiddenLoaded = true;
+    }
+  } catch(e) {
+    // Keep the last known list rather than suddenly showing hidden aircraft
+    console.warn('Hidden aircraft fetch failed:', e.message);
+  }
+}
 
 async function fetchFlights() {
-  // Start with all fleet aircraft as grounded
-  const fleetStatus = {};
+  const fleetStatus   = {};
   const fleetDepTimes = {};
-  FLEET.forEach(ac => fleetStatus[ac.reg] = false);
 
   try {
     const [res1, res2] = await Promise.all([
       fetch(`https://airbly.com/api/v3/assetList?groupKey=${AIRBLY_KEY}&log_types=flight&log_limit_per_asset=1`),
-      fetch(`https://airbly.com/api/v3/assetList?groupKey=${AIRBLY_KEY2}&log_types=flight&log_limit_per_asset=1`)
+      fetch(`https://airbly.com/api/v3/assetList?groupKey=${AIRBLY_KEY2}&log_types=flight&log_limit_per_asset=1`),
+      fetchHidden()
     ]);
     const [data1, data2] = await Promise.all([res1.json(), res2.json()]);
     const assets = [
       ...((data1.assetList && data1.assetList.assets) ? data1.assetList.assets : []),
       ...((data2.assetList && data2.assetList.assets) ? data2.assetList.assets : [])
     ];
+
+    const fleet = {};
+    const hrs   = {};
     assets.filter(a => a.asset_type === 'aircraft').forEach(a => {
-      // Match Airbly ident to fleet reg (strip hyphens)
-      const normIdent = (a.ident || '').replace(/[-\s]/g, '').toUpperCase();
-      const match = FLEET.find(ac => ac.reg.replace(/[-\s]/g, '').toUpperCase() === normIdent);
-      if (match) {
-        const isAirborne = a.operational_status === 'airborne' || a.operational_status === 'inflight';
-        fleetStatus[match.reg] = isAirborne;
-        // Capture live airframe hours (air_seconds ÷ 3600) — the same figure
-        // the tech log uses for check calcs. Lets the fleet hours card read
-        // live hours instead of a lagging once-a-day snapshot.
-        if (a.usage && a.usage.air_seconds) {
-          liveAirframeHrs[match.reg] = a.usage.air_seconds / 3600;
-        }
-        if (isAirborne && a.logs && a.logs[0] && a.logs[0].usage && a.logs[0].usage.engine_start_at) {
-          const d = new Date(a.logs[0].usage.engine_start_at);
-          fleetDepTimes[match.reg] = d.getUTCHours().toString().padStart(2,'0') + ':' + d.getUTCMinutes().toString().padStart(2,'0');
-        }
+      const norm = normReg(a.ident);
+      if (!norm) return;
+      if (!fleet[norm]) {
+        fleet[norm] = {
+          reg : displayReg(a.ident),
+          norm,
+          type: a.model || a.aircraft_model || a.type_designator || ''
+        };
+      }
+      const isAirborne = a.operational_status === 'airborne' || a.operational_status === 'inflight';
+      if (isAirborne) fleetStatus[norm] = true;
+      // Live airframe hours (air_seconds ÷ 3600), the same figure the tech log uses
+      if (a.usage && a.usage.air_seconds) hrs[norm] = a.usage.air_seconds / 3600;
+      if (isAirborne && a.logs && a.logs[0] && a.logs[0].usage && a.logs[0].usage.engine_start_at) {
+        const d = new Date(a.logs[0].usage.engine_start_at);
+        fleetDepTimes[norm] = d.getUTCHours().toString().padStart(2,'0') + ':' + d.getUTCMinutes().toString().padStart(2,'0');
       }
     });
+
+    airblyFleet = Object.values(fleet).sort((x, y) => x.reg.localeCompare(y.reg));
+    liveAirframeHrs = hrs;
   } catch(e) {
+    // Keep the last known fleet so the screen doesn't empty on a blip
     console.warn('Airbly fetch failed:', e.message);
   }
 
-  liveFlights = FLEET.map(ac => ({
+  liveFlights = visibleFleet().map(ac => ({
     reg:      ac.reg,
-    airborne: fleetStatus[ac.reg] || false,
-    depTime:  fleetDepTimes[ac.reg] || null,
+    airborne: fleetStatus[ac.norm] || false,
+    depTime:  fleetDepTimes[ac.norm] || null,
   }));
   renderFlights();
+  if (cachedSlots) renderSlots(cachedSlots);
+  renderManageList();
 
   // Recompute fleet check-hours now that live Airbly airframe hours are fresh
   fetchFleetHours();
 }
-
-const JSONBIN_KEY = '$2a$10$wjZldGseV25iurze/grlbOQ1ZxUVCugh.kmmRH3LOo3zEiUF4RKPS';
-const BIN_URL     = `https://api.jsonbin.io/v3/b/69ac06bf43b1c97be9bd5667`;
 
 // ── DEFECTS SHEET CONFIG ──────────────────────────────
 const DEFECTS_SHEET_ID  = '1aoavAzPkpi9bvD8IDNz1flxWYb-5WJeUtPePS1uVgHw';
@@ -778,17 +750,6 @@ async function fetchNotices() {
     renderNotices([]);
   }
 }
-
-const FLEET = [
-  { reg:'G-BCGJ', type:'PA-28-140' },
-  { reg:'G-BTGO', type:'PA-28-140' },
-  { reg:'G-BHFE', type:'PA-44-180' },
-  { reg:'G-FIAT', type:'PA-28-161' },
-  { reg:'G-HRYZ', type:'PA-28-161' },
-  { reg:'G-MKAS', type:'PA-28-181' },
-  { reg:'G-PETR', type:'PA-28-181' },
-  { reg:'N150PK', type:'PA-28-180' },
-];
 
 const SHEET_ID  = '1fnMYghrTIi8EdHDN6JxFrAdqqFMuRbnB4Oj8041Y5ZY';
 const SHEET_GID = '818960255';
@@ -948,36 +909,81 @@ function elapsed(dep) {
 }
 
 // ══════════════════════════════════════════════════════
-//  WEATHER — EGTK only, via token-cached Apps Script proxy
-//  The proxy authenticates with AutoRouter once per hour and
-//  reuses the token; the dashboard just asks for EGTK METAR/TAF.
+//  WEATHER: EGTK METAR and TAF from aviationweather.gov
+//  Free, no account, no login. The page fetches it directly;
+//  if the browser is blocked, it falls back to the Apps Script.
 // ══════════════════════════════════════════════════════
 const APPS_SCRIPT_PROXY = 'https://script.google.com/macros/s/AKfycbwKtjtdt1qFzX99gn-acyWGakzmoOxR3ozfhfUsLe9Z_DH2tEpiVvncPHxgsDMGkQcwrA/exec';
+const AWC_BASE = 'https://aviationweather.gov/api/data';
+
+async function awcJson(url) {
+  const res = await fetch(url);
+  if (res.status === 204) return [];          // no report currently issued
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  const text = await res.text();
+  return text ? JSON.parse(text) : [];
+}
+
+async function getWxDirect() {
+  const [metars, tafs] = await Promise.all([
+    awcJson(`${AWC_BASE}/metar?ids=${HOME_ICAO}&format=json&hours=12`),
+    awcJson(`${AWC_BASE}/taf?ids=${HOME_ICAO}&format=json`)
+  ]);
+  let latest = null;
+  (metars || []).forEach(m => { if (!latest || (m.obsTime || 0) > (latest.obsTime || 0)) latest = m; });
+  const taf = (tafs && tafs.length) ? tafs[0] : null;
+  return {
+    metar:   latest ? (latest.rawOb || '') : '',
+    obsTime: latest ? (latest.obsTime || null) : null,
+    taf:     taf ? (taf.rawTAF || '') : ''
+  };
+}
+
+async function getWxViaScript() {
+  const res = await fetch(`${APPS_SCRIPT_PROXY}?action=weather&icaos=${HOME_ICAO}`);
+  const results = await res.json();
+  const d = results[HOME_ICAO];
+  if (!d || d.error) throw new Error((d && d.error) || 'No data');
+  return { metar: d.metar || '', obsTime: d.obsTime || null, taf: d.taf || '' };
+}
 
 async function fetchWeather() {
+  let d = null;
   try {
-    const res     = await fetch(`${APPS_SCRIPT_PROXY}?action=weather&icaos=${HOME_ICAO}`);
-    const results = await res.json();
-    if (results.error) throw new Error(results.error);
-
-    const d = results[HOME_ICAO];
-    if (d && !d.error) {
-      const metar = d.metar || '';
-      const taf   = d.taf   || '';
-      wxData[HOME_ICAO] = {
-        metar,
-        taf,
-        cat:   flightCat(metar),
-        wind:  parseWind(metar),
-        vis:   parseVis(metar),
-        cloud: parseCloud(metar),
-      };
-    }
-    renderHomeWx();
+    d = await getWxDirect();
   } catch(e) {
-    console.warn('Weather fetch failed:', e.message);
-    renderHomeWx();
+    console.warn('Direct weather fetch failed, trying Apps Script:', e.message);
+    try { d = await getWxViaScript(); }
+    catch(e2) { console.warn('Weather fetch failed:', e2.message); }
   }
+  if (d) {
+    const metar = (d.metar || '').replace(/^(METAR|SPECI)\s+/, '');
+    wxData[HOME_ICAO] = {
+      metar,
+      obsTime: d.obsTime,
+      taf:   formatTaf(d.taf || ''),
+      cat:   flightCat(metar),
+      wind:  parseWind(metar),
+      vis:   parseVis(metar),
+      cloud: parseCloud(metar),
+    };
+  }
+  renderHomeWx();
+}
+
+// Put each TAF change group on its own line for the portrait screen
+function formatTaf(taf) {
+  return taf.replace(/\s+/g, ' ').trim()
+            .replace(/\s+(BECMG|TEMPO|PROB\d{2}(?:\s+TEMPO)?|FM\d{6})\b/g, '\n  $1');
+}
+
+// METAR age, e.g. "20 MIN AGO"
+function metarAge(obsTime) {
+  if (!obsTime) return null;
+  const mins = Math.round((Date.now() / 1000 - obsTime) / 60);
+  if (mins < 0) return null;
+  const txt = mins < 60 ? `${mins} MIN AGO` : `${Math.floor(mins/60)}H ${mins%60}M AGO`;
+  return { mins, txt };
 }
 
 // ── FORMAT HELPERS — parse raw METAR strings ──────────
@@ -1045,109 +1051,19 @@ function renderHomeWx() {
   document.getElementById('metarText').innerHTML = metar
     ? highlightMetar(metar)
     : '<span style="color:var(--dim)">NO DATA</span>';
-  document.getElementById('tafText').innerHTML = taf ? highlightMetar(taf) : 'NO DATA';
-}
+  document.getElementById('tafText').innerHTML = taf
+    ? highlightMetar(taf)
+    : '<span style="color:var(--dim)">NO TAF CURRENTLY ISSUED</span>';
 
-
-// ══════════════════════════════════════════════════════
-//  RENDER NOTAMs
-// ══════════════════════════════════════════════════════
-function renderNotams(notams) {
-  const wrap = document.getElementById('notamsWrap');
-
-  if (!notams || !notams.length) {
-    // Fall back to manual NOTAMs from JSONBin
-    const manualNotams = (window.binNotams || []).filter(n => {
-      if (n.to && new Date(n.to) < new Date()) return false;
-      return true;
-    });
-    if (manualNotams.length) {
-      wrap.innerHTML = manualNotams.map((n, i) => `
-        <div class="notam-item" style="animation-delay:${i*0.07}s">
-          <div class="notam-footer">
-            <span class="notam-valid">${n.from||''}${n.to?' → '+n.to:''}</span>
-          </div>
-          <div class="notam-text">${n.text}</div>
-        </div>`).join('');
-      return;
-    }
-    wrap.innerHTML = '<div style="font-family:var(--mono);font-size:10px;color:var(--dim);padding:8px 0;letter-spacing:.1em;text-align:center;">NO NOTAMs</div>';
-    return;
-  }
-
-  // Group by airfield
-  const grouped = {};
-  const order   = ['EGTK','EGVN','EGBJ','EGHI','EGBB','RADIUS'];
-  notams.forEach(n => {
-    if (!grouped[n.airfield]) grouped[n.airfield] = [];
-    grouped[n.airfield].push(n);
-  });
-  const sorted = Object.keys(grouped).sort((a,b) =>
-    (order.indexOf(a)+1||99) - (order.indexOf(b)+1||99)
-  );
-
-  const fmt = t => t ? new Date(t*1000).toUTCString().slice(0,16) : '?';
-
-  wrap.innerHTML = sorted.map(af => {
-    const items = grouped[af];
-    return `<div style="margin-bottom:10px;">
-      <div style="font-family:var(--mono);font-size:10px;letter-spacing:0.15em;color:var(--accent);margin-bottom:4px;padding-bottom:3px;border-bottom:1px solid var(--border);">${af}</div>
-      ${items.map((n, i) => `
-        <div class="notam-item" style="animation-delay:${i*0.06}s">
-          <div class="notam-text">${n.text}</div>
-          <div class="notam-footer">
-            <span class="notam-valid">${fmt(n.startValidity)} → ${fmt(n.endValidity)}</span>
-            <button class="notam-hide-btn" data-notamid="${n.id}" data-preview="${n.text.substring(0,80).replace(/"/g,'&quot;')}" onclick="openNotamHideModal(this.dataset.notamid, this.dataset.preview)">✕ HIDE</button>
-          </div>
-        </div>`).join('')}
-    </div>`;
-  }).join('');
-}
-
-// ── NOTAM HIDE MODAL ──────────────────────────────────
-let notamHideTargetId = null;
-
-function openNotamHideModal(id, preview) {
-  notamHideTargetId = id;
-  document.getElementById('notamHideDesc').textContent = preview + '…';
-  document.getElementById('notamHidePwInput').value = '';
-  document.getElementById('notamHideError').style.display = 'none';
-  document.getElementById('notamHideModal').classList.add('open');
-  setTimeout(() => document.getElementById('notamHidePwInput').focus(), 100);
-}
-
-function closeNotamHideModal() {
-  document.getElementById('notamHideModal').classList.remove('open');
-  notamHideTargetId = null;
-}
-
-async function confirmNotamHide() {
-  const pw = document.getElementById('notamHidePwInput').value;
-  if (pw !== 'limasierra') {
-    document.getElementById('notamHideError').style.display = 'block';
-    return;
-  }
-  if (!notamHideTargetId) return;
-  const btn = document.querySelector('#notamHideModalBox button.confirm');
-  btn.textContent = 'HIDING…';
-  btn.disabled = true;
-  try {
-    await fetch(`${NOTAM_WEBAPP_URL}?action=hide&id=${encodeURIComponent(notamHideTargetId)}`, { mode: 'no-cors' });
-    closeNotamHideModal();
-    setTimeout(fetchNotams, 1500);
-  } catch(e) {
-    console.warn('NOTAM hide failed:', e);
-    btn.textContent = 'HIDE';
-    btn.disabled = false;
+  // METAR age: amber if over an hour old so nobody reads a stale report as current
+  const age = metarAge(d.obsTime);
+  const ageEl = document.getElementById('metarAge');
+  if (ageEl) {
+    ageEl.textContent = age ? '· ' + age.txt : '';
+    ageEl.style.color = age && age.mins > 60 ? 'var(--amber)' : 'var(--dim)';
   }
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-  const m = document.getElementById('notamHideModal');
-  if (m) m.addEventListener('click', e => { if (e.target === m) closeNotamHideModal(); });
-  const p = document.getElementById('notamHidePwInput');
-  if (p) p.addEventListener('keydown', e => { if (e.key === 'Enter') confirmNotamHide(); });
-});
 
 // ══════════════════════════════════════════════════════
 //  RENDER FLIGHTS
@@ -1209,11 +1125,8 @@ function parseSheet(json) {
 
   const timeRegex = /^\d{2}:\d{2}$/;
 
-  // Build a set of fleet regs stripped of hyphens/spaces for fast lookup
-  const fleetNorm = {};
-  for (const ac of FLEET) {
-    fleetNorm[ac.reg.replace(/[\s-]/g,'')] = ac.reg;
-  }
+  // Keep every entry here; renderSlots filters to the visible Airbly fleet,
+  // so slots still appear correctly even if Airbly loads after the sheet.
 
   // Round a HH:MM time down to nearest 15 mins
   function roundDown15(t) {
@@ -1245,14 +1158,12 @@ function parseSheet(json) {
       for (const {offset, label} of offsets) {
         const val = (row[utcCol + offset] || '').trim().toUpperCase().replace(/[\s-]/g,'');
         if (!val) continue;
-        if (fleetNorm[val]) {
-          // Deduplicate: skip if same reg+time+col already added
-          const key = `${fleetNorm[val]}|${slotTime}|${label}`;
-          if (!slots._seen) slots._seen = new Set();
-          if (!slots._seen.has(key)) {
-            slots._seen.add(key);
-            slots.push({ time: slotTime, col: label, reg: fleetNorm[val] });
-          }
+        // Deduplicate: skip if same reg+time+col already added
+        const key = `${val}|${slotTime}|${label}`;
+        if (!slots._seen) slots._seen = new Set();
+        if (!slots._seen.has(key)) {
+          slots._seen.add(key);
+          slots.push({ time: slotTime, col: label, reg: val });
         }
       }
     }
@@ -1289,10 +1200,10 @@ function renderSlots(slots) {
   // Filter to upcoming/active (end time > now - 1)
   const upcoming = allBookings.filter(b => timeMins(b.end) > now);
 
-  // Group by reg, only show fleet aircraft
+  // Group by reg, only show visible Airbly fleet aircraft
   const byReg = {};
-  for (const ac of FLEET) {
-    const acBookings = upcoming.filter(b => b.reg === ac.reg);
+  for (const ac of visibleFleet()) {
+    const acBookings = upcoming.filter(b => normReg(b.reg) === ac.norm);
     if (acBookings.length > 0) byReg[ac.reg] = { type: ac.type, bookings: acBookings };
   }
 
@@ -1523,13 +1434,73 @@ document.getElementById('resolvePasswordInput').addEventListener('keydown', func
   if (e.key === 'Enter') confirmResolve();
 });
 
+
+// ══════════════════════════════════════════════════════
+//  MANAGE AIRCRAFT (hide / show)
+//  The password is checked by the Apps Script, not by this page.
+// ══════════════════════════════════════════════════════
+function openManageModal() {
+  document.getElementById('manageStatus').textContent = '';
+  document.getElementById('manageStatus').className = '';
+  document.getElementById('manageModal').classList.add('open');
+  renderManageList();
+  setTimeout(() => document.getElementById('managePwInput').focus(), 100);
+}
+
+function closeManageModal() {
+  document.getElementById('manageModal').classList.remove('open');
+  document.getElementById('managePwInput').value = '';
+}
+
+function renderManageList() {
+  const list = document.getElementById('manageList');
+  if (!list) return;
+  if (!airblyFleet.length) {
+    list.innerHTML = '<p>No aircraft loaded from Airbly yet.</p>';
+    return;
+  }
+  list.innerHTML = airblyFleet.map(ac => {
+    const hidden = hiddenRegs.has(ac.norm);
+    return `<div class="manage-row ${hidden ? 'is-hidden' : ''}">
+      <span class="manage-reg">${ac.reg}</span>
+      <button class="manage-toggle" onclick="toggleAircraft('${ac.norm}', this)">${hidden ? 'SHOW' : 'HIDE'}</button>
+    </div>`;
+  }).join('');
+}
+
+async function toggleAircraft(norm, btn) {
+  const pw = document.getElementById('managePwInput').value;
+  const status = document.getElementById('manageStatus');
+  if (!pw) { status.textContent = 'Enter the password first'; status.className = 'err'; return; }
+
+  const action = hiddenRegs.has(norm) ? 'unhideac' : 'hideac';
+  btn.disabled = true;
+  btn.textContent = 'SAVING…';
+  status.textContent = ''; status.className = '';
+  try {
+    const res  = await fetch(`${APPS_SCRIPT_PROXY}?action=${action}&reg=${encodeURIComponent(norm)}&pw=${encodeURIComponent(pw)}`);
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    hiddenRegs = new Set((data.hidden || []).map(normReg));
+    status.textContent = 'Saved';
+    fetchFlights();   // refresh every card with the new list
+  } catch(e) {
+    status.textContent = e.message === 'Incorrect password' ? 'Incorrect password' : 'Could not save: ' + e.message;
+    status.className = 'err';
+  }
+  renderManageList();
+}
+
+document.getElementById('manageModal').addEventListener('click', function(e) {
+  if (e.target === this) closeManageModal();
+});
+
 // ══════════════════════════════════════════════════════
 //  FLEET HOURS TO NEXT CHECK
 // ══════════════════════════════════════════════════════
 const TECHLOG_SHEET_ID  = '1KP5wGmSc2TI8kogZVH-wDtx95Mmqtlb8YwhHDrzyGnI';
 const TECHLOG_SHEET_GID = '0';
 
-// Known Tier 1 PPL trainers — only show these on the ops dashboard
 async function fetchFleetHours() {
   try {
     const res  = await fetch(`${APPS_SCRIPT_PROXY}?action=techlog`);
@@ -1545,7 +1516,7 @@ async function fetchFleetHours() {
     Object.keys(cfg).forEach(id => {
       const c = cfg[id];
       if (!c) return;
-      const reg = (c.reg || '').toUpperCase();
+      const reg = normReg(c.reg);
       if (!reg) return;
       const maintDue = parseFloat(c.maint_due || '0');
       const existing = cfgByReg[reg];
@@ -1556,21 +1527,19 @@ async function fetchFleetHours() {
       }
     });
 
-    // Which aircraft to show is driven ENTIRELY by live Airbly presence —
-    // an aircraft appears only if Airbly is currently tracking it. Departed
-    // aircraft (e.g. BOTN) simply have no live reading, so they never show,
-    // with no manual list to maintain. New Airbly aircraft (e.g. BHFE) appear
-    // automatically once they have a maint_due in the tech log.
+    // Which aircraft to show comes straight from Airbly (minus any hidden).
+    // An aircraft appears once it has a live Airbly reading and a maint_due
+    // in the tech log; no manual list to maintain.
     const aircraft = [];
-    Object.keys(liveAirframeHrs).forEach(reg => {
-      const currentHrs = liveAirframeHrs[reg];
+    visibleFleet().forEach(ac => {
+      const currentHrs = liveAirframeHrs[ac.norm];
       if (!currentHrs) return;
 
-      const c = cfgByReg[reg];
-      if (!c || !c.maintDue) return; // no check target in tech log — omit rather than guess
+      const c = cfgByReg[ac.norm];
+      if (!c || !c.maintDue) return; // no check target in tech log, omit rather than guess
 
       const hoursRemaining = Math.max(0, c.maintDue - currentHrs);
-      aircraft.push({ reg, currentHrs, maintDue: c.maintDue, hoursRemaining, checkType: c.checkType });
+      aircraft.push({ reg: ac.reg, currentHrs, maintDue: c.maintDue, hoursRemaining, checkType: c.checkType });
     });
 
     // Sort by hours remaining ascending (most urgent first)
@@ -1629,7 +1598,6 @@ function drawFleetHours() {
 loadOrder();
 initDrag();
 fetchWeather();
-fetchNotams();
 fetchNotices();
 fetchFlights();
 refreshSlots();
@@ -1637,7 +1605,6 @@ setInterval(updateElapsed, 60000);
 setInterval(init, 60000);
 setInterval(()=>{ if(cachedSlots) renderSlots(cachedSlots); }, 60000);
 setInterval(fetchWeather, 1800000);   // EGTK weather every 30 mins
-setInterval(fetchNotams,  1800000);   // NOTAMs every 30 mins (sheet read only)
 setInterval(fetchNotices,  300000);   // defects every 5 mins
 setInterval(fetchFlights,  120000);   // flights + fleet check-hours every 2 mins
 setInterval(refreshSlots,  120000);   // slots every 2 mins
