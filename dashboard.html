@@ -969,6 +969,16 @@ async function fetchWeather() {
     };
   }
   renderHomeWx();
+  return !!(d && d.metar);
+}
+
+// Weather refresh: every 30 mins when working, every 2 mins after a failure
+let wxTimer = null;
+async function weatherLoop() {
+  clearTimeout(wxTimer);
+  let ok = false;
+  try { ok = await fetchWeather(); } catch(e) {}
+  wxTimer = setTimeout(weatherLoop, ok ? 1800000 : 120000);
 }
 
 // Put each TAF change group on its own line for the portrait screen
@@ -1597,14 +1607,13 @@ function drawFleetHours() {
 
 loadOrder();
 initDrag();
-fetchWeather();
+weatherLoop();
 fetchNotices();
 fetchFlights();
 refreshSlots();
 setInterval(updateElapsed, 60000);
 setInterval(init, 60000);
 setInterval(()=>{ if(cachedSlots) renderSlots(cachedSlots); }, 60000);
-setInterval(fetchWeather, 1800000);   // EGTK weather every 30 mins
 setInterval(fetchNotices,  300000);   // defects every 5 mins
 setInterval(fetchFlights,  120000);   // flights + fleet check-hours every 2 mins
 setInterval(refreshSlots,  120000);   // slots every 2 mins
