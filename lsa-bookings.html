@@ -80,6 +80,14 @@ body::before{
 .tab-pane.active{display:block;}
 .tab-pane.iframe-pane{padding:0;}
 .tab-pane.iframe-pane.active{display:flex;flex-direction:column;}
+/* LSA Club Forms tab */
+.cf-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:8px 16px;border-bottom:1px solid var(--border);background:var(--panel);}
+.cf-title{font-family:var(--head);font-size:14px;font-weight:700;letter-spacing:.15em;color:var(--bright);}
+.cf-actions{display:flex;gap:8px;flex-wrap:wrap;}
+.cf-btn{font-family:var(--mono);font-size:11px;letter-spacing:.08em;color:var(--accent);background:none;border:1px solid rgba(0,170,255,.4);border-radius:6px;padding:7px 12px;cursor:pointer;text-decoration:none;white-space:nowrap;}
+.cf-btn:hover{background:rgba(0,170,255,.1);}
+.cf-loading{display:none;align-items:center;justify-content:center;gap:10px;padding:24px;font-family:var(--mono);font-size:13px;color:var(--dim);}
+.cf-loading.show{display:flex;}
 
 /* ── BOOKING FORM — card layout ── */
 .form-col{max-width:680px;margin:0 auto;display:flex;flex-direction:column;gap:12px;padding-bottom:32px;}
@@ -563,8 +571,7 @@ textarea.form-input{resize:vertical;min-height:90px;}
     <div class="tabs">
       <button class="tab-btn active" onclick="switchTab('booking', this)">📋 FLIGHT NOTIFICATION</button>
       <button class="tab-btn" onclick="switchTab('circuits', this)">🔄 CIRCUITS SLOTS</button>
-      <button class="tab-btn" onclick="switchTab('trialmember', this)">📝 TRIAL MEMBER</button>
-      <button class="tab-btn" onclick="switchTab('passenger', this)">👤 PASSENGER</button>
+      <button class="tab-btn" onclick="switchTab('clubforms', this)">📝 LSA CLUB FORMS</button>
       <button class="tab-btn" onclick="showSettingsPin()" style="margin-left:auto;">⚙ SETTINGS</button>
     </div>
 
@@ -713,23 +720,23 @@ textarea.form-input{resize:vertical;min-height:90px;}
       </div>
 
     </div>
-    <!-- TRIAL MEMBER TAB -->
-    <div class="tab-pane iframe-pane" id="tab-trialmember">
-      <iframe
-        src="https://forms.office.com/e/sn4WNr7KZi?embed=true"
+    <!-- LSA CLUB FORMS TAB (one Google Form: Membership / Trial Flight / Passenger).
+         The form only loads when this tab is first opened, so it never slows the app down,
+         and it is cleared when the app returns to the PIN screen so the next person starts fresh. -->
+    <div class="tab-pane iframe-pane" id="tab-clubforms">
+      <div class="cf-bar">
+        <span class="cf-title">LSA CLUB FORMS</span>
+        <span class="cf-actions">
+          <button class="cf-btn" onclick="resetClubForm()">↻ START A NEW FORM</button>
+          <a class="cf-btn" href="https://docs.google.com/forms/d/e/1FAIpQLSdOo8LH3obTSixxBUICE6D9Xjq3Ob0MPLwhK-C4BIT40rOlPA/viewform" target="_blank" rel="noopener">OPEN IN NEW WINDOW ↗</a>
+        </span>
+      </div>
+      <div class="cf-loading" id="cfLoading"><div class="spinner"></div> LOADING FORM…</div>
+      <iframe id="clubFormFrame" title="LSA Club Forms"
         frameborder="0" marginwidth="0" marginheight="0"
-        style="border:none;width:100%;height:calc(100vh - 120px);display:block;"
-        allowfullscreen webkitallowfullscreen mozallowfullscreen msallowfullscreen>
-      </iframe>
-    </div>
-
-    <!-- PASSENGER TAB -->
-    <div class="tab-pane iframe-pane" id="tab-passenger">
-      <iframe
-        src="https://forms.office.com/e/Hc1cycsgGg?embed=true"
-        frameborder="0" marginwidth="0" marginheight="0"
-        style="border:none;width:100%;height:calc(100vh - 120px);display:block;"
-        allowfullscreen webkitallowfullscreen mozallowfullscreen msallowfullscreen>
+        style="border:none;width:100%;height:calc(100vh - 160px);display:block;"
+        onload="window.clubFormLoaded && clubFormLoaded()"
+        allowfullscreen>
       </iframe>
     </div>
 
@@ -940,7 +947,6 @@ textarea.form-input{resize:vertical;min-height:90px;}
   </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <script>
 // ══ SETTINGS SCRIPT URL ═══════════════════════════
 const SETTINGS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxcqP4KA271hckQzsbXeOK8JaWSoYtlAF6lBkAqnoCM1hRbjPJglhgwrY9CSnsWA7gR/exec';
@@ -1040,6 +1046,7 @@ function utcToLocal(utcHHMM) {
 function showScreen(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById(id).classList.add('active');
+  if (id === 's-pin') clearClubForm();
 }
 
 // ══ PIN ════════════════════════════════════════════
@@ -1054,8 +1061,12 @@ function checkPin() {
     document.getElementById('pinErr').textContent = '';
     startClock();
     switchTab('booking', document.querySelector('.tab-btn'));
+    // Show the form straight away from the settings already saved on this device,
+    // instead of waiting for Google Apps Script to wake up (that was the slow load).
+    buildForm();
     fetchSettingsFromCloud().then(cloud => {
       if(cloud) {
+        const before = JSON.stringify(ST);
         ST = {
           ac:        cloud.ac        || ST.ac,
           instr:     cloud.instr     || ST.instr,
@@ -1065,8 +1076,11 @@ function checkPin() {
           fromEmail: cloud.fromEmail || ST.fromEmail
         };
         saveSettingsToCache();
+        // Only redraw if the cloud copy actually differs, and only if the pilot
+        // hasn't started picking options yet, so nothing they've chosen is wiped.
+        const untouched = !formState.ac && !formState.instr && !formState.route && !formState.dest;
+        if (JSON.stringify(ST) !== before && untouched) buildForm();
       }
-      buildForm();
     });
   } else {
     document.getElementById('pinErr').textContent = 'Incorrect PIN';
@@ -1101,7 +1115,9 @@ function startClock() {
     document.getElementById('clockDate').textContent = now.toUTCString().slice(5,16).toUpperCase();
   }
   tick();
-  setInterval(tick, 10000);
+  // Only ever run one clock timer (previously a new one was added at every PIN entry)
+  clearInterval(window.__clockTimer);
+  window.__clockTimer = setInterval(tick, 10000);
 }
 
 // ══ TABS ═══════════════════════════════════════════
@@ -1111,6 +1127,40 @@ function switchTab(name, btn) {
   btn.classList.add('active');
   document.getElementById('tab-'+name).classList.add('active');
   if(name === 'circuits') loadSlots();
+  if(name === 'clubforms') openClubForm();
+}
+
+// ══ LSA CLUB FORMS (Google Form) ═══════════════════
+// Loaded only when the tab is opened, never at start-up, so it can't slow the app.
+const CLUB_FORM_URL = 'https://docs.google.com/forms/d/e/1FAIpQLSdOo8LH3obTSixxBUICE6D9Xjq3Ob0MPLwhK-C4BIT40rOlPA/viewform?embedded=true';
+
+let clubFormLive = false;   // true while the Google Form is loaded in the tab
+
+function openClubForm() {
+  if (!clubFormLive) resetClubForm();   // first open since the app was unlocked
+}
+
+function resetClubForm() {
+  // Fresh, blank form (also used by the "Start a new form" button)
+  const f = document.getElementById('clubFormFrame');
+  clubFormLive = true;
+  document.getElementById('cfLoading').classList.add('show');
+  f.style.visibility = 'hidden';
+  f.src = CLUB_FORM_URL + '&t=' + Date.now();
+}
+
+function clubFormLoaded() {
+  if (!clubFormLive) return;   // ignore the blank page used when clearing
+  document.getElementById('cfLoading').classList.remove('show');
+  document.getElementById('clubFormFrame').style.visibility = 'visible';
+}
+
+function clearClubForm() {
+  // Wipe any half-filled form (it holds personal details) when the app locks
+  if (!clubFormLive) return;
+  clubFormLive = false;
+  document.getElementById('clubFormFrame').src = 'about:blank';
+  document.getElementById('cfLoading').classList.remove('show');
 }
 
 // ══ BUILD FORM ═════════════════════════════════════
