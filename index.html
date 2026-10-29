@@ -411,11 +411,10 @@ async function syncPull(){
     const remote = await r.json();
     if(remote.error) throw new Error(remote.error);
 
-    // cfg — GAS always wins, no timestamp comparison
+    // cfg — newest change wins per field (see mergeCfg). Unstamped fields
+    // still defer to the cloud, so older data behaves exactly as before.
     if(remote.cfg && typeof remote.cfg==='object'){
-      Object.keys(remote.cfg).forEach(k=>{
-        ST.cfg[k]=Object.assign({},ST.cfg[k]||{},remote.cfg[k]);
-      });
+      ST.cfg=mergeCfg(ST.cfg, remote.cfg);
       localStorage.setItem('tl_cfg',JSON.stringify(ST.cfg));
     }
 
@@ -476,6 +475,11 @@ function syncPush(){
     AD._pushing=true;
     syncStatus('syncing');
     try{
+      if(!(await pullCfgForPush())){
+        AD._pushPending=true;
+        syncStatus('offline','Saved locally — will sync when online');
+        return;
+      }
       const payload={
         cfg: ST.cfg,
         manual: ST.manualAircraft,
@@ -492,9 +496,11 @@ function syncPush(){
         headers:{'Content-Type':'application/json'},
         body: JSON.stringify(payload),
       });
+      AD._pushPending=false;
       syncStatus('ok','Synced '+ new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}));
     } catch(e){
       console.warn('syncPush failed:',e.message);
+      AD._pushPending=true;
       syncStatus('offline','Saved locally (offline)');
     } finally{
       AD._pushing=false;
@@ -510,6 +516,11 @@ function syncPushSafe(){
     if(AD._pushing) return;
     AD._pushing=true;
     try{
+      if(!(await pullCfgForPush())){
+        AD._pushPending=true;
+        syncStatus('offline','Saved locally — will sync when online');
+        return;
+      }
       const payload={
         cfg: ST.cfg,
         manual: ST.manualAircraft,
@@ -526,8 +537,10 @@ function syncPushSafe(){
         headers:{'Content-Type':'application/json'},
         body: JSON.stringify(payload),
       });
+      AD._pushPending=false;
       syncStatus('ok','Synced '+ new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}));
     } catch(e){
+      AD._pushPending=true;
       syncStatus('offline','Saved locally (offline)');
     } finally{
       AD._pushing=false;
@@ -556,6 +569,72 @@ function saveCfg(){
   ST._cfgSavedAt = Date.now();
   localStorage.setItem('tl_cfg',JSON.stringify(ST.cfg));
   localStorage.setItem('tl_cfg_ts', ST._cfgSavedAt.toString());
+}
+
+// ══ SETTINGS CHANGE STAMPS — "newest change wins" ═══════════════════
+// Every aircraft's settings carry _ts: {field: time it was last changed}.
+// When this machine and the cloud disagree, the more recent change wins,
+// rather than whichever machine happened to sync last. This stops a machine
+// holding an old copy (asleep, offline, old tab) from overwriting newer
+// sheet numbers, check hours, dates or tiers set elsewhere.
+// Fields with no stamp (older data) defer to the cloud copy, exactly as before.
+function cfgTouch(id, field){
+  if(!ST.cfg[id]) ST.cfg[id]={};
+  const c=ST.cfg[id];
+  if(!c._ts || typeof c._ts!=='object') c._ts={};
+  c._ts[field]=Date.now();
+}
+function cfgPut(id, field, value){
+  if(!ST.cfg[id]) ST.cfg[id]={};
+  ST.cfg[id][field]=value;
+  cfgTouch(id, field);
+}
+function mergeCfg(local, remote){
+  local=local||{}; remote=remote||{};
+  const out={};
+  const ids=new Set(Object.keys(local).concat(Object.keys(remote)));
+  ids.forEach(function(id){
+    const L=local[id], R=remote[id];
+    if(!L || typeof L!=='object'){ out[id]=R; return; }
+    if(!R || typeof R!=='object'){ out[id]=L; return; }
+    const Lt=(L._ts&&typeof L._ts==='object')?L._ts:{};
+    const Rt=(R._ts&&typeof R._ts==='object')?R._ts:{};
+    const o={}, ts={};
+    const keys=new Set(Object.keys(L).concat(Object.keys(R)));
+    keys.delete('_ts');
+    keys.forEach(function(k){
+      const lt=Lt[k]||0, rt=Rt[k]||0;
+      var useLocal;
+      if(lt>rt) useLocal=true;
+      else if(rt>lt) useLocal=false;
+      else useLocal=!(k in R);          // tie / unstamped: cloud wins if it has the field
+      const v=useLocal?L[k]:R[k];
+      if(v!==undefined) o[k]=v;         // a newer stamp with no value = a deletion
+      const t=Math.max(lt,rt); if(t) ts[k]=t;
+    });
+    if(Object.keys(ts).length) o._ts=ts;
+    out[id]=o;
+  });
+  return out;
+}
+// Fetch the cloud's settings and fold them in BEFORE uploading, so an upload
+// can never replace a newer value with an older one. Returns false if the
+// cloud couldn't be read, in which case the upload is held back and retried.
+async function pullCfgForPush(){
+  try{
+    const r=await fetch(GAS_APP_URL);
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const remote=await r.json();
+    if(remote.error) throw new Error(remote.error);
+    if(remote.cfg && typeof remote.cfg==='object'){
+      ST.cfg=mergeCfg(ST.cfg, remote.cfg);
+      localStorage.setItem('tl_cfg',JSON.stringify(ST.cfg));
+    }
+    return true;
+  }catch(e){
+    console.warn('[sync] pre-upload settings check failed:', e.message);
+    return false;
+  }
 }
 function saveManual(){
   localStorage.setItem('tl_manual',JSON.stringify(ST.manualAircraft));
@@ -665,7 +744,7 @@ function manToAc(m){
   };
 }
 function cfgGet(id,k,def=''){ return ST.cfg[id]?.[k]??def; }
-function cfgSet(id,k,v){ if(!ST.cfg[id]) ST.cfg[id]={}; ST.cfg[id][k]=v; saveCfg(); }
+function cfgSet(id,k,v){ cfgPut(id,k,v); saveCfg(); }
 
 // ══ HELPERS ══════════════════════════════════════
 const $ = id => document.getElementById(id);
@@ -1202,7 +1281,9 @@ async function showApp(){
   // Background sync every 60s — picks up changes from other users
   if(!ST._syncInterval){
     ST._syncInterval=setInterval(async()=>{
-      await syncPull();
+      const pulled = await syncPull();
+      // Retry any upload that was held back while the cloud was unreachable
+      if(pulled && AD._pushPending){ AD._pushPending=false; syncPush(); }
       // Only re-render if user is NOT actively typing OR daily log panel is open
       const active=document.activeElement;
       const userTyping=active&&(active.tagName==='INPUT'||active.tagName==='TEXTAREA'||active.tagName==='SELECT');
@@ -1843,8 +1924,9 @@ function setPreviewPage(i){ ST.previewPage=i; render(); }
 function changeSheetNum(id,delta){
   if(!ST.cfg[id]) ST.cfg[id]={};
   const cur=parseInt(ST.cfg[id].sheet_start||'1',10);
-  ST.cfg[id].sheet_start=String(Math.max(1,cur+delta));
+  cfgPut(id,'sheet_start',String(Math.max(1,cur+delta)));
   saveCfg();
+  syncPush();   // send to the cloud now — previously local-only, reverted on next pull
   render();
 }
 
@@ -2013,8 +2095,7 @@ function submitDailyLog(id){
   // Update last flight date only — totalHobbs is now calculated from baseline + entries
   const m = ST.manualAircraft.find(x=>x.id===id);
   if(m){
-    if(!ST.cfg[id]) ST.cfg[id]={};
-    ST.cfg[id].man_last_flight = dateISO;
+    cfgPut(id,'man_last_flight',dateISO);
     saveCfg();
     m.last_flight = dateDisplay;
     saveManual();
@@ -3646,11 +3727,11 @@ function addManualAc(){
   if(!ST.cfg[id]) ST.cfg[id]={};
   // Save all fields into cfg
   ['base','maint_due','check_type','cofa_exp','annual_due','sheet_start'].forEach(k=>{
-    ST.cfg[id][k]=g(k);
+    cfgPut(id,k,g(k));
   });
-  ST.cfg[id].man_hours=hours;
-  ST.cfg[id].man_landings=g('landings');
-  ST.cfg[id].man_last_flight=g('lastflight');
+  cfgPut(id,'man_hours',hours);
+  cfgPut(id,'man_landings',g('landings'));
+  cfgPut(id,'man_last_flight',g('lastflight'));
   saveCfg();
   ST.flights[id]=[];
   hideAddManualForm();
@@ -3663,7 +3744,13 @@ function deleteManualAc(id){
   if(!confirm(`Are you sure you want to delete ${ac.reg}?\n\nThis cannot be undone.`)) return;
   ST.manualAircraft=ST.manualAircraft.filter(m=>m.id!==id);
   saveManual();
-  delete ST.cfg[id];
+  // Stamped deletion of every field, so the cloud copy can't resurrect it
+  if(ST.cfg[id]){
+    Object.keys(ST.cfg[id]).forEach(function(k){
+      if(k==='_ts') return;
+      delete ST.cfg[id][k]; cfgTouch(id,k);
+    });
+  }
   saveCfg();
   delete ST.flights[id];
   delete ST.dailyLog[id];
@@ -3678,7 +3765,11 @@ function saveAcCfg(id){
   if(!ST.cfg[id]) ST.cfg[id]={};
   fields.forEach(f=>{
     const el=document.getElementById(`f_${id}_${f}`);
-    if(el) ST.cfg[id][f]=el.value.trim();
+    if(!el) return;
+    const v=el.value.trim();
+    // Only stamp fields that genuinely changed — unchanged ones keep their
+    // existing stamp, so a newer value from another machine still wins.
+    if(String(ST.cfg[id][f]??'')!==v){ ST.cfg[id][f]=v; cfgTouch(id,f); }
   });
   saveCfg();
   syncPush(); // explicit user save — push cfg to GAS
@@ -3717,9 +3808,9 @@ function archiveAircraft(id){
   const ac = allAircraft().find(a=>a.id===id);
   const reg = ac ? ac.reg : id;
   if(!confirm(`Archive ${reg} and remove from active fleet?\n\nIt will remain in the utilisation table for historical data.`)) return;
-  if(!ST.cfg[id]) ST.cfg[id]={};
-  ST.cfg[id].departed = new Date().toISOString().slice(0,10);
+  cfgPut(id,'departed',new Date().toISOString().slice(0,10));
   saveCfg();
+  syncPush();   // previously local-only — other machines never saw the archive
   buildAcList();
   render();
 }
@@ -3728,7 +3819,9 @@ function unarchiveAircraft(id){
   const pw = prompt('Enter password to restore this aircraft:');
   if(pw !== 'limasierra') return;
   if(ST.cfg[id]) delete ST.cfg[id].departed;
+  cfgTouch(id,'departed');   // stamped removal, so an older "departed" can't come back
   saveCfg();
+  syncPush();
   buildAcList();
   render();
 }
@@ -3820,8 +3913,9 @@ function doPrint(printAll){
 function bumpSheetNum(id){
   if(!ST.cfg[id]) ST.cfg[id]={};
   const cur=parseInt(ST.cfg[id].sheet_start||'1',10);
-  ST.cfg[id].sheet_start=String(cur+1);
+  cfgPut(id,'sheet_start',String(cur+1));
   saveCfg();
+  syncPush();   // debounced, so "Print ALL" still sends a single upload
 }
 
 // ══ DEBUG: expose raw Airbly data for inspection ═════
@@ -3972,6 +4066,7 @@ function setTierTarget(tier, valStr){
   }
   const v = (valStr==='' || valStr==null) ? null : parseFloat(valStr);
   ST.cfg.__settings__.tierTargets[tier] = (v!=null && !isNaN(v) && v>0) ? v : null;
+  cfgTouch('__settings__','tierTargets');
   saveCfg();
   syncPush();   // rides the existing cfg sync — no server change needed
   render();
