@@ -151,6 +151,9 @@ textarea.form-input{resize:vertical;min-height:90px;}
 .confirm-detail{background:#060a10;border:1px solid var(--border);border-radius:8px;padding:16px;text-align:left;margin-bottom:24px;font-family:var(--mono);font-size:12px;line-height:2;}
 .confirm-detail b{color:var(--accent);}
 .confirm-close{font-family:var(--head);font-size:15px;font-weight:700;letter-spacing:.1em;background:var(--accent);border:none;border-radius:8px;padding:12px 32px;color:#000;cursor:pointer;text-transform:uppercase;}
+.confirm-box.fail-box{border:2px solid var(--red);}
+.fail-reason{font-family:var(--body);font-size:16px;color:var(--bright);line-height:1.5;margin:8px 0 14px;}
+.fail-action{font-family:var(--head);font-size:18px;font-weight:900;letter-spacing:.06em;color:var(--amber);margin-bottom:24px;}
 
 /* ── CIRCUITS VIEWER ── */
 .slots-header{display:flex;align-items:center;gap:10px;margin-bottom:16px;}
@@ -547,7 +550,7 @@ textarea.form-input{resize:vertical;min-height:90px;}
     <div class="pin-title">SETTINGS</div>
     <div class="pin-sub">ADMIN ACCESS REQUIRED</div>
     <input class="pin-input" id="settingsPinInput" type="password" maxlength="20" placeholder="PASSWORD" style="letter-spacing:4px;">
-    <button class="pin-btn" onclick="checkSettingsPin()">ENTER</button>
+    <button class="pin-btn" id="settingsPinBtn" onclick="checkSettingsPin()">ENTER</button>
     <div class="pin-err" id="settingsPinErr"></div>
     <div class="pin-links">
       <button class="pin-link" onclick="showScreen('s-pin')">← BACK</button>
@@ -787,7 +790,7 @@ textarea.form-input{resize:vertical;min-height:90px;}
     </div>
     <div class="ct-modal-foot">
       <button class="ct-modal-cancel-btn" onclick="closeBookModal()">CANCEL</button>
-      <button class="ct-modal-submit-btn" onclick="submitBookSlot()">SEND REQUEST TO ATC →</button>
+      <button class="ct-modal-submit-btn" id="bookSubmitBtn" onclick="submitBookSlot()">SEND REQUEST TO ATC →</button>
     </div>
   </div>
 </div>
@@ -813,7 +816,7 @@ textarea.form-input{resize:vertical;min-height:90px;}
     </div>
     <div class="ct-modal-foot">
       <button class="ct-modal-cancel-btn" onclick="closeAmendModal()">BACK</button>
-      <button class="ct-modal-submit-btn" onclick="submitAmendSlot()">SEND AMENDMENT TO ATC →</button>
+      <button class="ct-modal-submit-btn" id="amendSubmitBtn" onclick="submitAmendSlot()">SEND AMENDMENT TO ATC →</button>
     </div>
   </div>
 </div>
@@ -860,7 +863,7 @@ textarea.form-input{resize:vertical;min-height:90px;}
     </div>
     <div class="ct-modal-foot">
       <button class="ct-modal-cancel-btn" onclick="closeCancelModal()">BACK</button>
-      <button class="ct-modal-submit-btn ct-modal-cancel-submit" onclick="submitCancelSlot()">NOTIFY ATC OF CANCELLATION →</button>
+      <button class="ct-modal-submit-btn ct-modal-cancel-submit" id="cancelSubmitBtn" onclick="submitCancelSlot()">NOTIFY ATC OF CANCELLATION →</button>
     </div>
   </div>
 </div>
@@ -915,16 +918,10 @@ textarea.form-input{resize:vertical;min-height:90px;}
       </div>
 
       <div class="settings-section">
-        <div class="settings-section-title">Email Settings</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
-          <div>
-            <div class="form-label" style="margin-bottom:8px;">ATC Email Address</div>
-            <input class="form-input" id="atcEmail" type="email" placeholder="atc@example.com">
-          </div>
-          <div>
-            <div class="form-label" style="margin-bottom:8px;">From Address</div>
-            <input class="form-input" id="fromEmail" type="email" placeholder="ops@example.com">
-          </div>
+        <div class="settings-section-title">Email</div>
+        <div class="field-hint" style="font-size:11px;line-height:1.8;">
+          WHO RECEIVES THE EMAILS IS FIXED IN THE EMAIL SCRIPT AND CAN'T BE CHANGED FROM THIS APP.<br>
+          IT CAN ONLY BE CHANGED IN THE GOOGLE APPS SCRIPT ITSELF.
         </div>
       </div>
 
@@ -940,16 +937,63 @@ textarea.form-input{resize:vertical;min-height:90px;}
 <div class="confirm-overlay" id="confirmOverlay">
   <div class="confirm-box">
     <div class="confirm-icon">✈</div>
-    <div class="confirm-title">ATC NOTIFIED</div>
-    <div class="confirm-sub">FLIGHT NOTIFICATION SENT SUCCESSFULLY</div>
+    <div class="confirm-title">SENT TO ATC</div>
+    <div class="confirm-sub" id="confirmSub">THE EMAIL SERVER CONFIRMED IT WAS SENT</div>
     <div class="confirm-detail" id="confirmDetail"></div>
     <button class="confirm-close" onclick="closeConfirm()">NEW BOOKING</button>
   </div>
 </div>
 
+<!-- ══ SEND FAILED OVERLAY ═════════════════════════ -->
+<div class="confirm-overlay" id="failOverlay">
+  <div class="confirm-box fail-box">
+    <div class="confirm-icon">⚠</div>
+    <div class="confirm-title" style="color:var(--red);">NOT CONFIRMED</div>
+    <div class="fail-reason" id="failReason"></div>
+    <div class="fail-action">PHONE OXFORD ATC TO BOOK OUT, OR TRY AGAIN.</div>
+    <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
+      <button class="confirm-close" onclick="retrySendFail()">TRY AGAIN</button>
+      <button class="confirm-close" style="background:none;border:1px solid var(--border);color:var(--text);" onclick="closeSendFail()">BACK TO FORM</button>
+    </div>
+  </div>
+</div>
+
 <script>
-// ══ SETTINGS SCRIPT URL ═══════════════════════════
+// ══ GOOGLE APPS SCRIPT ADDRESSES ══════════════════
+// Who receives the emails is decided inside the email script, not here.
 const SETTINGS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxcqP4KA271hckQzsbXeOK8JaWSoYtlAF6lBkAqnoCM1hRbjPJglhgwrY9CSnsWA7gR/exec';
+const EMAIL_SCRIPT_URL    = 'https://script.google.com/macros/s/AKfycbwg4sqiX6kwdioXW7qTpXjfjNuVVqz1HuDR2BvsLPCDdPxUooW-WkNiAGz6nyRs86D4Jg/exec';
+
+// ── Call a script and READ its reply ───────────────
+// Sent as plain text so the browser doesn't need a pre-check, which means
+// the script's real answer comes back (the old way could not read it).
+async function callScript(url, payload, timeoutMs) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs || 25000);
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(payload),
+      signal: ctrl.signal
+    });
+    const text = await res.text();
+    try { return JSON.parse(text); }
+    catch (e) { return { ok: false, code: 'NO_REPLY', error: 'Unexpected reply from the server.' }; }
+  } catch (e) {
+    if (e.name === 'AbortError') return { ok: false, code: 'TIMEOUT', error: 'No reply from the server in time.' };
+    return { ok: false, code: 'NETWORK', error: 'Could not reach the server (check Wi-Fi).' };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// ── Make text safe to put on the page ──────────────
+function esc(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
 
 // ══ DEFAULTS ══════════════════════════════════════
 const DEFAULTS = {
@@ -964,9 +1008,7 @@ const DEFAULTS = {
   route:    ['Circuits','Local Area - North','Local Area - South','Local Area - West','Local Area - East',
              'Conington (Land)','Enstone (Land)','Thruxton (Land)','Wellesbourne (Land)',
              'Dual to Solo Check (Details in notes)','Other'],
-  dest:     ['Oxford','Enstone','Leicester','Wellesbourne','Thruxton','Kemble','Other'],
-  atcEmail: 'atc1@londonoxfordairport.com',
-  fromEmail:'ops@limasierra.org'
+  dest:     ['Oxford','Enstone','Leicester','Wellesbourne','Thruxton','Kemble','Other']
 };
 
 // ══ STATE ══════════════════════════════════════════
@@ -976,50 +1018,37 @@ function loadSettingsFromCache() {
   try {
     const s = JSON.parse(localStorage.getItem('lsa_settings') || '{}');
     return {
-      ac:        s.ac        || [...DEFAULTS.ac],
-      instr:     s.instr     || [...DEFAULTS.instr],
-      route:     s.route     || [...DEFAULTS.route],
-      dest:      s.dest      || [...DEFAULTS.dest],
-      atcEmail:  s.atcEmail  || DEFAULTS.atcEmail,
-      fromEmail: s.fromEmail || DEFAULTS.fromEmail
+      ac:    s.ac    || [...DEFAULTS.ac],
+      instr: s.instr || [...DEFAULTS.instr],
+      route: s.route || [...DEFAULTS.route],
+      dest:  s.dest  || [...DEFAULTS.dest]
     };
   } catch(e) {
-    return {
-      ac:[...DEFAULTS.ac], instr:[...DEFAULTS.instr],
-      route:[...DEFAULTS.route], dest:[...DEFAULTS.dest],
-      atcEmail:DEFAULTS.atcEmail, fromEmail:DEFAULTS.fromEmail
-    };
+    return { ac:[...DEFAULTS.ac], instr:[...DEFAULTS.instr], route:[...DEFAULTS.route], dest:[...DEFAULTS.dest] };
   }
 }
 
 function saveSettingsToCache() {
-  localStorage.setItem('lsa_settings', JSON.stringify(ST));
+  try { localStorage.setItem('lsa_settings', JSON.stringify(ST)); } catch(e) {}
 }
 
-// ── Fetch settings from cloud (GAS GET — works cross-origin) ────
+// Take the lists from a cloud copy, keeping this device's list if one is missing
+function settingsFrom(cloud) {
+  const pick = (k) => (Array.isArray(cloud[k]) && cloud[k].length) ? cloud[k] : ST[k];
+  return { ac: pick('ac'), instr: pick('instr'), route: pick('route'), dest: pick('dest') };
+}
+
+// ── Fetch settings from cloud (GET works cross-origin) ────
 async function fetchSettingsFromCloud() {
-  if(!SETTINGS_SCRIPT_URL || SETTINGS_SCRIPT_URL.includes('YOUR_SETTINGS')) return null;
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 12000);
   try {
-    const res = await fetch(SETTINGS_SCRIPT_URL + '?action=getSettings');
+    const res = await fetch(SETTINGS_SCRIPT_URL + '?action=getSettings', { signal: ctrl.signal });
     const data = await res.json();
     if(data.ok && data.settings) return data.settings;
     return null;
   } catch(e) { return null; }
-}
-
-// ── Save settings to cloud (GAS POST — no-cors, treat success as ok) ──
-async function saveSettingsToCloud(settings) {
-  if(!SETTINGS_SCRIPT_URL || SETTINGS_SCRIPT_URL.includes('YOUR_SETTINGS')) return false;
-  return new Promise(resolve => {
-    fetch(SETTINGS_SCRIPT_URL, {
-      method: 'POST',
-      mode: 'no-cors',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ action: 'saveSettings', settings })
-    })
-    .then(() => resolve(true))
-    .catch(() => resolve(false));
-  });
+  finally { clearTimeout(timer); }
 }
 
 // ══ UTC WARNING BANNER ════════════════════════════
@@ -1044,9 +1073,13 @@ function utcToLocal(utcHHMM) {
 
 // ══ SCREENS ════════════════════════════════════════
 function showScreen(id) {
+  // Leaving Settings without saving: throw away unsaved edits on this device
+  const wasSettings = document.getElementById('s-settings').classList.contains('active');
+  if (wasSettings && id !== 's-settings') { ST = loadSettingsFromCache(); buildForm(); }
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById(id).classList.add('active');
   if (id === 's-pin') clearClubForm();
+  if (id !== 's-settings') { settingsPassword = ''; settingsBase = null; }
 }
 
 // ══ PIN ════════════════════════════════════════════
@@ -1067,14 +1100,7 @@ function checkPin() {
     fetchSettingsFromCloud().then(cloud => {
       if(cloud) {
         const before = JSON.stringify(ST);
-        ST = {
-          ac:        cloud.ac        || ST.ac,
-          instr:     cloud.instr     || ST.instr,
-          route:     cloud.route     || ST.route,
-          dest:      cloud.dest      || ST.dest,
-          atcEmail:  cloud.atcEmail  || ST.atcEmail,
-          fromEmail: cloud.fromEmail || ST.fromEmail
-        };
+        ST = settingsFrom(cloud);
         saveSettingsToCache();
         // Only redraw if the cloud copy actually differs, and only if the pilot
         // hasn't started picking options yet, so nothing they've chosen is wiped.
@@ -1094,14 +1120,36 @@ function showSettingsPin() {
   document.getElementById('settingsPinErr').textContent = '';
 }
 
-function checkSettingsPin() {
-  const v = document.getElementById('settingsPinInput').value;
-  if(v === 'limasierra') {
+// The Settings password is checked by the Settings script, not in this page.
+// It is held in memory only while Settings is open, then forgotten.
+let settingsPassword = '';
+let settingsBase = null;   // the cloud copy's "last saved" stamp; null = cloud not loaded
+
+async function checkSettingsPin() {
+  const input = document.getElementById('settingsPinInput');
+  const errEl = document.getElementById('settingsPinErr');
+  const btn   = document.getElementById('settingsPinBtn');
+  const v = input.value;
+  if(!v) { errEl.textContent = 'Enter the password'; return; }
+  btn.disabled = true;
+  errEl.style.color = 'var(--dim)';
+  errEl.textContent = 'Checking…';
+  const r = await callScript(SETTINGS_SCRIPT_URL, { action: 'checkPassword', password: v }, 20000);
+  btn.disabled = false;
+  errEl.style.color = '';
+  if(r.ok) {
+    settingsPassword = v;
+    input.value = '';
+    errEl.textContent = '';
     showScreen('s-settings');
     loadSettingsUI();
   } else {
-    document.getElementById('settingsPinErr').textContent = 'Incorrect password';
-    document.getElementById('settingsPinInput').value = '';
+    input.value = '';
+    errEl.textContent =
+      r.code === 'BAD_PASSWORD' ? 'Incorrect password' :
+      r.code === 'LOCKED'       ? r.error :
+      (r.code === 'NETWORK' || r.code === 'TIMEOUT') ? 'Can\'t reach the server. Settings need an internet connection.' :
+      ('Could not check password: ' + (r.error || 'unknown error'));
   }
 }
 
@@ -1170,7 +1218,7 @@ function buildRadioList(containerId, items, stateKey, hasOther) {
   items.forEach(item => {
     const row = document.createElement('div');
     row.className = 'radio-row';
-    row.innerHTML = `<div class="radio-circle"><div class="radio-dot"></div></div><span class="radio-label">${item}</span>`;
+    row.innerHTML = `<div class="radio-circle"><div class="radio-dot"></div></div><span class="radio-label">${esc(item)}</span>`;
     row.dataset.val = item;
     row.onclick = () => selectRadio(container, row, stateKey);
     container.appendChild(row);
@@ -1298,22 +1346,15 @@ Notes:       ${notes||'None'}
 =====================================
 Sent from LSA Bookings System`;
 
-  sendEmail({
-    to:      ST.atcEmail || 'atc1@londonoxfordairport.com',
-    cc:      'LSAOPS814@gmail.com',
-    from:    'LSAOPS814@gmail.com',
-    subject,
-    body,
-    onSuccess: () => {
-      btn.disabled = false;
-      document.getElementById('submitMsg').textContent = '';
-      showConfirm(data, eta);
-    },
-    onError: (msg) => {
-      btn.disabled = false;
-      flashMsg('⚠ ' + msg, 'err');
-    }
-  });
+  const result = await sendEmail(subject, body);
+  btn.disabled = false;
+  document.getElementById('submitMsg').textContent = '';
+  if(result.ok) {
+    showConfirm(data, eta, result);
+  } else {
+    // Keep everything the pilot entered, so TRY AGAIN resends the same thing
+    showSendFail(result);
+  }
 }
 
 function flashMsg(msg, type) {
@@ -1322,19 +1363,59 @@ function flashMsg(msg, type) {
   el.className = 'submit-msg ' + (type || '');
 }
 
-function showConfirm(d, eta) {
+function showConfirm(d, eta, result) {
   document.getElementById('confirmDetail').innerHTML = `
-    <b>Aircraft</b>   ${d.aircraft}<br>
-    <b>Departure</b>  ${d.dep_time}<br>
-    <b>Duration</b>   ${d.duration}<br>
-    <b>ETA Return</b> ${eta||'—'}<br>
-    <b>PIC</b>        ${d.instructor}<br>
-    <b>POB</b>        ${d.pob}<br>
-    <b>Route</b>      ${d.route}<br>
-    <b>Destination</b>${d.destination}<br>
-    <b>Notes</b>      ${d.notes}
+    <b>Aircraft</b>   ${esc(d.aircraft)}<br>
+    <b>Departure</b>  ${esc(d.dep_time)}<br>
+    <b>Duration</b>   ${esc(d.duration)}<br>
+    <b>ETA Return</b> ${esc(eta||'-')}<br>
+    <b>PIC</b>        ${esc(d.instructor)}<br>
+    <b>POB</b>        ${esc(d.pob)}<br>
+    <b>Route</b>      ${esc(d.route)}<br>
+    <b>Destination</b>${esc(d.destination)}<br>
+    <b>Notes</b>      ${esc(d.notes)}
   `;
+  document.getElementById('confirmSub').textContent = sendNote(result);
   document.getElementById('confirmOverlay').classList.add('active');
+}
+
+// Short line under "SENT TO ATC" (practice mode / already sent / allowance low)
+function sendNote(result) {
+  const notes = [];
+  if(result && result.mode === 'PRACTISE') notes.push('PRACTICE MODE: SENT TO THE TEST ADDRESS, NOT ATC');
+  else notes.push('THE EMAIL SERVER CONFIRMED IT WAS SENT');
+  if(result && result.duplicate) notes.push('(IT HAD ALREADY BEEN SENT A MOMENT AGO, SO IT WAS NOT SENT TWICE)');
+  if(result && result.lowAllowance) notes.push('WARNING: ONLY ' + result.remaining + ' EMAILS LEFT TODAY. TELL OPS.');
+  return notes.join(' ');
+}
+
+// Plain-English reason an email didn't go
+function failReason(r) {
+  switch(r.code) {
+    case 'QUOTA':   return "The app has used up today's email allowance. The notification was NOT sent.";
+    case 'RATE':    return 'Too many emails have been sent in the last few minutes. The notification was NOT sent.';
+    case 'BUSY':    return 'The email server was busy. The notification was NOT sent.';
+    case 'INVALID': return 'The email server refused it (' + r.error + '). The notification was NOT sent.';
+    case 'TIMEOUT':
+    case 'NETWORK':
+    case 'NO_REPLY':
+      return 'No answer from the email server (' + r.error + '). It may NOT have reached ATC.';
+    default:        return 'The notification was NOT sent (' + (r.error || 'unknown error') + ').';
+  }
+}
+
+function showSendFail(r) {
+  document.getElementById('failReason').textContent = failReason(r);
+  document.getElementById('failOverlay').classList.add('active');
+}
+
+function closeSendFail() {
+  document.getElementById('failOverlay').classList.remove('active');
+}
+
+function retrySendFail() {
+  closeSendFail();
+  submitBooking();
 }
 
 function closeConfirm() {
@@ -1490,9 +1571,9 @@ function renderSlotsGrid(json) {
       const lc = lw.includes('calm')?'cb-lc-calm':lw.includes('light')?'cb-lc-light':
                  lw.includes('mod')?'cb-lc-mod':lw.includes('busy')?'cb-lc-busy':
                  lw.includes('heavy')?'cb-lc-heavy':'';
-      return `<span class="${lc}">${v}</span>`;
+      return `<span class="${lc}">${esc(v)}</span>`;
     }
-    return v;
+    return esc(v);
   }
 
   // Work out how many 15-min rows fit in the visible height
@@ -1555,8 +1636,9 @@ function renderSlotsGrid(json) {
         const isAvbl = vUp === 'AVBL';
         const isLsa  = !isAvbl && cls === 'cb-lsa';
         const clickable = isAvbl || isLsa;
+        // Tapping is handled by one listener on the grid (see below), using these data values
         const clickAttr = clickable
-          ? `onclick="onBlockClick(${t},'${lane}','${isAvbl?'avbl':'lsa'}','${v}')" style="cursor:pointer;"`
+          ? `data-click="${isAvbl?'avbl':'lsa'}" data-reg="${esc(v)}" style="cursor:pointer;"`
           : '';
         h += `<td class="cg-lane-td"><div class="cb ${cls}" data-t="${t}" data-lane="${lane}" ${clickAttr}>${lbl}</div></td>`;
       });
@@ -1604,31 +1686,31 @@ function renderSlotsGrid(json) {
 
 
 // ══ SETTINGS UI ════════════════════════════════════
-function loadSettingsUI() {
+function setSyncStatus(cls, text) {
   const status = document.getElementById('syncStatus');
-  status.className = 'settings-sync-status loading';
-  status.textContent = '⟳ LOADING SETTINGS FROM CLOUD…';
+  status.className = 'settings-sync-status ' + cls;
+  status.textContent = text;
+}
+
+function loadSettingsUI() {
+  settingsBase = null;
+  const btn = document.getElementById('saveBtn');
+  btn.disabled = true;
+  setSyncStatus('loading', '⟳ LOADING SETTINGS FROM CLOUD…');
 
   fetchSettingsFromCloud().then(cloud => {
     if(cloud) {
-      ST = {
-        ac:        cloud.ac        || ST.ac,
-        instr:     cloud.instr     || ST.instr,
-        route:     cloud.route     || ST.route,
-        dest:      cloud.dest      || ST.dest,
-        atcEmail:  cloud.atcEmail  || ST.atcEmail,
-        fromEmail: cloud.fromEmail || ST.fromEmail
-      };
+      ST = settingsFrom(cloud);
+      settingsBase = cloud.updatedAt || '';
       saveSettingsToCache();
-      status.className = 'settings-sync-status ok';
-      status.textContent = '✓ SETTINGS LOADED FROM CLOUD';
+      setSyncStatus('ok', '✓ SETTINGS LOADED FROM CLOUD');
+      btn.disabled = false;
     } else {
-      status.className = 'settings-sync-status err';
-      status.textContent = '⚠ COULD NOT REACH CLOUD — SHOWING CACHED SETTINGS';
+      // Saving is blocked here: this device's copy may be out of date and
+      // must never overwrite newer settings saved from another device.
+      setSyncStatus('err', '⚠ COULD NOT REACH CLOUD. SHOWING THIS DEVICE\'S COPY. SAVING IS OFF UNTIL THE CLOUD CAN BE REACHED (GO BACK AND TRY AGAIN).');
     }
     renderAllTags();
-    document.getElementById('atcEmail').value  = ST.atcEmail;
-    document.getElementById('fromEmail').value = ST.fromEmail;
   });
 }
 
@@ -1648,7 +1730,7 @@ function renderTags(containerId, items, key) {
     tag.draggable = true;
     tag.dataset.index = i;
     tag.dataset.key = key;
-    tag.innerHTML = `<span class="tag-handle">⠿</span><span>${item}</span><button class="tag-del" onclick="removeTag('${key}',${i})">×</button>`;
+    tag.innerHTML = `<span class="tag-handle">⠿</span><span>${esc(item)}</span><button class="tag-del" onclick="removeTag('${key}',${i})">×</button>`;
     tag.addEventListener('dragstart', e => {
       e.dataTransfer.effectAllowed = 'move';
       e.dataTransfer.setData('text/plain', JSON.stringify({key, idx: i}));
@@ -1694,39 +1776,61 @@ function addTag(key) {
 });
 
 async function saveSettings() {
-  ST.atcEmail  = document.getElementById('atcEmail').value.trim();
-  ST.fromEmail = document.getElementById('fromEmail').value.trim();
-  saveSettingsToCache();
-
   const btn   = document.getElementById('saveBtn');
   const flash = document.getElementById('settingsFlash');
+  if(settingsBase === null) {
+    setSyncStatus('err', '⚠ NOT SAVED. THE CLOUD COPY COULDN\'T BE LOADED, SO SAVING IS OFF. GO BACK AND TRY AGAIN.');
+    return;
+  }
+
   btn.disabled = true;
   btn.textContent = 'SAVING…';
 
-  const ok = await saveSettingsToCloud(ST);
+  const r = await callScript(SETTINGS_SCRIPT_URL, {
+    action: 'saveSettings',
+    password: settingsPassword,
+    baseUpdatedAt: settingsBase,
+    settings: { ac: ST.ac, instr: ST.instr, route: ST.route, dest: ST.dest }
+  }, 25000);
 
   btn.disabled = false;
   btn.textContent = 'SAVE ALL SETTINGS';
 
-  const status = document.getElementById('syncStatus');
-  if(ok) {
-    status.className = 'settings-sync-status ok';
-    status.textContent = '✓ SETTINGS SAVED TO CLOUD — ALL DEVICES WILL UPDATE';
+  if(r.ok && r.settings) {
+    // The script returns the cleaned lists exactly as saved
+    ST = settingsFrom(r.settings);
+    settingsBase = r.settings.updatedAt || '';
+    saveSettingsToCache();
+    renderAllTags();
+    buildForm();
+    setSyncStatus('ok', '✓ SETTINGS SAVED TO CLOUD. OTHER DEVICES UPDATE THE NEXT TIME SOMEONE ENTERS THE PIN.');
     flash.textContent = '✓ SAVED TO CLOUD';
-  } else {
-    status.className = 'settings-sync-status err';
-    status.textContent = '⚠ CLOUD SAVE FAILED — SAVED LOCALLY ONLY';
-    flash.textContent = '✓ SAVED LOCALLY';
+    flash.style.opacity = '1';
+    setTimeout(() => flash.style.opacity = '0', 3000);
+    return;
   }
-  flash.style.opacity = '1';
-  setTimeout(() => flash.style.opacity = '0', 3000);
-  buildForm();
+
+  if(r.code === 'STALE' && r.settings) {
+    // Someone saved from another device since this one loaded. Show theirs.
+    ST = settingsFrom(r.settings);
+    settingsBase = r.settings.updatedAt || '';
+    saveSettingsToCache();
+    renderAllTags();
+    buildForm();
+    setSyncStatus('err', '⚠ NOT SAVED. SETTINGS WERE CHANGED ON ANOTHER DEVICE. THE LATEST VERSION IS NOW SHOWING: PLEASE MAKE YOUR CHANGE AGAIN AND SAVE.');
+    return;
+  }
+
+  if(r.code === 'BAD_PASSWORD' || r.code === 'LOCKED') {
+    setSyncStatus('err', '⚠ NOT SAVED. ' + (r.code === 'LOCKED' ? r.error : 'THE PASSWORD WAS NOT ACCEPTED.') + ' GO BACK AND SIGN IN TO SETTINGS AGAIN.');
+    return;
+  }
+
+  // Timeout / network / anything else: nothing on this device changes
+  setSyncStatus('err', '⚠ NOT SAVED: ' + (r.error || 'unknown error').toUpperCase() + ' NOTHING WAS CHANGED. TRY AGAIN.');
 }
 
 // ══ CIRCUIT SLOT BOOKING & CANCELLATION ════════════════════════
-
-// PHP endpoint — replace with your GoDaddy URL once hosting confirmed
-const PHP_EMAIL_URL = 'https://script.google.com/macros/s/AKfycbwg4sqiX6kwdioXW7qTpXjfjNuVVqz1HuDR2BvsLPCDdPxUooW-WkNiAGz6nyRs86D4Jg/exec';
 
 // In-memory cancellation log (persists this session only — backend TBD)
 const cancelLog = [];
@@ -1739,7 +1843,7 @@ function openBookModal(prefillLane, prefillStart, prefillEnd) {
   ST.ac.forEach(reg => {
     const lbl = document.createElement('label');
     lbl.className = 'ct-radio-opt';
-    lbl.innerHTML = `<input type="radio" name="bookAc" value="${reg}"> ${reg}`;
+    lbl.innerHTML = `<input type="radio" name="bookAc" value="${esc(reg)}"> ${esc(reg)}`;
     acList.appendChild(lbl);
   });
   // Pre-fill start time to next 15-min boundary
@@ -1773,7 +1877,7 @@ function closeBookModal(e) {
   document.getElementById('bookModalOverlay').classList.remove('open');
 }
 
-function submitBookSlot() {
+async function submitBookSlot() {
   const lane  = document.querySelector('input[name="bookLane"]:checked')?.value || '';
   const ac    = document.querySelector('input[name="bookAc"]:checked')?.value || '';
   const start = document.getElementById('bookStart').value.trim();
@@ -1809,18 +1913,10 @@ function submitBookSlot() {
 ` +
     `Sent from LS Airmotive Bookings App`;
 
-  sendEmail({
-    to: ST.atcEmail || 'atc1@londonoxfordairport.com',
-    cc: ST.fromEmail || 'ops@limasierra.org',
-    from: ST.fromEmail || 'ops@limasierra.org',
-    subject,
-    body,
-    onSuccess: () => {
-      document.getElementById('bookModalOverlay').classList.remove('open');
-      showSlotsToast(`✓ Slot request sent — ${ac} ${lane} ${start}–${end}`);
-      loadSlots();
-    },
-    onError: (msg) => { err.textContent = msg; }
+  await sendFromModal(subject, body, 'bookSubmitBtn', err, () => {
+    document.getElementById('bookModalOverlay').classList.remove('open');
+    showSlotsToast(`✓ Slot request sent: ${ac} ${lane} ${start}–${end}`);
+    loadSlots();
   });
 }
 
@@ -1844,7 +1940,7 @@ function closeCancelModal(e) {
   document.getElementById('cancelModalOverlay').classList.remove('open');
 }
 
-function submitCancelSlot() {
+async function submitCancelSlot() {
   const lane   = document.querySelector('input[name="cancelLane"]:checked')?.value || '';
   const start  = document.getElementById('cancelStart').value.trim();
   const end    = document.getElementById('cancelEnd').value.trim();
@@ -1884,21 +1980,13 @@ function submitCancelSlot() {
 ` +
     `Sent from LS Airmotive Bookings App`;
 
-  sendEmail({
-    to: ST.atcEmail || 'atc1@londonoxfordairport.com',
-    cc: ST.fromEmail || 'ops@limasierra.org',
-    from: ST.fromEmail || 'ops@limasierra.org',
-    subject,
-    body,
-    onSuccess: () => {
-      // Add to in-memory log
-      cancelLog.unshift({ at: loggedAt, lane, reg, start, end, name, reason });
-      renderCancelLog();
-      document.getElementById('cancelModalOverlay').classList.remove('open');
-      showSlotsToast(`✓ Cancellation sent — ${reg} ${lane} ${start}–${end}`);
-      loadSlots();
-    },
-    onError: (msg) => { err.textContent = msg; }
+  await sendFromModal(subject, body, 'cancelSubmitBtn', err, () => {
+    // Add to in-memory log
+    cancelLog.unshift({ at: loggedAt, lane, reg, start, end, name, reason });
+    renderCancelLog();
+    document.getElementById('cancelModalOverlay').classList.remove('open');
+    showSlotsToast(`✓ Cancellation sent: ${reg} ${lane} ${start}–${end}`);
+    loadSlots();
   });
 }
 
@@ -1910,42 +1998,40 @@ function renderCancelLog() {
     '<div class="ct-cancel-log-title">⚠ CANCELLATIONS THIS SESSION (' + cancelLog.length + ')</div>' +
     cancelLog.map(c =>
       '<div class="ct-cancel-log-row">' +
-        '<span class="cl-time">' + c.at + '</span>' +
-        '<span class="cl-slot">' + c.reg + ' · ' + c.lane + ' · ' + c.start + '–' + c.end + '</span>' +
-        '<span class="cl-who">by ' + c.name + '</span>' +
-        (c.reason ? '<span class="cl-reason">' + c.reason + '</span>' : '') +
+        '<span class="cl-time">' + esc(c.at) + '</span>' +
+        '<span class="cl-slot">' + esc(c.reg + ' · ' + c.lane + ' · ' + c.start + '–' + c.end) + '</span>' +
+        '<span class="cl-who">by ' + esc(c.name) + '</span>' +
+        (c.reason ? '<span class="cl-reason">' + esc(c.reason) + '</span>' : '') +
       '</div>'
     ).join('') +
   '</div>';
 }
 
-// ── Email sender (PHP backend) ──────────────────────────────────
-function sendEmail({to, cc, from, subject, body, onSuccess, onError}) {
-  // ── TODO: Replace PHP_EMAIL_URL with your GoDaddy script URL ──
-  // Until then, falls back to mailto so nothing is blocked.
-  if(!PHP_EMAIL_URL || PHP_EMAIL_URL.includes('YOUR-GODADDY')) {
-    // Fallback: open mail client
-    const mailto = 'mailto:' + to +
-      '?cc=' + encodeURIComponent(cc) +
-      '&subject=' + encodeURIComponent(subject) +
-      '&body=' + encodeURIComponent(body);
-    window.open(mailto);
-    onSuccess && onSuccess();
-    return;
-  }
+// ── Email sender ────────────────────────────────────────────────
+// Sends to the email script and returns its real answer:
+//   { ok:true, mode, remaining, lowAllowance, duplicate }  or  { ok:false, code, error }
+// The script decides who receives it (Oxford ATC + ops copy).
+async function sendEmail(subject, body) {
+  return callScript(EMAIL_SCRIPT_URL, { subject, body }, 25000);
+}
 
-  // Google Apps Script requires no-cors; we can't read the response body
-  // so we treat a network success as a send success
-  fetch(PHP_EMAIL_URL, {
-    method: 'POST',
-    mode: 'no-cors',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({ to, cc, from, subject, body })
-  })
-  .then(() => {
-    onSuccess && onSuccess();
-  })
-  .catch(e => { onError && onError('Could not reach email server: ' + e.message); });
+// Used by the Book / Cancel / Amend slot windows
+async function sendFromModal(subject, body, btnId, errEl, onSent) {
+  const btn = document.getElementById(btnId);
+  const label = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = 'SENDING…';
+  errEl.style.color = '';
+  errEl.textContent = '';
+  const r = await sendEmail(subject, body);
+  btn.disabled = false;
+  btn.textContent = label;
+  if(r.ok) {
+    onSent();
+    if(r.mode === 'PRACTISE' || r.lowAllowance) showSlotsToast(sendNote(r));
+  } else {
+    errEl.textContent = '⚠ ' + failReason(r).replace('The notification', 'This') + ' Phone ATC, or try again.';
+  }
 }
 
 // ── Toast notification ──────────────────────────────────────────
@@ -2081,7 +2167,7 @@ function bookFromSelection() {
   ST.ac.forEach(reg => {
     const lbl = document.createElement('label');
     lbl.className = 'ct-radio-opt';
-    lbl.innerHTML = `<input type="radio" name="bookAc" value="${reg}"> ${reg}`;
+    lbl.innerHTML = `<input type="radio" name="bookAc" value="${esc(reg)}"> ${esc(reg)}`;
     acList.appendChild(lbl);
   });
 
@@ -2151,7 +2237,7 @@ function closeAmendModal(e) {
   document.getElementById('amendModalOverlay').classList.remove('open');
 }
 
-function submitAmendSlot() {
+async function submitAmendSlot() {
   const acList = document.getElementById('amendAcList');
   const newReg = acList._getSelected();
   const lane   = acList.dataset.lane;
@@ -2175,22 +2261,21 @@ New Reg:       ${newReg}
 ======================================
 Sent from LSA Bookings App`;
 
-  sendEmail({
-    to: ST.atcEmail || 'atc1@londonoxfordairport.com',
-    cc: 'LSAOPS814@gmail.com',
-    from: 'LSAOPS814@gmail.com',
-    subject, body,
-    onSuccess: () => {
-      document.getElementById('amendModalOverlay').classList.remove('open');
-      showSlotsToast('✓ Amendment sent — ' + oldReg + ' → ' + newReg + ' · ' + lane + ' ' + start + '–' + end);
-      loadSlots();
-    },
-    onError: (msg) => { err.textContent = msg; }
+  await sendFromModal(subject, body, 'amendSubmitBtn', err, () => {
+    document.getElementById('amendModalOverlay').classList.remove('open');
+    showSlotsToast('✓ Amendment sent: ' + oldReg + ' → ' + newReg + ' · ' + lane + ' ' + start + '–' + end);
+    loadSlots();
   });
 }
 
 
-// ══ GRID SELECTION STATE ══════════════════════════════════════
+// ══ GRID TAPS ══════════════════════════════════════════════════
+// One listener for the whole grid, so nothing from ATC's sheet is ever run as code
+document.getElementById('ctBands').addEventListener('click', e => {
+  const el = e.target.closest('[data-click]');
+  if(!el) return;
+  onBlockClick(Number(el.dataset.t), el.dataset.lane, el.dataset.click, el.dataset.reg);
+});
 </script>
 </body>
 </html>
