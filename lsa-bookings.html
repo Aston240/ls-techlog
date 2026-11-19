@@ -767,11 +767,11 @@ textarea.form-input{resize:vertical;min-height:90px;}
       <div class="ct-field-row">
         <div class="ct-field">
           <label class="ct-label">START TIME (UTC)</label>
-          <input class="ct-input" id="bookStart" type="text" placeholder="09:00" maxlength="5">
+          <input class="ct-input" id="bookStart" type="text" inputmode="numeric" oninput="formatDepTime(this); updateBookModalTitle()" placeholder="09:00" maxlength="5">
         </div>
         <div class="ct-field">
           <label class="ct-label">END TIME (UTC)</label>
-          <input class="ct-input" id="bookEnd" type="text" placeholder="10:00" maxlength="5">
+          <input class="ct-input" id="bookEnd" type="text" inputmode="numeric" oninput="formatDepTime(this)" placeholder="10:00" maxlength="5">
         </div>
       </div>
       <div class="ct-field">
@@ -840,11 +840,11 @@ textarea.form-input{resize:vertical;min-height:90px;}
       <div class="ct-field-row">
         <div class="ct-field">
           <label class="ct-label">SLOT START TIME (UTC)</label>
-          <input class="ct-input" id="cancelStart" type="text" placeholder="09:00" maxlength="5">
+          <input class="ct-input" id="cancelStart" type="text" inputmode="numeric" oninput="formatDepTime(this)" placeholder="09:00" maxlength="5">
         </div>
         <div class="ct-field">
           <label class="ct-label">SLOT END TIME (UTC)</label>
-          <input class="ct-input" id="cancelEnd" type="text" placeholder="10:00" maxlength="5">
+          <input class="ct-input" id="cancelEnd" type="text" inputmode="numeric" oninput="formatDepTime(this)" placeholder="10:00" maxlength="5">
         </div>
       </div>
       <div class="ct-field">
@@ -1052,13 +1052,18 @@ async function fetchSettingsFromCloud() {
 }
 
 // ══ UTC WARNING BANNER ════════════════════════════
+// UK clocks change on the last Sunday of March and of October every year.
+// The warning shows from 3 days before each change to the end of the 15th day after it.
 (function() {
-  const now   = new Date();
-  const start = new Date('2026-03-28T00:00:00Z');
-  const end   = new Date('2026-04-13T23:59:59Z');
-  if(now >= start && now <= end) {
-    document.getElementById('utcWarning').style.display = 'block';
+  function lastSunday(year, month) {          // month: 0 = Jan
+    const d = new Date(Date.UTC(year, month + 1, 0));   // last day of the month
+    d.setUTCDate(d.getUTCDate() - d.getUTCDay());
+    return d.getTime();
   }
+  const now = Date.now(), day = 86400000, y = new Date().getUTCFullYear();
+  const show = [lastSunday(y, 2), lastSunday(y, 9)]
+    .some(c => now >= c - 3 * day && now < c + 16 * day);
+  if(show) document.getElementById('utcWarning').style.display = 'block';
 })();
 
 // ── Local time from UTC string ─────────────────────
@@ -1460,23 +1465,49 @@ function setSlotsStatus(state, label) {
   }
 }
 
-async function loadSlots() {
+let slotsLoadedOnce = false;   // has the grid ever loaded since the page opened?
+let slotsLoading = false;
+let slotsBlocks = null;          // last 15-minute blocks read from ATC's sheet (used to check typed times)
+
+// opts.auto = true for the automatic 2-minute refresh and after sending (doesn't move the grid)
+async function loadSlots(opts) {
+  const auto = !!(opts && opts.auto);
+  if (slotsLoading) return;
+  slotsLoading = true;
+  // The 2-minute refresh keeps running even after a failure, so the grid recovers by itself
+  if (!slotsAutoRefresh) slotsAutoRefresh = setInterval(() => loadSlots({ auto: true }), 120000);
+
+  const dot = document.getElementById('ctDot');
+  const lbl = document.getElementById('ctLbl');
+  if (!slotsLoadedOnce && lbl) lbl.textContent = 'LOADING…';
+
+  const ctrl  = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 15000);   // never wait more than 15 seconds
   try {
-    const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&gid=${SHEET_GID}`;
-    const res  = await fetch(url);
+    const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&gid=${SHEET_GID}&t=${Date.now()}`;
+    const res = await fetch(url, { signal: ctrl.signal });
+    if (!res.ok) throw new Error('ATC sheet replied with error ' + res.status);
     const text = await res.text();
-    const json = JSON.parse(text.replace(/^[^(]+\(/,'').replace(/\);?\s*$/,''));
-    renderSlotsGrid(json);
-    // auto-refresh every 2 mins
-    clearInterval(slotsAutoRefresh);
-    slotsAutoRefresh = setInterval(loadSlots, 120000);
-  } catch(e) {
-    const dot = document.getElementById('ctDot');
-    if(dot) dot.className='ct-status-dot error';
-    const lbl = document.getElementById('ctLbl');
-    if(lbl) lbl.textContent = 'ERROR: ' + e.message;
-    document.getElementById('ctWrap').innerHTML = '<div class="ct-loading" style="color:var(--red)">⚠ ' + e.message + '</div>';
+    let json;
+    try { json = JSON.parse(text.replace(/^[^(]+\(/,'').replace(/\);?\s*$/,'')); }
+    catch (e) { throw new Error("ATC sheet couldn't be read (is it still shared?)"); }
+    if (!json.table || !json.table.rows) throw new Error("ATC sheet came back empty");
+    renderSlotsGrid(json, { scrollToNow: !auto || !slotsLoadedOnce });
+    slotsLoadedOnce = true;
+  } catch (e) {
+    const msg = e.name === 'AbortError' ? 'ATC sheet not responding' : (e.message || 'unknown error');
+    if (dot) dot.className = 'ct-status-dot error';
+    if (lbl) lbl.textContent = 'NOT UPDATING: ' + msg.toUpperCase() +
+      (slotsLoadedOnce ? ' · SHOWING LAST UPDATE · RETRYING EVERY 2 MIN' : ' · RETRYING EVERY 2 MIN');
+    if (!slotsLoadedOnce) {
+      document.getElementById('ctBands').innerHTML =
+        '<div class="ct-loading" style="color:var(--red)">⚠ Can\'t load ATC\'s slot sheet (' + esc(msg) +
+        '). Use ↗ ATC SHEET or phone ATC. Retrying automatically every 2 minutes.</div>';
+    }
     console.error('loadSlots error:', e);
+  } finally {
+    clearTimeout(timer);
+    slotsLoading = false;
   }
 }
 
@@ -1533,7 +1564,7 @@ function toMins(t) {
   const [h,m] = t.split(':').map(Number); return h*60+m;
 }
 
-function renderSlotsGrid(json) {
+function renderSlotsGrid(json, opts) {
   const fleet   = new Set(ST.ac.map(r=>r.replace(/[\s-]/g,'').toUpperCase()));
   const nowMins = nowUTCMins();
   const rawGrid = parseRawGrid(json);
@@ -1550,6 +1581,8 @@ function renderSlotsGrid(json) {
       }
     });
   }
+
+  slotsBlocks = blocks;
 
   function bClass(lane, v) {
     if(!v || v==='X') return 'cb-closed';
@@ -1674,13 +1707,26 @@ function renderSlotsGrid(json) {
     upd.textContent = '· '+n.getUTCHours().toString().padStart(2,'0')+':'+n.getUTCMinutes().toString().padStart(2,'0')+'Z';
   }
 
-  // Scroll NOW band into view horizontally
-  setTimeout(() => {
-    const nr = document.getElementById('ctNowRow');
-    if(nr) {
-      nr.scrollIntoView({inline:'center', behavior:'smooth'});
+  // Keep a selection across the refresh if every selected block is still the same;
+  // if ATC's sheet changed under it, clear it and say so
+  if (ctSelection.length) {
+    const els = ctSelection.map(sel => document.querySelector(`[data-t="${sel.t}"][data-lane="${sel.lane}"][data-click="${sel.type}"]`));
+    const still = els.every((el, i) => el && (ctSelection[i].type !== 'lsa' || el.dataset.reg === ctSelection[i].reg));
+    if (still) {
+      els.forEach(el => el.classList.add(ctSelection[0].type === 'avbl' ? 'cb-selected-avbl' : 'cb-selected-lsa'));
+    } else {
+      clearSelection();
+      showSlotsToast("⚠ ATC's sheet changed: your selected slot is no longer the same. Selection cleared.");
     }
-  }, 200);
+  }
+
+  // Scroll the NOW row into view only on first load or when the pilot asked (not on the auto refresh)
+  if (opts && opts.scrollToNow) {
+    setTimeout(() => {
+      const nr = document.getElementById('ctNowRow');
+      if(nr) nr.scrollIntoView({inline:'center', block:'nearest', behavior:'smooth'});
+    }, 200);
+  }
 }
 
 
@@ -1870,6 +1916,33 @@ function updateBookModalTitle() {
   const lane = document.querySelector('input[name="bookLane"]:checked')?.value || '';
   document.getElementById('bookModalTitle').textContent =
     lane === 'ARR' ? 'BOOK APPROACH SLOT' : 'BOOK CIRCUIT SLOT';
+  // Approach (ARR) is one 15-minute slot: set the end time to match
+  const st = document.getElementById('bookStart').value.trim();
+  if (lane === 'ARR' && validateDepTime(st)) document.getElementById('bookEnd').value = toHHMM(toMins(st) + 15);
+}
+
+// Checks typed slot times. Returns '' if fine, otherwise the problem in plain English.
+// forBooking = true also checks length, the past, and ATC's sheet.
+function checkSlotTimes(lane, start, end, forBooking) {
+  if (!validateDepTime(start)) return 'Enter a valid start time (HH:MM, UTC).';
+  if (!validateDepTime(end))   return 'Enter a valid end time (HH:MM, UTC).';
+  const s = toMins(start);
+  const e = (end === '00:00' && s > 0) ? 1440 : toMins(end);   // 00:00 = midnight at the end of the day
+  if (s % 15 || e % 15) return 'ATC slots are in 15-minute steps: use :00, :15, :30 or :45.';
+  if (e <= s) return 'The end time must be after the start time.';
+  if (!forBooking) return '';
+  if (lane === 'ARR' && e - s > 15) return 'Approach (ARR) bookings are one 15-minute slot only.';
+  if (e - s > 60) return 'The longest booking is 60 minutes.';
+  if (s + 15 <= nowUTCMins()) return 'That start time has already passed (times are UTC).';
+  if (slotsBlocks) {
+    for (let t = s; t < e; t += 15) {
+      const v = (slotsBlocks[toHHMM(t) + '|' + lane] || '').trim();
+      if (v.toUpperCase().replace(/[\s-]/g, '') !== 'AVBL') {
+        return toHHMM(t) + ' on ' + lane + " isn't available on ATC's sheet (" + (v || 'closed') + ').';
+      }
+    }
+  }
+  return '';
 }
 
 function closeBookModal(e) {
@@ -1887,8 +1960,8 @@ async function submitBookSlot() {
   const err   = document.getElementById('bookErr');
 
   if(!ac)    { err.textContent = 'Please select an aircraft.'; return; }
-  if(!start || !/^\d{2}:\d{2}$/.test(start)) { err.textContent = 'Enter a valid start time (HH:MM).'; return; }
-  if(!end   || !/^\d{2}:\d{2}$/.test(end))   { err.textContent = 'Enter a valid end time (HH:MM).'; return; }
+  const timeProblem = checkSlotTimes(lane, start, end, true);
+  if(timeProblem) { err.textContent = timeProblem; return; }
   if(!name)  { err.textContent = 'Please enter your name.'; return; }
   err.textContent = '';
 
@@ -1916,7 +1989,7 @@ async function submitBookSlot() {
   await sendFromModal(subject, body, 'bookSubmitBtn', err, () => {
     document.getElementById('bookModalOverlay').classList.remove('open');
     showSlotsToast(`✓ Slot request sent: ${ac} ${lane} ${start}–${end}`);
-    loadSlots();
+    loadSlots({ auto: true });
   });
 }
 
@@ -1949,8 +2022,8 @@ async function submitCancelSlot() {
   const reason = document.getElementById('cancelReason').value.trim();
   const err    = document.getElementById('cancelErr');
 
-  if(!start || !/^\d{2}:\d{2}$/.test(start)) { err.textContent = 'Enter a valid start time (HH:MM).'; return; }
-  if(!end   || !/^\d{2}:\d{2}$/.test(end))   { err.textContent = 'Enter a valid end time (HH:MM).'; return; }
+  const timeProblem = checkSlotTimes(lane, start, end, false);
+  if(timeProblem) { err.textContent = timeProblem; return; }
   if(!reg)   { err.textContent = 'Enter the aircraft registration.'; return; }
   if(!name)  { err.textContent = 'Enter your name for the log.'; return; }
   err.textContent = '';
@@ -1986,7 +2059,7 @@ async function submitCancelSlot() {
     renderCancelLog();
     document.getElementById('cancelModalOverlay').classList.remove('open');
     showSlotsToast(`✓ Cancellation sent: ${reg} ${lane} ${start}–${end}`);
-    loadSlots();
+    loadSlots({ auto: true });
   });
 }
 
@@ -2074,10 +2147,13 @@ function onBlockClick(tMins, lane, type, reg) {
   // Only allow selecting AVBL or LSA fleet blocks
   if(type !== 'avbl' && type !== 'lsa') return;
 
-  // If existing selection is different lane or different type — clear and start fresh
+  // Slots that have already finished can't be booked or changed
+  if(tMins + 15 <= nowUTCMins()) { showSlotsToast('That slot has already passed (times are UTC).'); return; }
+
+  // Different lane, different type, or a different aircraft: clear and start fresh
   if(ctSelection.length > 0) {
     const firstSel = ctSelection[0];
-    if(firstSel.lane !== lane || firstSel.type !== type) {
+    if(firstSel.lane !== lane || firstSel.type !== type || (type === 'lsa' && firstSel.reg !== reg)) {
       clearSelection();
     }
   }
@@ -2089,8 +2165,8 @@ function onBlockClick(tMins, lane, type, reg) {
     return;
   }
 
-  // Check max 4 (60 mins)
-  if(ctSelection.length >= 4) {
+  // Maximum 4 blocks (60 min); approach (ARR) is one 15-minute slot only
+  if(ctSelection.length >= (lane === 'ARR' ? 1 : 4)) {
     clearSelection();
   }
 
@@ -2264,7 +2340,7 @@ Sent from LSA Bookings App`;
   await sendFromModal(subject, body, 'amendSubmitBtn', err, () => {
     document.getElementById('amendModalOverlay').classList.remove('open');
     showSlotsToast('✓ Amendment sent: ' + oldReg + ' → ' + newReg + ' · ' + lane + ' ' + start + '–' + end);
-    loadSlots();
+    loadSlots({ auto: true });
   });
 }
 
